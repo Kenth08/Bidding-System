@@ -2,7 +2,7 @@
 import StatCard from "../../components/shared/StatCard";
 import StatusBadge from "../../components/shared/StatusBadge";
 
-export default function SupplierDashboard({ supplierProjects, supplierBids, user }) {
+export default function SupplierDashboard({ supplierProjects, supplierBids, user, setActivePage }) {
   const stats = {
     available: supplierProjects.length,
     myBids: supplierBids.length,
@@ -29,7 +29,7 @@ export default function SupplierDashboard({ supplierProjects, supplierBids, user
           <div className="px-5 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Active Projects</h3></div>
           <div className="divide-y divide-slate-50">
             {supplierProjects.slice(0, 3).map((project) => (
-              <div key={project.id} className="px-5 py-3 flex items-center justify-between"><div><p className="text-sm font-medium text-slate-800">{project.title}</p><p className="text-xs text-slate-500">Deadline: {project.deadline}</p></div><button className="text-xs font-semibold text-emerald-600">Bid Now</button></div>
+              <div key={project.id} className="px-5 py-3 flex items-center justify-between"><div><p className="text-sm font-medium text-slate-800">{project.title}</p><p className="text-xs text-slate-500">Deadline: {project.deadline}</p></div><button onClick={() => setActivePage?.("available-projects")} className="text-xs font-semibold text-emerald-600">Bid Now</button></div>
             ))}
           </div>
         </div>

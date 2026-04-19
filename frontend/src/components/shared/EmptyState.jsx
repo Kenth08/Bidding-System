@@ -1,6 +1,16 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\EmptyState.jsx
 import { ClipboardList } from "lucide-react";
 
+/**
+ * @param {{
+ * icon?: import('react').ComponentType<{ className?: string }>,
+ * title?: string,
+ * subtitle?: string,
+ * actionLabel?: string,
+ * onAction?: () => void,
+ * label?: string
+ * }} props
+ */
 export default function EmptyState({
   icon: Icon = ClipboardList,
   title = "No records found",

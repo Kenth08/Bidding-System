@@ -34,7 +34,7 @@ export default function AdminBlockchain({ blockchainRecords }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6"><div><h1 className="text-lg font-bold text-slate-900">Blockchain Records</h1><p className="text-sm text-slate-500 mt-0.5">Immutable procurement logs</p></div></div>
-      <div className="mb-5 rounded-2xl bg-slate-900 text-white p-4 flex items-center gap-3"><Shield className="h-5 w-5 text-emerald-400" /><p className="text-sm">All entries are immutable and blockchain-verified</p></div>
+      <div className="mb-5 rounded-2xl bg-slate-900 text-white p-4 flex items-center gap-3"><Shield className="h-5 w-5 text-emerald-400" /><p className="text-sm flex-1">All entries are immutable and blockchain-verified</p><div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /><span className="text-xs font-semibold text-emerald-300">Live</span></div></div>
 
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <div className="px-6 py-3 border-b border-slate-50"><SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by project or winner" /></div>

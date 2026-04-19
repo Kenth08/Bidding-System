@@ -1,5 +1,8 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\LoadingSkeleton.jsx
-export default function LoadingSkeleton({ rows = 5, cols = 4 }) {
+/**
+ * @param {{ rows?: number }} props
+ */
+export default function LoadingSkeleton({ rows = 5 }) {
   return (
     <div className="animate-pulse space-y-3">
       {Array.from({ length: rows }).map((_, rowIndex) => (

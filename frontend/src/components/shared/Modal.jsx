@@ -8,6 +8,16 @@ const SIZE_CLASS = {
   lg: "max-w-lg",
 };
 
+/**
+ * @param {{
+ * isOpen: boolean,
+ * onClose: () => void,
+ * title?: string,
+ * subtitle?: string,
+ * size?: 'sm'|'md'|'lg',
+ * children: import('react').ReactNode
+ * }} props
+ */
 export default function Modal({ isOpen, onClose, title, subtitle, children, size = "lg" }) {
   useEffect(() => {
     if (!isOpen) return undefined;

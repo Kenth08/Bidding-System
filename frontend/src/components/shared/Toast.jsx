@@ -1,5 +1,4 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\Toast.jsx
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\Toast.jsx
 import { useEffect } from "react";
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 
@@ -18,6 +17,14 @@ const TOAST_STYLE = {
   },
 };
 
+/**
+ * @param {{
+ * message: string,
+ * type?: 'success'|'error'|'warning',
+ * isVisible: boolean,
+ * onClose?: () => void
+ * }} props
+ */
 export default function Toast({ message, type = "success", isVisible, onClose }) {
   useEffect(() => {
     if (!isVisible || !onClose) return undefined;

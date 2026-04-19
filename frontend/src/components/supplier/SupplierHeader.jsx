@@ -150,7 +150,7 @@ export default function SupplierHeader({ title, subtitle, notifications, user, s
         </button>
         <div>
           <h1 className="text-base font-semibold text-slate-800">{title}</h1>
-          <p className="mt-0.5 text-xs text-slate-400">{displayDate}</p>
+          <p className="mt-0.5 text-xs text-slate-400">{subtitle || displayDate}</p>
         </div>
       </div>
 

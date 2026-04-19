@@ -19,6 +19,12 @@ const ICON_MAP = {
   Users,
 };
 
+/**
+ * @param {{
+ * notifications?: Array<{id: string|number, icon: string, title: string, subtitle: string, time: string, read: boolean}>,
+ * onMarkAllRead?: () => void
+ * }} props
+ */
 export default function NotificationPanel({ notifications = [], onMarkAllRead }) {
   const unreadCount = notifications.filter((item) => !item.read).length;
 

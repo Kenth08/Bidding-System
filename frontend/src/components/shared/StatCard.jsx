@@ -1,8 +1,16 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\StatCard.jsx
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\StatCard.jsx
 import { BarChart3 } from "lucide-react";
 
-export default function StatCard({ title, value, icon: Icon, accentLine = false }) {
+/**
+ * @param {{
+ * title: string,
+ * value: string|number,
+ * icon?: import('react').ComponentType<{ className?: string }>,
+ * subtitle?: string,
+ * accentLine?: boolean
+ * }} props
+ */
+export default function StatCard({ title, value, icon: Icon, subtitle = "Updated just now", accentLine = false }) {
   const ResolvedIcon = Icon || BarChart3;
 
   return (
@@ -18,7 +26,7 @@ export default function StatCard({ title, value, icon: Icon, accentLine = false 
         </div>
       </div>
       <div className="mt-3 border-t border-slate-50 pt-3">
-        <p className="text-xs text-slate-400">Updated just now</p>
+        <p className="text-xs text-slate-400">{subtitle}</p>
       </div>
     </article>
   );

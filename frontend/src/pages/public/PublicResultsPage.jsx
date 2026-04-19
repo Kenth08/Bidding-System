@@ -17,6 +17,14 @@ function shortHash(hash) {
   return `${hash.slice(0, 18)}...`;
 }
 
+function formatPeso(value) {
+  if (typeof value !== "number") {
+    return value;
+  }
+
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
+}
+
 export default function PublicResultsPage({ records = MOCK_BLOCKCHAIN_RECORDS, onBack }) {
   const [search, setSearch] = useState("");
 
@@ -26,7 +34,7 @@ export default function PublicResultsPage({ records = MOCK_BLOCKCHAIN_RECORDS, o
         id: item.id,
         projectName: item.projectName || item.projectId || "Untitled Project",
         winner: item.winner || "Not available",
-        bidAmount: item.bidAmount || "N/A",
+        bidAmount: formatPeso(item.bidAmount ?? "N/A"),
         awardDate: item.awardDate || item.timestamp || "N/A",
         hash: item.hash || "",
       })),

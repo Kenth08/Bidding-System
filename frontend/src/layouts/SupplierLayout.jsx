@@ -25,6 +25,13 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
   const [bidDraft, setBidDraft] = useState({ bidAmount: "", proposal: "" });
 
   const supplierProjects = MOCK_PROJECTS.filter((project) => project.status === "Active");
+  const pageMeta = useMemo(() => {
+    if (currentPage === "available-projects") return { title: "Available Projects", subtitle: "Browse active opportunities and submit proposals" };
+    if (currentPage === "my-bids") return { title: "My Bids", subtitle: "Track submitted bids and evaluation status" };
+    if (currentPage === "results") return { title: "Results", subtitle: "View blockchain-verified procurement outcomes" };
+    return { title: "Supplier Dashboard", subtitle: "Overview of projects, bids, and latest updates" };
+  }, [currentPage]);
+
   const page = useMemo(() => {
     if (currentPage === "available-projects") {
       return (
@@ -43,9 +50,9 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
         />
       );
     }
-    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} />;
+    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
     if (currentPage === "results") return <SupplierResults supplierResults={MOCK_RESULTS} />;
-    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} />;
+    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
   }, [activeUser, bidDraft, currentPage, selectedProject, showBidModal, supplierBids, supplierProjectFilter, supplierProjects]);
 
   return (
@@ -53,8 +60,8 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
       <SupplierSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={activeUser} />
       <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-[248px]">
         <SupplierHeader
-          title="Supplier Workspace"
-          subtitle="Manage projects, bids, and results"
+          title={pageMeta.title}
+          subtitle={pageMeta.subtitle}
           notifications={MOCK_NOTIFICATIONS.supplier}
           user={activeUser}
           setSidebarOpen={setSidebarOpen}

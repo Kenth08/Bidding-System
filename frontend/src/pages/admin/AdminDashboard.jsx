@@ -10,7 +10,7 @@ export default function AdminDashboard({ projects, bids, blockchainRecords, setA
   const stats = {
     projects: projects.length,
     bids: bids.length,
-    active: projects.filter((project) => project.status === "Active").length,
+    awarded: projects.filter((project) => project.status === "Awarded").length,
     recorded: blockchainRecords.length,
   };
 
@@ -21,14 +21,14 @@ export default function AdminDashboard({ projects, bids, blockchainRecords, setA
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard title="Total Projects" value={stats.projects} />
         <StatCard title="Total Bids" value={stats.bids} />
-        <StatCard title="Active Bidding" value={stats.active} />
+        <StatCard title="Awarded Projects" value={stats.awarded} />
         <StatCard title="Blockchain Records" value={stats.recorded} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Recent Projects</h3><p className="text-xs text-slate-400 mt-0.5">Last 5 projects</p></div>
-          <table className="w-full"><thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead><tbody className="divide-y divide-slate-50">{projects.slice(0, 5).map((project) => (<tr key={project.id}><td className="px-6 py-3 text-sm text-slate-700">{project.title}</td><td className="px-6 py-3 text-sm text-slate-600">{formatPeso(project.budget)}</td><td className="px-6 py-3"><StatusBadge status={project.status} /></td></tr>))}</tbody></table>
+          <table className="w-full"><thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead><tbody className="divide-y divide-slate-50">{projects.slice(0, 5).map((project) => (<tr key={project.id}><td className="px-6 py-3 text-sm text-slate-700">{project.title}</td><td className="px-6 py-3 text-sm text-slate-600">{formatPeso(project.budget)}</td><td className="px-6 py-3 text-sm text-slate-600">{project.deadline}</td><td className="px-6 py-3"><StatusBadge status={project.status} /></td></tr>))}</tbody></table>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5">

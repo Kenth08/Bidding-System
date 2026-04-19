@@ -1,5 +1,6 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\supplier\SupplierMyBids.jsx
 import { FileText } from "lucide-react";
+import { Fragment } from "react";
 import { useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import StatusBadge from "../../components/shared/StatusBadge";
@@ -8,7 +9,7 @@ function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-export default function SupplierMyBids({ supplierBids }) {
+export default function SupplierMyBids({ supplierBids, onNavigate }) {
   const [expandedId, setExpandedId] = useState(null);
   const [filter, setFilter] = useState("All");
   const filtered = useMemo(() => supplierBids.filter((bid) => filter === "All" || bid.status === filter), [filter, supplierBids]);
@@ -46,10 +47,10 @@ export default function SupplierMyBids({ supplierBids }) {
           <thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project Name</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Bid Amount</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Company</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Submitted</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead>
           <tbody className="divide-y divide-slate-50">
             {filtered.length === 0 ? (
-              <tr><td colSpan={5}><EmptyState icon={FileText} title="No bids yet" subtitle="Browse active projects and submit your first bid." actionLabel="Browse Projects" /></td></tr>
+              <tr><td colSpan={5}><EmptyState icon={FileText} title="No bids yet" subtitle="Browse active projects and submit your first bid." actionLabel="Browse Projects" onAction={() => onNavigate?.("available-projects")} /></td></tr>
             ) : filtered.map((bid) => (
-              <>
-                <tr key={bid.id} onClick={() => setExpandedId((prev) => (prev === bid.id ? null : bid.id))} className="hover:bg-slate-50/50 transition-colors cursor-pointer">
+              <Fragment key={bid.id}>
+                <tr onClick={() => setExpandedId((prev) => (prev === bid.id ? null : bid.id))} className="hover:bg-slate-50/50 transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">{bid.projectTitle || bid.projectName}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(bid.bidAmount)}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{bid.company}</td>
@@ -59,7 +60,7 @@ export default function SupplierMyBids({ supplierBids }) {
                 {expandedId === bid.id && (
                   <tr><td colSpan={5} className="px-6 py-3 bg-slate-50/70 text-sm text-slate-600">{bid.proposal}</td></tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -21,6 +21,9 @@ const STATUS_CLASS_MAP = {
   viewer: "border border-slate-200 bg-slate-100 text-slate-500",
 };
 
+/**
+ * @param {{ status: string, className?: string }} props
+ */
 export default function StatusBadge({ status, className = "" }) {
   const tone = STATUS_CLASS_MAP[status] || "border border-slate-200 bg-slate-100 text-slate-500";
   return (

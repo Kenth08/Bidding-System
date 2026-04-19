@@ -1,6 +1,14 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\SearchBar.jsx
 import { Search } from "lucide-react";
 
+/**
+ * @param {{
+ * value: string,
+ * onChange: (event: import('react').ChangeEvent<HTMLInputElement>) => void,
+ * placeholder?: string,
+ * className?: string
+ * }} props
+ */
 export default function SearchBar({ value, onChange, placeholder = "Search...", className = "" }) {
   return (
     <div className={`relative ${className}`}>

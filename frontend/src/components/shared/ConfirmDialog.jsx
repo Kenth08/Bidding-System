@@ -1,6 +1,19 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\ConfirmDialog.jsx
 import Modal from "./Modal";
 
+/**
+ * @param {{
+ * isOpen: boolean,
+ * onClose: () => void,
+ * onConfirm: () => void,
+ * title: string,
+ * message: string,
+ * confirmLabel?: string,
+ * confirmVariant?: 'danger'|'primary',
+ * icon?: import('react').ReactNode,
+ * infoCard?: import('react').ReactNode
+ * }} props
+ */
 export default function ConfirmDialog({
   isOpen,
   onClose,

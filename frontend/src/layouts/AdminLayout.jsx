@@ -17,6 +17,16 @@ export default function AdminLayout({ currentUser, onLogout }) {
   const [users, setUsers] = useState(MOCK_USERS);
   const [bids, setBids] = useState(MOCK_BIDS);
   const [blockchainRecords, setBlockchainRecords] = useState(MOCK_BLOCKCHAIN_RECORDS);
+  const suppliers = useMemo(() => users.filter((user) => user.role === "supplier"), [users]);
+
+  const pageMeta = useMemo(() => {
+    if (currentPage === "projects") return { title: "Project Management", subtitle: "Create, update, and monitor procurement projects" };
+    if (currentPage === "suppliers") return { title: "Supplier Management", subtitle: "Review registrations and supplier status" };
+    if (currentPage === "bids") return { title: "Bid Evaluation", subtitle: "Review proposals and select project winners" };
+    if (currentPage === "users") return { title: "User Accounts", subtitle: "Manage access, roles, and account status" };
+    if (currentPage === "records") return { title: "Blockchain Records", subtitle: "Inspect immutable procurement ledger entries" };
+    return { title: "Admin Dashboard", subtitle: "Overview of projects, bids, and blockchain activity" };
+  }, [currentPage]);
 
   const page = useMemo(() => {
     if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} />;
@@ -32,14 +42,14 @@ export default function AdminLayout({ currentUser, onLogout }) {
       <AdminSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} />
       <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-[248px]">
         <AdminHeader
-          title="Admin Workspace"
-          subtitle="Manage projects, suppliers, bids, and records"
+          title={pageMeta.title}
+          subtitle={pageMeta.subtitle}
           notifications={MOCK_NOTIFICATIONS.admin}
           currentUser={currentUser}
           setSidebarOpen={setSidebarOpen}
           onLogout={onLogout}
           projects={projects}
-          suppliers={[]}
+          suppliers={suppliers}
           bids={bids}
           blockchainRecords={blockchainRecords}
         />
