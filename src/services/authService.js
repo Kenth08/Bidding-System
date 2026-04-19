@@ -1,70 +1,39 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\services\authService.js
+import { execute, initializeDatabase, query } from "../lib/database";
 
-const USERS_KEY = "eprocurement_users";
-
-function readUsers() {
-  try {
-    const raw = localStorage.getItem(USERS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function ensureSeedAdmin() {
-  const users = readUsers();
-  const hasAdmin = users.some((user) => user.email === "admin@gmail.com" && user.role === "admin");
-
-  if (!hasAdmin) {
-    users.push({
-      id: users.length ? Math.max(...users.map((user) => Number(user.id) || 0)) + 1 : 1,
-      full_name: "Administrator",
-      email: "admin@gmail.com",
-      password: "admin123",
-      role: "admin",
-      status: "Active",
-      company_name: "",
-      company_address: "",
-      phone: "",
-      business_type: "",
-      created_at: new Date().toISOString(),
-    });
-    writeUsers(users);
-  }
-
-  return users;
+function normalize(row) {
+  return {
+    id: String(row.id),
+    full_name: row.full_name,
+    fullName: row.full_name,
+    email: row.email,
+    password: row.password,
+    role: row.role,
+    status: row.status,
+    company_name: row.company_name,
+    company_address: row.company_address,
+    phone: row.phone,
+    business_type: row.business_type,
+    created_at: row.created_at,
+  };
 }
 
 export async function loginUser(email, password) {
   try {
-    const users = ensureSeedAdmin();
+    await initializeDatabase();
     const normalizedEmail = email.trim().toLowerCase();
-    const user = users.find((item) => item.email === normalizedEmail && item.password === password);
+    const rows = await query(
+      "SELECT * FROM users WHERE email = ? AND password = ? LIMIT 1;",
+      [normalizedEmail, password]
+    );
+    const user = rows[0] ? normalize(rows[0]) : null;
 
-    if (!user) {
-      return { user: null, error: "Invalid email or password." };
-    }
-
+    if (!user) return { user: null, error: "Invalid email or password." };
     if (user.role === "supplier" && user.status === "Pending") {
-      return {
-        user: null,
-        error:
-          "Your account is pending admin approval. Please wait for approval before logging in.",
-      };
+      return { user: null, error: "Your account is pending admin approval." };
     }
-
     if (user.role === "supplier" && user.status === "Rejected") {
-      return {
-        user: null,
-        error:
-          "Your registration has been rejected. Please contact the administrator.",
-      };
+      return { user: null, error: "Your registration has been rejected." };
     }
 
     return { user, error: null };
@@ -83,38 +52,37 @@ export async function registerSupplier({
   businessType,
 }) {
   try {
-    const users = ensureSeedAdmin();
+    await initializeDatabase();
     const normalizedEmail = email.trim().toLowerCase();
-
-    const existing = users.find((item) => item.email === normalizedEmail);
-    if (existing) {
-      return { success: false, error: "This email is already registered." };
-    }
 
     if (!fullName || !email || !password || !companyName) {
       return { success: false, error: "Please fill in all required fields." };
     }
-
     if (password.length < 6) {
       return { success: false, error: "Password must be at least 6 characters." };
     }
 
-    const nextId = users.length ? Math.max(...users.map((user) => Number(user.id) || 0)) + 1 : 1;
-    users.push({
-      id: nextId,
-      full_name: fullName.trim(),
-      email: normalizedEmail,
-      password,
-      role: "supplier",
-      status: "Pending",
-      company_name: companyName.trim(),
-      company_address: companyAddress?.trim() || "",
-      phone: phone?.trim() || "",
-      business_type: businessType || "Other",
-      created_at: new Date().toISOString(),
-    });
+    const existing = await query("SELECT id FROM users WHERE email = ? LIMIT 1;", [normalizedEmail]);
+    if (existing.length) {
+      return { success: false, error: "This email is already registered." };
+    }
 
-    writeUsers(users);
+    await execute(
+      `INSERT INTO users (
+        full_name, email, password, role, status, company_name, company_address, phone, business_type, created_at
+      ) VALUES (?, ?, ?, 'supplier', 'Pending', ?, ?, ?, ?, ?);`,
+      [
+        fullName.trim(),
+        normalizedEmail,
+        password,
+        companyName.trim(),
+        companyAddress?.trim() || "",
+        phone?.trim() || "",
+        businessType || "Other",
+        new Date().toISOString(),
+      ]
+    );
+
     return { success: true, error: null };
   } catch {
     return { success: false, error: "Registration failed. Please try again." };
@@ -123,12 +91,11 @@ export async function registerSupplier({
 
 export async function getAllSuppliers() {
   try {
-    const users = ensureSeedAdmin();
-    const data = users
-      .filter((user) => user.role === "supplier")
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    return { data, error: null };
+    await initializeDatabase();
+    const rows = await query(
+      "SELECT * FROM users WHERE role = 'supplier' ORDER BY datetime(created_at) DESC;"
+    );
+    return { data: rows.map(normalize), error: null };
   } catch {
     return { data: [], error: "Failed to load suppliers." };
   }
@@ -136,26 +103,10 @@ export async function getAllSuppliers() {
 
 export async function updateSupplierStatus(id, status) {
   try {
-    const users = ensureSeedAdmin();
-    const updated = users.map((user) =>
-      Number(user.id) === Number(id) && user.role === "supplier"
-        ? { ...user, status }
-        : user
-    );
-    writeUsers(updated);
+    await initializeDatabase();
+    await execute("UPDATE users SET status = ? WHERE id = ? AND role = 'supplier';", [status, Number(id)]);
     return { success: true, error: null };
   } catch {
     return { success: false, error: "Failed to update supplier status." };
-  }
-}
-
-export async function getSupplierById(id) {
-  try {
-    const users = ensureSeedAdmin();
-    const user = users.find((item) => Number(item.id) === Number(id)) || null;
-
-    return { user };
-  } catch {
-    return { user: null };
   }
 }

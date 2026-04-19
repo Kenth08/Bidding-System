@@ -1,235 +1,210 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminProjects.jsx
-import { Pencil, PlusCircle, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FolderOpen, Pencil, PlusCircle, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
-import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
 import Modal from "../../components/shared/Modal";
-import SectionHeader from "../../components/shared/SectionHeader";
+import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
-import TableWrapper from "../../components/shared/TableWrapper";
+import Toast from "../../components/shared/Toast";
 
-function formatCurrency(value) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
+const INITIAL_FORM = { title: "", budget: "", deadline: "", requirements: "", status: "Active" };
+
+function formatPeso(value) {
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-function truncate(text, max = 65) {
-  if (text.length <= max) {
-    return text;
+export default function AdminProjects({ projects, setProjects }) {
+  const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [errors, setErrors] = useState({});
+
+  const filteredProjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return projects.filter((project) => {
+      const matchesFilter = filter === "All" || project.status === filter;
+      const matchesSearch = !query || project.title.toLowerCase().includes(query);
+      return matchesFilter && matchesSearch;
+    });
+  }, [filter, projects, search]);
+
+  function openCreate() {
+    setEditingProject(null);
+    setForm(INITIAL_FORM);
+    setErrors({});
+    setShowModal(true);
   }
-  return `${text.slice(0, max)}...`;
-}
 
-export default function AdminProjects({
-  projects,
-  setProjects,
-  projectFilter,
-  setProjectFilter,
-  showProjectModal,
-  setShowProjectModal,
-  newProject,
-  setNewProject,
-}) {
-  const [isLoading, setIsLoading] = useState(true);
-  const filteredProjects = projectFilter === "All" ? projects : projects.filter((project) => project.status === projectFilter);
+  function openEdit(project) {
+    setEditingProject(project);
+    setForm({
+      title: project.title,
+      budget: String(project.budget),
+      deadline: project.deadline,
+      requirements: project.requirements,
+      status: project.status,
+    });
+    setErrors({});
+    setShowModal(true);
+  }
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 450);
-    return () => clearTimeout(timer);
-  }, []);
+  function validateForm() {
+    const nextErrors = {};
+    if (!form.title.trim()) nextErrors.title = "Project title is required.";
+    if (!form.budget || Number(form.budget) <= 0) nextErrors.budget = "Budget is required.";
+    if (!form.deadline) nextErrors.deadline = "Deadline is required.";
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
 
   function saveProject() {
-    if (!newProject.name.trim() || !newProject.budget || !newProject.deadline || !newProject.requirements.trim()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     const payload = {
-      id: `PRJ-${1000 + projects.length + 1}`,
-      name: newProject.name.trim(),
-      budget: Number(newProject.budget),
-      deadline: newProject.deadline,
-      requirements: newProject.requirements.trim(),
-      status: "Active",
+      id: editingProject ? editingProject.id : String(Date.now()),
+      title: form.title.trim(),
+      name: form.title.trim(),
+      budget: Number(form.budget),
+      deadline: form.deadline,
+      requirements: form.requirements.trim(),
+      status: form.status,
+      createdAt: editingProject?.createdAt || new Date().toISOString().slice(0, 10),
     };
 
-    setProjects((prev) => [payload, ...prev]);
-    setNewProject({ name: "", budget: "", deadline: "", requirements: "" });
-    setShowProjectModal(false);
-    setProjectFilter("All");
+    if (editingProject) {
+      setProjects((prev) => prev.map((item) => (item.id === editingProject.id ? payload : item)));
+      setToast({ message: "Project updated successfully", type: "success" });
+    } else {
+      setProjects((prev) => [payload, ...prev]);
+      setToast({ message: "Project created successfully", type: "success" });
+    }
+    setShowModal(false);
   }
 
-  function deleteProject(projectId) {
-    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  function confirmDelete() {
+    setProjects((prev) => prev.filter((item) => item.id !== deletingId));
+    setDeletingId(null);
+    setShowConfirm(false);
+    setToast({ message: "Project deleted", type: "warning" });
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <SectionHeader title="Projects" subtitle="Create and manage procurement projects" />
-        <button
-          type="button"
-          onClick={() => setShowProjectModal(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-emerald-600 active:scale-95"
-        >
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900">Projects</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Create and manage procurement projects</p>
+        </div>
+        <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">
           <PlusCircle className="h-4 w-4" />
           Create New Project
         </button>
       </div>
 
-      <div className="mb-5 flex gap-1 border-b border-slate-100">
-        {["All", "Active", "Closed", "Awarded"].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setProjectFilter(tab)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-              projectFilter === tab
-                ? "border-emerald-500 text-emerald-600"
-                : "border-transparent text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <TableWrapper>
-        {isLoading ? (
-          <LoadingSkeleton rows={6} cols={6} />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Project Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Budget</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Deadline</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Requirements</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-              {filteredProjects.length ? (
-                filteredProjects.map((project) => (
-                  <tr key={project.id} className="group transition-colors duration-100 hover:bg-slate-50/50">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{project.name}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{formatCurrency(project.budget)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{project.deadline}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500" title={project.requirements}>
-                      {truncate(project.requirements, 54)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={project.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all duration-150 hover:bg-slate-100 hover:text-slate-600"
-                          aria-label={`Edit ${project.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteProject(project.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all duration-150 hover:bg-slate-100 hover:text-slate-600"
-                          aria-label={`Delete ${project.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6}>
-                    <EmptyState />
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="px-6 pt-4 flex gap-4 border-b border-slate-50">
+          {["All", "Active", "Closed", "Awarded"].map((tab) => (
+            <button key={tab} onClick={() => setFilter(tab)} className={`pb-3 text-sm font-medium border-b-2 ${filter === tab ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-400"}`}>
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="px-6 py-3 border-b border-slate-50">
+          <SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by project title" />
+        </div>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-slate-50/50 border-b border-slate-100">
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-3">Project Name</th>
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-3">Budget</th>
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-3">Deadline</th>
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-3">Requirements</th>
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-3">Status</th>
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {filteredProjects.length === 0 ? (
+              <tr><td colSpan={6}><EmptyState icon={FolderOpen} title="No projects found" subtitle="Try a different filter or search keyword." /></td></tr>
+            ) : (
+              filteredProjects.map((project) => (
+                <tr key={project.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-800">{project.title}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(project.budget)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{project.deadline}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{project.requirements.length > 40 ? `${project.requirements.slice(0, 40)}...` : project.requirements}</td>
+                  <td className="px-6 py-4"><StatusBadge status={project.status} /></td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openEdit(project)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => { setDeletingId(project.id); setShowConfirm(true); }} className="p-2 rounded-lg hover:bg-slate-100 text-red-500"><Trash2 className="h-4 w-4" /></button>
+                    </div>
                   </td>
                 </tr>
-              )}
-            </tbody>
-            </table>
-          </div>
-        )}
-      </TableWrapper>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      <Modal
-        isOpen={showProjectModal}
-        onClose={() => setShowProjectModal(false)}
-        title="Create New Project"
-        subtitle="Add procurement details and publish a new bidding project"
-      >
-
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingProject ? "Edit Project" : "Create New Project"} subtitle="Manage project details" size="lg">
         <div className="grid gap-4">
-          <label className="grid gap-1.5">
-            <span className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Project Name</span>
-            <input
-              type="text"
-              value={newProject.name}
-              onChange={(event) => setNewProject((prev) => ({ ...prev, name: event.target.value }))}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              placeholder="e.g. Smart Street Lighting"
-            />
-          </label>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-1.5">
-              <span className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Budget</span>
-              <input
-                type="number"
-                value={newProject.budget}
-                onChange={(event) => setNewProject((prev) => ({ ...prev, budget: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                placeholder="250000"
-              />
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Deadline</span>
-              <input
-                type="date"
-                value={newProject.deadline}
-                onChange={(event) => setNewProject((prev) => ({ ...prev, deadline: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              />
-            </label>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Project Title <span className="text-red-400">*</span></label>
+            <input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />
+            {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
           </div>
-
-          <label className="grid gap-1.5">
-            <span className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Requirements</span>
-            <textarea
-              rows={4}
-              value={newProject.requirements}
-              onChange={(event) => setNewProject((prev) => ({ ...prev, requirements: event.target.value }))}
-              className="resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              placeholder="List project scope, qualifications, and deliverables"
-            />
-          </label>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-0 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowProjectModal(false)}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={saveProject}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-emerald-600"
-          >
-            Save
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Budget P <span className="text-red-400">*</span></label>
+              <input type="number" value={form.budget} onChange={(event) => setForm((prev) => ({ ...prev, budget: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />
+              {errors.budget && <p className="text-xs text-red-500 mt-1">{errors.budget}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Deadline <span className="text-red-400">*</span></label>
+              <input type="date" value={form.deadline} onChange={(event) => setForm((prev) => ({ ...prev, deadline: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />
+              {errors.deadline && <p className="text-xs text-red-500 mt-1">{errors.deadline}</p>}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Requirements</label>
+            <textarea rows={4} value={form.requirements} onChange={(event) => setForm((prev) => ({ ...prev, requirements: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Status</label>
+            <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+              <option>Active</option><option>Closed</option><option>Awarded</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button>
+            <button onClick={saveProject} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Save</button>
+          </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Project?"
+        message="This action cannot be undone. All associated bids will also be removed."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+      />
+
+      <Toast
+        message={toast?.message || ""}
+        type={toast?.type || "success"}
+        isVisible={Boolean(toast)}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }

@@ -1,145 +1,105 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminSuppliers.jsx
-import { useEffect, useState } from "react";
+import { Eye, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
-import SectionHeader from "../../components/shared/SectionHeader";
 import StatusBadge from "../../components/shared/StatusBadge";
-import TableWrapper from "../../components/shared/TableWrapper";
+import Toast from "../../components/shared/Toast";
 import { getAllSuppliers, updateSupplierStatus } from "../../services/authService";
 
-export default function AdminSuppliers({ suppliers, setSuppliers, supplierSearch, setSupplierSearch }) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const normalizedQuery = supplierSearch.trim().toLowerCase();
-  const filteredSuppliers = suppliers.filter((supplier) =>
-    String(supplier.full_name || supplier.name || "").toLowerCase().includes(normalizedQuery)
-  );
+export default function AdminSuppliers() {
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [viewingSupplier, setViewingSupplier] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    async function load() {
-      setIsLoading(true);
-      const { data, error } = await getAllSuppliers();
-      if (!error) {
-        setSuppliers(data);
-      }
-      setIsLoading(false);
+    async function loadSuppliers() {
+      setLoading(true);
+      const { data } = await getAllSuppliers();
+      setSuppliers(data);
+      setLoading(false);
     }
-
-    load();
+    loadSuppliers();
   }, []);
 
-  async function handleApprove(id) {
-    const { success } = await updateSupplierStatus(id, "Approved");
-    if (success) {
-      setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status: "Approved" } : supplier)));
-    }
-  }
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return suppliers.filter((supplier) => {
+      const statusMatch = filter === "All" || supplier.status === filter;
+      const text = `${supplier.full_name} ${supplier.company_name}`.toLowerCase();
+      return statusMatch && (!query || text.includes(query));
+    });
+  }, [filter, search, suppliers]);
 
-  async function handleReject(id) {
-    const { success } = await updateSupplierStatus(id, "Rejected");
-    if (success) {
-      setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status: "Rejected" } : supplier)));
-    }
+  async function changeStatus(id, status) {
+    const { success } = await updateSupplierStatus(id, status);
+    if (!success) return;
+    setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status } : supplier)));
+    setToast({ message: status === "Approved" ? "Supplier approved" : "Supplier rejected", type: status === "Approved" ? "success" : "warning" });
   }
 
   return (
-    <div className="space-y-5">
-      <div className="space-y-4">
-        <SectionHeader title="Suppliers" subtitle="Manage and approve registered suppliers" />
-        <SearchBar
-          value={supplierSearch}
-          onChange={(event) => setSupplierSearch(event.target.value)}
-          placeholder="Search supplier by name..."
-        />
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900">Suppliers</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Review registrations and update approval status</p>
+        </div>
       </div>
 
-      <TableWrapper>
-        {isLoading ? (
-          <LoadingSkeleton rows={5} cols={6} />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Supplier Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Company</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Registered Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-              {filteredSuppliers.length ? (
-                filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="transition-colors duration-100 hover:bg-slate-50/50">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{supplier.full_name || supplier.name || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{supplier.company_name || supplier.company || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{supplier.email || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{supplier.created_at || supplier.registeredDate || "-"}</td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={supplier.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(supplier.id)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 px-3 py-2 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(supplier.id)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-red-100 px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSupplier(supplier)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-50"
-                        >
-                          View Details
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6}>
-                    <EmptyState />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            </table>
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="px-6 pt-4 flex gap-4 border-b border-slate-50">
+          {["All", "Pending", "Approved", "Rejected"].map((tab) => (
+            <button key={tab} onClick={() => setFilter(tab)} className={`pb-3 text-sm font-medium border-b-2 ${filter === tab ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-400"}`}>{tab}</button>
+          ))}
+        </div>
+        <div className="px-6 py-3 border-b border-slate-50"><SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or company" /></div>
+
+        <table className="w-full">
+          <thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Full Name</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Company</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Email</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Phone</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Business Type</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Registered</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th></tr></thead>
+          <tbody className="divide-y divide-slate-50">
+            {loading ? (
+              <LoadingSkeleton rows={5} />
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={8}><EmptyState icon={Users} title="No suppliers registered yet" subtitle="New supplier registrations will appear here." /></td></tr>
+            ) : filtered.map((supplier) => (
+              <tr key={supplier.id} className="hover:bg-slate-50/50 transition-colors group">
+                <td className="px-6 py-4 text-sm font-medium text-slate-800">{supplier.full_name}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.company_name}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.email}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.phone || "-"}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_type || "-"}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.created_at?.slice(0, 10)}</td>
+                <td className="px-6 py-4"><StatusBadge status={supplier.status} /></td>
+                <td className="px-6 py-4"><div className="flex gap-2"><button onClick={() => setViewingSupplier(supplier)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Eye className="h-4 w-4" /></button>{supplier.status !== "Approved" && <button onClick={() => changeStatus(supplier.id, "Approved")} className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600">Approve</button>}{supplier.status !== "Rejected" && <button onClick={() => changeStatus(supplier.id, "Rejected")} className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">Reject</button>}</div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal isOpen={Boolean(viewingSupplier)} onClose={() => setViewingSupplier(null)} title="Supplier Profile" subtitle="Registration details" size="md">
+        {viewingSupplier && (
+          <div className="space-y-3 text-sm text-slate-700">
+            <div className="mx-auto h-14 w-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl font-bold">{viewingSupplier.full_name?.charAt(0) || "S"}</div>
+            <p><span className="font-semibold">Full Name:</span> {viewingSupplier.full_name}</p>
+            <p><span className="font-semibold">Email:</span> {viewingSupplier.email}</p>
+            <p><span className="font-semibold">Company:</span> {viewingSupplier.company_name}</p>
+            <p><span className="font-semibold">Address:</span> {viewingSupplier.company_address || "-"}</p>
+            <p><span className="font-semibold">Phone:</span> {viewingSupplier.phone || "-"}</p>
+            <p><span className="font-semibold">Business Type:</span> {viewingSupplier.business_type || "-"}</p>
+            <p><span className="font-semibold">Registered Date:</span> {viewingSupplier.created_at?.slice(0, 10)}</p>
+            <StatusBadge status={viewingSupplier.status} />
           </div>
         )}
-      </TableWrapper>
-
-      <Modal
-        isOpen={Boolean(selectedSupplier)}
-        onClose={() => setSelectedSupplier(null)}
-        title="Supplier Details"
-        subtitle="Review supplier profile and registration info"
-      >
-        {selectedSupplier ? (
-          <div className="space-y-2 text-sm text-slate-600">
-            <p><span className="font-semibold text-slate-800">Name:</span> {selectedSupplier.full_name || selectedSupplier.name || "-"}</p>
-            <p><span className="font-semibold text-slate-800">Company:</span> {selectedSupplier.company_name || selectedSupplier.company || "-"}</p>
-            <p><span className="font-semibold text-slate-800">Email:</span> {selectedSupplier.email || "-"}</p>
-            <p><span className="font-semibold text-slate-800">Registered Date:</span> {selectedSupplier.created_at || selectedSupplier.registeredDate || "-"}</p>
-            <div className="pt-2">
-              <StatusBadge status={selectedSupplier.status} />
-            </div>
-          </div>
-        ) : null}
       </Modal>
+
+      <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );
 }

@@ -1,296 +1,153 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminUsers.jsx
-import {
-  Ban,
-  Pencil,
-  PlusCircle,
-  Trash2,
-  Users,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Ban, Eye, EyeOff, Pencil, PlusCircle, Trash2, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
-import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
-import SectionHeader from "../../components/shared/SectionHeader";
 import StatusBadge from "../../components/shared/StatusBadge";
-import TableWrapper from "../../components/shared/TableWrapper";
+import Toast from "../../components/shared/Toast";
 
-const ROLE_CLASS = {
-  admin: "border border-blue-100 bg-blue-50 text-blue-600",
-  supplier: "border border-emerald-100 bg-emerald-50 text-emerald-700",
-  viewer: "border border-slate-200 bg-slate-100 text-slate-500",
-};
+const INITIAL_FORM = { fullName: "", email: "", password: "", role: "supplier", status: "Active" };
 
-const INITIAL_USER = {
-  fullName: "",
-  email: "",
-  password: "",
-  role: "supplier",
-  status: "Active",
-};
-
-export default function AdminUsers({ users, setUsers }) {
-  const [roleFilter, setRoleFilter] = useState("All");
-  const [search, setSearch] = useState("");
+export default function AdminUsers({ users, setUsers, currentUser }) {
   const [showModal, setShowModal] = useState(false);
-  const [userForm, setUserForm] = useState(INITIAL_USER);
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [editingUser, setEditingUser] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [toast, setToast] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 450);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const filteredUsers = useMemo(() => {
+  const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-
-    return users.filter((item) => {
-      const roleMatch = roleFilter === "All" || item.role === roleFilter.toLowerCase();
-      const searchMatch =
-        !query ||
-        item.fullName.toLowerCase().includes(query) ||
-        item.email.toLowerCase().includes(query);
-
+    return users.filter((user) => {
+      const roleMatch = filter === "All" || user.role.toLowerCase() === filter.toLowerCase();
+      const searchMatch = !query || user.fullName.toLowerCase().includes(query) || user.email.toLowerCase().includes(query);
       return roleMatch && searchMatch;
     });
-  }, [roleFilter, search, users]);
+  }, [filter, search, users]);
 
-  function openCreateModal() {
-    setEditingUserId(null);
-    setUserForm(INITIAL_USER);
+  function openCreate() {
+    setEditingUser(null);
+    setForm(INITIAL_FORM);
+    setErrors({});
     setShowModal(true);
   }
 
-  function openEditModal(user) {
-    setEditingUserId(user.id);
-    setUserForm({
-      fullName: user.fullName,
-      email: user.email,
-      password: "",
-      role: user.role,
-      status: user.status,
-    });
+  function openEdit(user) {
+    setEditingUser(user);
+    setForm({ ...user, password: "" });
+    setErrors({});
     setShowModal(true);
+  }
+
+  function validate() {
+    const next = {};
+    if (!form.fullName.trim()) next.fullName = "Full name is required.";
+    if (!form.email.trim()) next.email = "Email is required.";
+    if (!editingUser && !form.password.trim()) next.password = "Password is required.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
   function saveUser() {
-    if (!userForm.fullName.trim() || !userForm.email.trim() || (!editingUserId && !userForm.password)) {
-      return;
-    }
-
-    if (editingUserId) {
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === editingUserId
-            ? { ...user, fullName: userForm.fullName.trim(), email: userForm.email.trim(), role: userForm.role, status: userForm.status }
-            : user
-        )
-      );
+    if (!validate()) return;
+    if (editingUser) {
+      setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...form, fullName: form.fullName.trim(), email: form.email.trim() } : u)));
+      setToast({ message: "User updated", type: "success" });
     } else {
       const payload = {
-        id: `${users.length + 1}`,
-        fullName: userForm.fullName.trim(),
-        email: userForm.email.trim(),
-        role: userForm.role,
-        status: userForm.status,
+        id: `u-${Date.now()}`,
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        status: form.status,
         createdAt: new Date().toISOString().slice(0, 10),
       };
       setUsers((prev) => [payload, ...prev]);
+      setToast({ message: "User created", type: "success" });
     }
-
     setShowModal(false);
   }
 
+  function confirmDelete() {
+    setUsers((prev) => prev.filter((user) => user.id !== deletingId));
+    setShowConfirm(false);
+    setDeletingId(null);
+    setToast({ message: "User deleted", type: "warning" });
+  }
+
+  function toggleStatus(id) {
+    setUsers((prev) => prev.map((user) => (user.id === id ? { ...user, status: user.status === "Active" ? "Inactive" : "Active" } : user)));
+    setToast({ message: "User status updated", type: "success" });
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <SectionHeader title="User Management" subtitle="Manage all system accounts and roles" />
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-emerald-600 active:scale-95"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Add New User
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900">Users</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Manage account access and permissions</p>
+        </div>
+        <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">
+          <PlusCircle className="h-4 w-4" /> Add User
         </button>
       </div>
 
-      <SearchBar
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search users by name or email"
-      />
-
-      <div className="flex gap-1 border-b border-slate-100">
-        {["All", "Admin", "Supplier", "Viewer"].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setRoleFilter(tab)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-              roleFilter === tab
-                ? "border-emerald-500 text-emerald-600"
-                : "border-transparent text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="px-6 pt-4 flex gap-4 border-b border-slate-50">
+          {["All", "Admin", "Supplier", "Viewer"].map((tab) => (
+            <button key={tab} onClick={() => setFilter(tab)} className={`pb-3 text-sm font-medium border-b-2 ${filter === tab ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-400"}`}>{tab}</button>
+          ))}
+        </div>
+        <div className="px-6 py-3 border-b border-slate-50">
+          <SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or email" />
+        </div>
+        <table className="w-full">
+          <thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">User</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Email</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Role</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Created</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th></tr></thead>
+          <tbody className="divide-y divide-slate-50">
+            {filtered.length === 0 ? (
+              <tr><td colSpan={6}><EmptyState icon={Users} title="No users found" subtitle="Try adjusting your search or filters." /></td></tr>
+            ) : filtered.map((user) => {
+              const cannotDelete = user.email === (currentUser?.email || "admin@gmail.com");
+              return (
+                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-800">{user.fullName}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{user.email}</td>
+                  <td className="px-6 py-4 text-sm capitalize text-slate-600">{user.role}</td>
+                  <td className="px-6 py-4"><StatusBadge status={user.status} /></td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{user.createdAt}</td>
+                  <td className="px-6 py-4"><div className="flex gap-2"><button onClick={() => openEdit(user)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Pencil className="h-4 w-4" /></button><button onClick={() => toggleStatus(user.id)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Ban className="h-4 w-4" /></button><button disabled={cannotDelete} onClick={() => { setDeletingId(user.id); setShowConfirm(true); }} className="p-2 rounded-lg hover:bg-slate-100 text-red-500 disabled:text-slate-300"><Trash2 className="h-4 w-4" /></button></div></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      <TableWrapper>
-        {isLoading ? (
-          <LoadingSkeleton rows={6} cols={6} />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Full Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Created Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredUsers.length ? (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="transition-colors duration-100 hover:bg-slate-50/50">
-                      <td className="px-6 py-4 text-sm font-medium text-slate-900">{user.fullName}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${ROLE_CLASS[user.role] || "border border-slate-200 bg-slate-100 text-slate-500"}`}>
-                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-60" />
-                          {user.role[0].toUpperCase() + user.role.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={user.status} />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">{user.createdAt}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <button type="button" onClick={() => openEditModal(user)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, status: "Inactive" } : item)))}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                          >
-                            <Ban className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setUsers((prev) => prev.filter((item) => item.id !== user.id))}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6}>
-                      <EmptyState icon={Users} title="No users found" subtitle="Try clearing filters or create a new user." />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </TableWrapper>
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingUserId ? "Edit User" : "Add New User"}
-        subtitle="Manage account details and access roles"
-      >
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingUser ? "Edit User" : "Add User"} size="md">
         <div className="grid gap-4">
-          <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Full Name</span>
-            <input
-              type="text"
-              value={userForm.fullName}
-              onChange={(event) => setUserForm((prev) => ({ ...prev, fullName: event.target.value }))}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </label>
-
-          <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</span>
-            <input
-              type="email"
-              value={userForm.email}
-              onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </label>
-
-          {!editingUserId ? (
-            <label className="grid gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Password</span>
-              <input
-                type="password"
-                value={userForm.password}
-                onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              />
-            </label>
-          ) : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</span>
-              <select
-                value={userForm.role}
-                onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              >
-                <option value="admin">Admin</option>
-                <option value="supplier">Supplier</option>
-                <option value="viewer">Viewer</option>
-              </select>
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
-              <select
-                value={userForm.status}
-                onChange={(event) => setUserForm((prev) => ({ ...prev, status: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </label>
+          <div><label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Full Name <span className="text-red-400">*</span></label><input value={form.fullName} onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />{errors.fullName && <p className="text-xs text-red-500 mt-1">{errors.fullName}</p>}</div>
+          <div><label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Email <span className="text-red-400">*</span></label><input type="email" value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />{errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}</div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Password {editingUser ? "(leave blank to keep current)" : <span className="text-red-400">*</span>}</label>
+            <div className="relative"><input type={showPassword ? "text" : "password"} placeholder={editingUser ? "......" : "Enter password"} value={form.password || ""} onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" /><button type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3 top-2.5 text-slate-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+            {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
           </div>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-0 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowModal(false)}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={saveUser}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-emerald-600"
-          >
-            Save
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Role</label><select value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm"><option value="admin">Admin</option><option value="supplier">Supplier</option><option value="viewer">Viewer</option></select></div>
+            <div><label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Status</label><select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm"><option>Active</option><option>Inactive</option></select></div>
+          </div>
+          <div className="flex justify-end gap-2"><button onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button><button onClick={saveUser} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Save</button></div>
         </div>
       </Modal>
+
+      <ConfirmDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={confirmDelete} title="Delete User?" message="This action cannot be undone." confirmLabel="Delete" confirmVariant="danger" />
+      <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );
 }

@@ -43,7 +43,7 @@ export default function AdminSidebar({ currentPage, setCurrentPage, sidebarOpen,
   return (
     <>
       <aside
-        className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col bg-slate-900 px-4 py-5 shadow-[4px_0_24px_rgba(0,0,0,0.08)] lg:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col bg-navy-900 px-4 py-5 shadow-[4px_0_24px_rgba(0,0,0,0.08)] lg:flex"
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
@@ -79,7 +79,7 @@ export default function AdminSidebar({ currentPage, setCurrentPage, sidebarOpen,
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
           <aside
-            className="absolute inset-y-0 left-0 flex w-[248px] flex-col bg-slate-900 px-4 py-5 shadow-[4px_0_24px_rgba(0,0,0,0.08)]"
+            className="absolute inset-y-0 left-0 flex w-[248px] flex-col bg-navy-900 px-4 py-5 shadow-[4px_0_24px_rgba(0,0,0,0.08)]"
             style={{
               backgroundImage:
                 "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",

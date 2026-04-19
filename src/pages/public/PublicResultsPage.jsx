@@ -3,6 +3,7 @@ import { ArrowLeft, Eye, Shield } from "lucide-react";
 import { useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
+import { MOCK_BLOCKCHAIN_RECORDS } from "../../constants/mockData";
 
 function shortHash(hash) {
   if (!hash) {
@@ -16,7 +17,7 @@ function shortHash(hash) {
   return `${hash.slice(0, 18)}...`;
 }
 
-export default function PublicResultsPage({ records = [], onBack }) {
+export default function PublicResultsPage({ records = MOCK_BLOCKCHAIN_RECORDS, onBack }) {
   const [search, setSearch] = useState("");
 
   const normalizedResults = useMemo(
@@ -42,7 +43,7 @@ export default function PublicResultsPage({ records = [], onBack }) {
       (item) =>
         item.projectName.toLowerCase().includes(query) ||
         item.winner.toLowerCase().includes(query) ||
-        item.bidAmount.toLowerCase().includes(query) ||
+        String(item.bidAmount).toLowerCase().includes(query) ||
         item.hash.toLowerCase().includes(query)
     );
   }, [normalizedResults, search]);
