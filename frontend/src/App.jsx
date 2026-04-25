@@ -1,28 +1,24 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\App.jsx
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AdminLayout from "./layouts/AdminLayout";
 import SupplierLayout from "./layouts/SupplierLayout";
 import LoginPage from "./pages/auth/LoginPage";
 import LandingPage from "./pages/public/LandingPage";
 import PublicResultsPage from "./pages/public/PublicResultsPage";
 import RegisterPage from "./pages/auth/RegisterPage";
-import { initializeDatabase } from "./lib/database";
+import { logoutUser } from "./services/authService";
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState("landing");
   const [currentUser, setCurrentUser] = useState(null);
-  const [loginRole, setLoginRole] = useState("admin");
-
-  useEffect(() => {
-    initializeDatabase();
-  }, []);
 
   function handleLogin(role, user) {
     setCurrentUser(user || null);
     setCurrentScreen(role);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await logoutUser();
     setCurrentUser(null);
     setCurrentScreen("landing");
   }
@@ -30,14 +26,7 @@ export default function App() {
   if (currentScreen === "landing") {
     return (
       <LandingPage
-        onAdminLogin={() => {
-          setLoginRole("admin");
-          setCurrentScreen("login");
-        }}
-        onSupplierLogin={() => {
-          setLoginRole("supplier");
-          setCurrentScreen("login");
-        }}
+        onAdminLogin={() => setCurrentScreen("login")}
         onViewResults={() => setCurrentScreen("public-results")}
         onRegister={() => setCurrentScreen("register")}
       />
@@ -47,7 +36,6 @@ export default function App() {
   if (currentScreen === "login") {
     return (
       <LoginPage
-        defaultRole={loginRole}
         onLogin={handleLogin}
         onBack={() => setCurrentScreen("landing")}
         onGoToRegister={() => setCurrentScreen("register")}

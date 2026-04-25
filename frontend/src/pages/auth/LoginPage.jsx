@@ -1,36 +1,14 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\auth\LoginPage.jsx
-import { ArrowLeft, Building2, Check, Eye, EyeOff, Loader2, Lock, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, Shield } from "lucide-react";
+import { useState } from "react";
 import { loginUser } from "../../services/authService";
 
-export default function LoginPage({ defaultRole = "admin", onLogin, onBack, onGoToRegister }) {
-  const [activeRole, setActiveRole] = useState("admin");
+export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (defaultRole === "admin" || defaultRole === "supplier") {
-      setActiveRole(defaultRole);
-    }
-  }, [defaultRole]);
-
-  const roleConfig = {
-    admin: {
-      title: "Admin Portal",
-      subtitle: "Sign in to your workspace",
-      hint: "Use: admin@gmail.com / admin123",
-      email: "admin@gmail.com",
-    },
-    supplier: {
-      title: "Supplier Portal",
-      subtitle: "Sign in to your workspace",
-      hint: "Use your registered supplier email and password",
-      email: "supplier@example.com",
-    },
-  }[activeRole];
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -110,36 +88,9 @@ export default function LoginPage({ defaultRole = "admin", onLogin, onBack, onGo
 
       <div className="flex min-h-screen flex-1 flex-col items-center justify-center bg-white px-6 py-8 lg:px-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex gap-1 border-b border-slate-100">
-            <button
-              type="button"
-              onClick={() => setActiveRole("admin")}
-              className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                activeRole === "admin"
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              <Shield className="h-4 w-4" />
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveRole("supplier")}
-              className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                activeRole === "supplier"
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              <Building2 className="h-4 w-4" />
-              Supplier
-            </button>
-          </div>
-
-          <div className="mb-6">
+          <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-            <p className="mt-1 text-sm text-slate-500">Sign in to your {activeRole === "admin" ? "Admin" : "Supplier"} workspace</p>
+            <p className="mt-1 text-sm text-slate-500">Sign in to your account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -147,7 +98,7 @@ export default function LoginPage({ defaultRole = "admin", onLogin, onBack, onGo
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email Address</span>
               <input
                 type="email"
-                placeholder={roleConfig.email}
+                placeholder="Enter your email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
@@ -187,18 +138,6 @@ export default function LoginPage({ defaultRole = "admin", onLogin, onBack, onGo
             {error ? (
               <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
             ) : null}
-
-            <p className="mt-4 text-center text-xs text-slate-300">{roleConfig.hint}</p>
-
-            {activeRole === "supplier" ? (
-              <p className="text-center text-sm text-slate-400">
-                Don&apos;t have an account?{" "}
-                <button type="button" onClick={onGoToRegister} className="font-medium text-emerald-600 hover:text-emerald-700">
-                  Register as Supplier
-                </button>
-              </p>
-            ) : null}
-
           </form>
         </div>
 

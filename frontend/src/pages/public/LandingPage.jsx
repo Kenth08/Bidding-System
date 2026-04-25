@@ -14,7 +14,7 @@ import {
   Users,
 } from "lucide-react";
 
-export default function LandingPage({ onAdminLogin, onSupplierLogin, onViewResults, onRegister }) {
+export default function LandingPage({ onAdminLogin, onViewResults, onRegister }) {
   return (
     <div className="bg-white">
       <nav className="fixed left-0 right-0 top-0 z-50 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
@@ -51,17 +51,10 @@ export default function LandingPage({ onAdminLogin, onSupplierLogin, onViewResul
             </button>
             <button
               type="button"
-              onClick={onSupplierLogin}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition-all hover:border-slate-500 hover:text-white"
-            >
-              Supplier Login
-            </button>
-            <button
-              type="button"
               onClick={onAdminLogin}
               className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-600"
             >
-              Admin Login
+              Login
             </button>
           </div>
 
@@ -107,10 +100,10 @@ export default function LandingPage({ onAdminLogin, onSupplierLogin, onViewResul
             <div className="flex flex-wrap items-center gap-4">
               <button
                 type="button"
-                onClick={onSupplierLogin}
+                onClick={onAdminLogin}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition-all active:scale-95 hover:bg-emerald-600"
               >
-                <Building2 className="h-4 w-4" /> Get Started as Supplier
+                <Shield className="h-4 w-4" /> Login
               </button>
               <button
                 type="button"
@@ -300,7 +293,7 @@ export default function LandingPage({ onAdminLogin, onSupplierLogin, onViewResul
                   "Evaluate and rank bids",
                   "Select winner and record to blockchain",
                 ],
-                cta: "Admin Login",
+                cta: "Login",
                 onClick: onAdminLogin,
               },
               {
@@ -314,8 +307,8 @@ export default function LandingPage({ onAdminLogin, onSupplierLogin, onViewResul
                   "Submit bids with proposals",
                   "Track status and view results",
                 ],
-                cta: "Supplier Login",
-                onClick: onSupplierLogin,
+                cta: "Login",
+                onClick: onAdminLogin,
               },
               {
                 icon: Eye,
