@@ -82,8 +82,15 @@ export const usersAPI = {
 }
 
 export const blockchainAPI = {
-  getAll: () => api.get('/blockchain/'),
-  getOne: (id) => api.get(`/blockchain/${id}/`),
+  // Admin only — includes hash and technical blockchain details
+  getAll: () => api.get('/blockchain/admin/'),
+  getOne: (id) => api.get(`/blockchain/admin/${id}/`),
+
+  // Public — no hash exposed
+  getPublic: () => axios.get(`${BASE_URL}/blockchain/public/`),
+
+  // Supplier — their own results only, no hash exposed
+  getMyResults: () => api.get('/blockchain/supplier/'),
 }
 
 export default api

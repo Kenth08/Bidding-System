@@ -150,7 +150,7 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
                   { label: "Winner", value: "Apex InfraTech" },
                   { label: "Project ID", value: "PRJ-2048" },
                   { label: "Bid Amount", value: "₱125,000" },
-                  { label: "Timestamp", value: "2026-04-13 09:45" },
+                  { label: "Award Date", value: "2026-04-13" },
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-xl bg-slate-900 p-3">
                     <p className="mb-1 text-xs text-slate-500">{label}</p>
@@ -159,16 +159,18 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
                 ))}
               </div>
 
-              <div className="rounded-xl bg-slate-900 p-3">
-                <p className="mb-1.5 text-xs text-slate-500">HASH</p>
-                <p className="break-all font-mono text-xs leading-relaxed text-emerald-400">
-                  0x8f21c7ad4e51b2a6f3c1d9e2a8b8b5d4c2e1f7a9...
+              <div className="bg-slate-900 rounded-xl p-3 mt-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className="text-xs text-emerald-400 font-medium">Blockchain Verified</span>
+                  </div>
+                  <span className="text-xs text-slate-500">Immutable Record</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  This award is permanently recorded and cannot be altered.
                 </p>
               </div>
-
-              <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-600">
-                <Shield className="h-3 w-3" /> Permanently stored · Cannot be altered
-              </p>
             </div>
 
             <div className="absolute -right-3 -top-3 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-lg">

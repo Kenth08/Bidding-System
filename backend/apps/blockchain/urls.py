@@ -1,8 +1,13 @@
 from django.urls import path
 
-from .views import BlockchainDetailView, BlockchainListView
+from . import views
 
 urlpatterns = [
-    path("", BlockchainListView.as_view(), name="blockchain-list"),
-    path("<uuid:pk>/", BlockchainDetailView.as_view(), name="blockchain-detail"),
+    path("", views.BlockchainPublicListView.as_view(), name="blockchain-list"),
+    path("public/", views.BlockchainPublicListView.as_view(), name="blockchain-public"),
+
+    path("admin/", views.BlockchainAdminListView.as_view(), name="blockchain-admin"),
+    path("admin/<uuid:pk>/", views.BlockchainAdminDetailView.as_view(), name="blockchain-admin-detail"),
+
+    path("supplier/", views.BlockchainSupplierListView.as_view(), name="blockchain-supplier"),
 ]
