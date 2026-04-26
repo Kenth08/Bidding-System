@@ -1,9 +1,9 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\public\PublicResultsPage.jsx
 import { ArrowLeft, Eye, Shield } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
-import { MOCK_BLOCKCHAIN_RECORDS } from "../../constants/mockData";
+import { blockchainAPI } from "../../services/api";
 
 function shortHash(hash) {
   if (!hash) {
@@ -25,17 +25,37 @@ function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 }
 
-export default function PublicResultsPage({ records = MOCK_BLOCKCHAIN_RECORDS, onBack }) {
+export default function PublicResultsPage({ onBack }) {
+  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function loadRecords() {
+      setIsLoading(true);
+      try {
+        const res = await blockchainAPI.getAll();
+        setRecords(res.data.results || res.data || []);
+      } catch (err) {
+        console.error("Failed to load public blockchain records", err);
+        setError("Failed to load results. Please refresh.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadRecords();
+  }, []);
 
   const normalizedResults = useMemo(
     () =>
       records.map((item) => ({
         id: item.id,
-        projectName: item.projectName || item.projectId || "Untitled Project",
-        winner: item.winner || "Not available",
-        bidAmount: formatPeso(item.bidAmount ?? "N/A"),
-        awardDate: item.awardDate || item.timestamp || "N/A",
+        projectName: item.projectTitle || item.project?.title || item.project || "Untitled Project",
+        winner: item.winner || item.winner_name || "Not available",
+        bidAmount: formatPeso(item.bidAmount ?? item.bid_amount ?? "N/A"),
+        awardDate: item.awardDate || item.recordedAt || item.recorded_at || "N/A",
         hash: item.hash || "",
       })),
     [records]
@@ -113,7 +133,11 @@ export default function PublicResultsPage({ records = MOCK_BLOCKCHAIN_RECORDS, o
           className="w-full"
         />
 
-        {filteredResults.length ? (
+        {isLoading ? (
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">Loading public results...</div>
+        ) : error ? (
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center text-red-500">{error}</div>
+        ) : filteredResults.length ? (
           <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
             {filteredResults.map((record) => (
               <article key={record.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

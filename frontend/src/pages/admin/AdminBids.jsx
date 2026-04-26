@@ -1,6 +1,7 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminBids.jsx
 import { Shield } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
+import { bidsAPI } from "../../services/api";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
@@ -20,6 +21,7 @@ export default function AdminBids({ bids, setBids, onRecordToBlockchain }) {
   const [showBlockchainConfirm, setShowBlockchainConfirm] = useState(false);
   const [recordingBid, setRecordingBid] = useState(null);
   const [toast, setToast] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -30,37 +32,57 @@ export default function AdminBids({ bids, setBids, onRecordToBlockchain }) {
     });
   }, [bids, filter, search]);
 
-  function setUnderReview(id) {
-    setBids((prev) => prev.map((bid) => (bid.id === id ? { ...bid, status: "Under Review" } : bid)));
+  async function setUnderReview(id) {
+    setActionLoading(true);
+    try {
+      const res = await bidsAPI.markReview(id);
+      setBids((prev) => prev.map((bid) => (bid.id === id ? res.data : bid)));
+      setToast({ message: "Bid marked under review", type: "success" });
+    } catch (error) {
+      console.error("Failed to mark bid under review", error);
+      setToast({ message: "Could not update bid status.", type: "error" });
+    } finally {
+      setActionLoading(false);
+    }
   }
 
-  function confirmWinnerSelection() {
+  async function confirmWinnerSelection() {
     if (!selectingBid) return;
-    setBids((prev) => prev.map((bid) => {
-      if (bid.projectId !== selectingBid.projectId) return bid;
-      return bid.id === selectingBid.id ? { ...bid, status: "Selected" } : { ...bid, status: "Rejected" };
-    }));
-    setShowWinnerConfirm(false);
-    setSelectingBid(null);
-    setToast({ message: "Winner selected successfully", type: "success" });
+    setActionLoading(true);
+    try {
+      const res = await bidsAPI.selectWinner(selectingBid.id);
+      setBids((prev) => prev.map((bid) => {
+        if (bid.project !== selectingBid.project) return bid;
+        if (bid.id === selectingBid.id) return res.data;
+        return { ...bid, status: "Rejected" };
+      }));
+      setToast({ message: "Winner selected successfully", type: "success" });
+    } catch (error) {
+      console.error("Failed to select winner", error);
+      setToast({ message: "Could not select winner.", type: "error" });
+    } finally {
+      setSelectingBid(null);
+      setShowWinnerConfirm(false);
+      setActionLoading(false);
+    }
   }
 
-  function confirmBlockchainRecord() {
+  async function confirmBlockchainRecord() {
     if (!recordingBid) return;
-    const record = {
-      id: `bc-${Date.now()}`,
-      projectId: `PRJ-${recordingBid.projectId}`,
-      projectTitle: recordingBid.projectTitle || recordingBid.projectName,
-      winner: recordingBid.supplierName,
-      bidAmount: recordingBid.bidAmount,
-      hash: `0x${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`.slice(0, 66),
-      recordedAt: `${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
-    };
-    onRecordToBlockchain((prev) => [record, ...prev]);
-    setBids((prev) => prev.map((bid) => (bid.id === recordingBid.id ? { ...bid, recorded: true } : bid)));
-    setShowBlockchainConfirm(false);
-    setRecordingBid(null);
-    setToast({ message: "Successfully recorded to blockchain!", type: "success" });
+    setActionLoading(true);
+    try {
+      const res = await bidsAPI.recordBlockchain(recordingBid.id);
+      setBids((prev) => prev.map((bid) => (bid.id === recordingBid.id ? { ...bid, recorded: true } : bid)));
+      onRecordToBlockchain((prev) => [res.data, ...prev]);
+      setToast({ message: "Blockchain record created successfully", type: "success" });
+    } catch (error) {
+      console.error("Failed to record bid to blockchain", error);
+      setToast({ message: "Could not record to blockchain.", type: "error" });
+    } finally {
+      setRecordingBid(null);
+      setShowBlockchainConfirm(false);
+      setActionLoading(false);
+    }
   }
 
   return (
@@ -69,7 +91,7 @@ export default function AdminBids({ bids, setBids, onRecordToBlockchain }) {
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <div className="px-6 pt-4 flex gap-4 border-b border-slate-50">{["All", "Submitted", "Under Review", "Selected", "Rejected"].map((tab) => <button key={tab} onClick={() => setFilter(tab)} className={`pb-3 text-sm font-medium border-b-2 ${filter === tab ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-400"}`}>{tab}</button>)}</div>
         <div className="px-6 py-3 border-b border-slate-50"><SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by supplier or project" /></div>
-        <table className="w-full"><thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Supplier</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Company</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Amount</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Submitted</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th></tr></thead><tbody className="divide-y divide-slate-50">{filtered.length === 0 ? <tr><td colSpan={7}><EmptyState title="No bids found" subtitle="Try changing filters or search terms." /></td></tr> : filtered.map((bid) => (<Fragment key={bid.id}><tr onClick={() => setExpandedBid((prev) => prev === bid.id ? null : bid.id)} className="hover:bg-slate-50/50 transition-colors cursor-pointer"><td className="px-6 py-4 text-sm font-medium text-slate-800">{bid.supplierName}</td><td className="px-6 py-4 text-sm text-slate-600">{bid.company}</td><td className="px-6 py-4 text-sm text-slate-600">{bid.projectTitle || bid.projectName}</td><td className="px-6 py-4 text-sm text-slate-600">{formatPeso(bid.bidAmount)}</td><td className="px-6 py-4 text-sm text-slate-600">{bid.submittedAt}</td><td className="px-6 py-4"><StatusBadge status={bid.status} /></td><td className="px-6 py-4"><div className="flex gap-2">{bid.status === "Submitted" && <button onClick={(event) => { event.stopPropagation(); setUnderReview(bid.id); }} className="rounded-lg border border-blue-200 px-2 py-1 text-xs text-blue-600">Review</button>}{bid.status === "Under Review" && <button onClick={(event) => { event.stopPropagation(); setSelectingBid(bid); setShowWinnerConfirm(true); }} className="rounded-lg bg-emerald-500 px-2 py-1 text-xs text-white">Select Winner</button>}</div></td></tr>{expandedBid === bid.id && <tr><td colSpan={7} className="px-6 py-4 bg-slate-50/70"><p className="text-sm text-slate-700 mb-3">{bid.proposal}</p>{bid.status === "Selected" && !bid.recorded && <button onClick={() => { setRecordingBid(bid); setShowBlockchainConfirm(true); }} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs text-white">Record to Blockchain</button>}{bid.recorded && <span className="text-xs font-semibold text-emerald-600">Recorded ✓</span>}</td></tr>}</Fragment>))}</tbody></table>
+        <table className="w-full"><thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Supplier</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Company</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Amount</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Submitted</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th></tr></thead><tbody className="divide-y divide-slate-50">{filtered.length === 0 ? <tr><td colSpan={7}><EmptyState title="No bids found" subtitle="Try changing filters or search terms." /></td></tr> : filtered.map((bid) => (<Fragment key={bid.id}><tr onClick={() => setExpandedBid((prev) => prev === bid.id ? null : bid.id)} className="hover:bg-slate-50/50 transition-colors cursor-pointer"><td className="px-6 py-4 text-sm font-medium text-slate-800">{bid.supplierName}</td><td className="px-6 py-4 text-sm text-slate-600">{bid.supplierCompany}</td><td className="px-6 py-4 text-sm text-slate-600">{bid.projectTitle || bid.projectName}</td><td className="px-6 py-4 text-sm text-slate-600">{formatPeso(bid.bidAmount)}</td><td className="px-6 py-4 text-sm text-slate-600">{bid.submittedAt}</td><td className="px-6 py-4"><StatusBadge status={bid.status} /></td><td className="px-6 py-4"><div className="flex gap-2">{bid.status === "Submitted" && <button onClick={(event) => { event.stopPropagation(); setUnderReview(bid.id); }} className="rounded-lg border border-blue-200 px-2 py-1 text-xs text-blue-600">Review</button>}{bid.status === "Under Review" && <button onClick={(event) => { event.stopPropagation(); setSelectingBid(bid); setShowWinnerConfirm(true); }} className="rounded-lg bg-emerald-500 px-2 py-1 text-xs text-white">Select Winner</button>}</div></td></tr>{expandedBid === bid.id && <tr><td colSpan={7} className="px-6 py-4 bg-slate-50/70"><p className="text-sm text-slate-700 mb-3">{bid.proposal}</p>{bid.status === "Selected" && !bid.recorded && <button onClick={() => { setRecordingBid(bid); setShowBlockchainConfirm(true); }} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs text-white">Record to Blockchain</button>}{bid.recorded && <span className="text-xs font-semibold text-emerald-600">Recorded ✓</span>}</td></tr>}</Fragment>))}</tbody></table>
       </div>
 
       <ConfirmDialog isOpen={showWinnerConfirm} onClose={() => setShowWinnerConfirm(false)} onConfirm={confirmWinnerSelection} title="Select this supplier as winner?" message="This will reject all other bids for the same project." confirmLabel="Select Winner" infoCard={selectingBid && <div className="text-sm text-slate-600"><p>Supplier: {selectingBid.supplierName}</p><p>Project: {selectingBid.projectTitle || selectingBid.projectName}</p><p>Amount: {formatPeso(selectingBid.bidAmount)}</p></div>} />

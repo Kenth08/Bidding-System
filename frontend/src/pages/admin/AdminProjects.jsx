@@ -1,6 +1,7 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminProjects.jsx
+// c:\Users\Mico\Bidding-System\frontend\src\pages\admin\AdminProjects.jsx
 import { FolderOpen, Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { projectsAPI } from "../../services/api";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
@@ -24,6 +25,7 @@ export default function AdminProjects({ projects, setProjects }) {
   const [toast, setToast] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -44,11 +46,11 @@ export default function AdminProjects({ projects, setProjects }) {
   function openEdit(project) {
     setEditingProject(project);
     setForm({
-      title: project.title,
-      budget: String(project.budget),
-      deadline: project.deadline,
-      requirements: project.requirements,
-      status: project.status,
+      title: project.title || "",
+      budget: String(project.budget || ""),
+      deadline: project.deadline || "",
+      requirements: project.requirements || "",
+      status: project.status || "Active",
     });
     setErrors({});
     setShowModal(true);
@@ -63,35 +65,50 @@ export default function AdminProjects({ projects, setProjects }) {
     return Object.keys(nextErrors).length === 0;
   }
 
-  function saveProject() {
+  async function saveProject() {
     if (!validateForm()) return;
 
+    setIsSaving(true);
     const payload = {
-      id: editingProject ? editingProject.id : String(Date.now()),
       title: form.title.trim(),
-      name: form.title.trim(),
       budget: Number(form.budget),
       deadline: form.deadline,
       requirements: form.requirements.trim(),
       status: form.status,
-      createdAt: editingProject?.createdAt || new Date().toISOString().slice(0, 10),
     };
 
-    if (editingProject) {
-      setProjects((prev) => prev.map((item) => (item.id === editingProject.id ? payload : item)));
-      setToast({ message: "Project updated successfully", type: "success" });
-    } else {
-      setProjects((prev) => [payload, ...prev]);
-      setToast({ message: "Project created successfully", type: "success" });
+    try {
+      if (editingProject) {
+        const res = await projectsAPI.update(editingProject.id, payload);
+        setProjects((prev) => prev.map((item) => (item.id === editingProject.id ? res.data : item)));
+        setToast({ message: "Project updated successfully", type: "success" });
+      } else {
+        const res = await projectsAPI.create(payload);
+        setProjects((prev) => [res.data, ...prev]);
+        setToast({ message: "Project created successfully", type: "success" });
+      }
+      setShowModal(false);
+    } catch (error) {
+      console.error(error);
+      setToast({ message: "Failed to save project. Please try again.", type: "error" });
+    } finally {
+      setIsSaving(false);
     }
-    setShowModal(false);
   }
 
-  function confirmDelete() {
-    setProjects((prev) => prev.filter((item) => item.id !== deletingId));
-    setDeletingId(null);
-    setShowConfirm(false);
-    setToast({ message: "Project deleted", type: "warning" });
+  async function confirmDelete() {
+    if (!deletingId) return;
+    try {
+      await projectsAPI.delete(deletingId);
+      setProjects((prev) => prev.filter((item) => item.id !== deletingId));
+      setToast({ message: "Project deleted", type: "warning" });
+    } catch (error) {
+      console.error(error);
+      setToast({ message: "Failed to delete project.", type: "error" });
+    } finally {
+      setDeletingId(null);
+      setShowConfirm(false);
+    }
   }
 
   return (
@@ -131,14 +148,18 @@ export default function AdminProjects({ projects, setProjects }) {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {filteredProjects.length === 0 ? (
-              <tr><td colSpan={6}><EmptyState icon={FolderOpen} title="No projects found" subtitle="Try a different filter or search keyword." /></td></tr>
+              <tr>
+                <td colSpan={6}>
+                  <EmptyState icon={FolderOpen} title="No projects found" subtitle="Try a different filter or search keyword." />
+                </td>
+              </tr>
             ) : (
               filteredProjects.map((project) => (
                 <tr key={project.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">{project.title}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(project.budget)}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{project.deadline}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{project.requirements.length > 40 ? `${project.requirements.slice(0, 40)}...` : project.requirements}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{project.requirements?.length > 40 ? `${project.requirements.slice(0, 40)}...` : project.requirements}</td>
                   <td className="px-6 py-4"><StatusBadge status={project.status} /></td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -179,12 +200,16 @@ export default function AdminProjects({ projects, setProjects }) {
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Status</label>
             <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
-              <option>Active</option><option>Closed</option><option>Awarded</option>
+              <option>Active</option>
+              <option>Closed</option>
+              <option>Awarded</option>
             </select>
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button>
-            <button onClick={saveProject} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Save</button>
+            <button onClick={saveProject} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white" disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </button>
           </div>
         </div>
       </Modal>

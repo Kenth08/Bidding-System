@@ -1,7 +1,7 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\auth\LoginPage.jsx
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, Shield } from "lucide-react";
 import { useState } from "react";
-import { loginUser } from "../../services/authService";
+import { authAPI } from "../../services/api";
 
 export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
   const [email, setEmail] = useState("");
@@ -21,16 +21,16 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
     setIsLoading(true);
     setError("");
 
-    const { user, error } = await loginUser(email, password);
-
-    setIsLoading(false);
-
-    if (error) {
-      setError(error);
-      return;
+    try {
+      const res = await authAPI.login(email, password);
+      localStorage.setItem("access_token", res.data.access);
+      localStorage.setItem("refresh_token", res.data.refresh);
+      onLogin(res.data.user.role, res.data.user);
+    } catch (err) {
+      setError(err.response?.data?.error || "Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-
-    onLogin(user.role, user);
   }
 
   return (
@@ -138,6 +138,12 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
             {error ? (
               <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
             ) : null}
+            <p className="mt-4 text-center text-sm text-slate-500">
+              Don’t have an account?{' '}
+              <button type="button" onClick={onGoToRegister} className="font-medium text-emerald-600 hover:text-emerald-700">
+                Register as Supplier
+              </button>
+            </p>
           </form>
         </div>
 

@@ -8,7 +8,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useState } from "react";
-import { registerSupplier } from "../../services/authService";
+import { authAPI } from "../../services/api";
 
 const BUSINESS_TYPES = [
   "Construction",
@@ -63,24 +63,22 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
 
     setIsLoading(true);
 
-    const { success, error: registerError } = await registerSupplier({
-      fullName: form.fullName,
-      email: form.email,
-      password: form.password,
-      companyName: form.companyName,
-      companyAddress: form.companyAddress,
-      phone: form.phone,
-      businessType: form.businessType,
-    });
-
-    setIsLoading(false);
-
-    if (!success) {
-      setError(registerError);
-      return;
+    try {
+      await authAPI.register({
+        full_name: form.fullName,
+        email: form.email,
+        password: form.password,
+        company_name: form.companyName,
+        company_address: form.companyAddress,
+        phone: form.phone,
+        business_type: form.businessType,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.error || "Registration failed.");
+    } finally {
+      setIsLoading(false);
     }
-
-    setSubmitted(true);
   }
 
   function handleGoToLogin() {

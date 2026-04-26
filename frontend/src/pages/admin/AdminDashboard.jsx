@@ -6,12 +6,13 @@ function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-export default function AdminDashboard({ projects, bids, blockchainRecords, setActivePage }) {
-  const stats = {
+export default function AdminDashboard({ stats, projects, bids, blockchainRecords, setActivePage }) {
+  const counts = stats || {
     projects: projects.length,
     bids: bids.length,
-    awarded: projects.filter((project) => project.status === "Awarded").length,
-    recorded: blockchainRecords.length,
+    activeBidding: projects.filter((project) => project.status === "Active").length,
+    awardedContracts: projects.filter((project) => project.status === "Awarded").length,
+    blockchainRecords: blockchainRecords.length,
   };
 
   return (
@@ -19,10 +20,10 @@ export default function AdminDashboard({ projects, bids, blockchainRecords, setA
       <div className="flex items-center justify-between mb-6"><div><h1 className="text-lg font-bold text-slate-900">Dashboard</h1><p className="text-sm text-slate-500 mt-0.5">Procurement activity overview</p></div></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Projects" value={stats.projects} />
-        <StatCard title="Total Bids" value={stats.bids} />
-        <StatCard title="Awarded Projects" value={stats.awarded} />
-        <StatCard title="Blockchain Records" value={stats.recorded} />
+        <StatCard title="Total Projects" value={counts.total_projects ?? counts.projects} />
+        <StatCard title="Total Bids" value={counts.total_bids ?? counts.bids} />
+        <StatCard title="Active Bidding" value={counts.active_bidding ?? counts.activeBidding} />
+        <StatCard title="Awarded Contracts" value={counts.awarded_contracts ?? counts.awarded ?? counts.awardedContracts} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">

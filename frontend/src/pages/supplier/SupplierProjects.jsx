@@ -1,5 +1,6 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\supplier\SupplierProjects.jsx
 import { useMemo, useState } from "react";
+import { bidsAPI } from "../../services/api";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
@@ -32,6 +33,7 @@ export default function SupplierProjects({
   const [submittedProjectIds, setSubmittedProjectIds] = useState([]);
   const [toast, setToast] = useState(null);
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -52,31 +54,31 @@ export default function SupplierProjects({
     setShowBidModal(true);
   }
 
-  function submitBid() {
+  async function submitBid() {
     const next = {};
     if (!bidDraft.bidAmount || Number(bidDraft.bidAmount) <= 0) next.bidAmount = "Enter a valid amount.";
     if (!bidDraft.proposal || bidDraft.proposal.trim().length < 20) next.proposal = "Proposal must be at least 20 characters.";
     setErrors(next);
     if (Object.keys(next).length) return;
 
-    const newBid = {
-      id: `sb-${Date.now()}`,
-      projectId: selectedProject.id,
-      projectTitle: selectedProject.title,
-      projectName: selectedProject.title,
-      supplierName: activeUser?.full_name || activeUser?.fullName || "Supplier User",
-      company: activeUser?.company_name || "Blue Grid Works",
-      bidAmount: Number(bidDraft.bidAmount),
-      proposal: bidDraft.proposal.trim(),
-      status: "Submitted",
-      submittedAt: new Date().toISOString().slice(0, 10),
-      recorded: false,
-    };
-
-    setSupplierBids((prev) => [newBid, ...prev]);
-    setSubmittedProjectIds((prev) => [...prev, selectedProject.id]);
-    setShowBidModal(false);
-    setToast({ message: "Bid submitted successfully!", type: "success" });
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        project: selectedProject.id,
+        bid_amount: Number(bidDraft.bidAmount),
+        proposal: bidDraft.proposal.trim(),
+      };
+      const res = await bidsAPI.create(payload);
+      setSupplierBids((prev) => [res.data, ...prev]);
+      setSubmittedProjectIds((prev) => [...prev, selectedProject.id]);
+      setShowBidModal(false);
+      setToast({ message: "Bid submitted successfully!", type: "success" });
+    } catch (error) {
+      console.error("Failed to submit bid", error);
+      setToast({ message: "Failed to submit bid. Please try again.", type: "error" });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -131,7 +133,7 @@ export default function SupplierProjects({
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Company Name</label>
             <input readOnly value={activeUser?.company_name || "Blue Grid Works"} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-sm text-slate-500" />
           </div>
-          <div className="flex justify-end gap-2"><button onClick={() => setShowBidModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button><button onClick={submitBid} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Submit Bid</button></div>
+          <div className="flex justify-end gap-2"><button onClick={() => setShowBidModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button><button onClick={submitBid} disabled={isSubmitting} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">{isSubmitting ? "Submitting..." : "Submit Bid"}</button></div>
         </div>
       </Modal>
 

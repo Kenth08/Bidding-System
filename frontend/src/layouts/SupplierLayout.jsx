@@ -1,14 +1,14 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\layouts\SupplierLayout.jsx
-import { useMemo, useState } from "react";
+// c:\Users\Mico\Bidding-System\frontend\src\layouts\SupplierLayout.jsx
+import { useEffect, useMemo, useState } from "react";
 import SupplierProfileModal from "../components/supplier/SupplierProfileModal";
 import SupplierSettingsModal from "../components/supplier/SupplierSettingsModal";
 import SupplierHeader from "../components/supplier/SupplierHeader";
 import SupplierSidebar from "../components/supplier/SupplierSidebar";
-import { MOCK_BIDS, MOCK_NOTIFICATIONS, MOCK_PROJECTS, MOCK_RESULTS } from "../constants/mockData";
 import SupplierDashboard from "../pages/supplier/SupplierDashboard";
 import SupplierMyBids from "../pages/supplier/SupplierMyBids";
 import SupplierProjects from "../pages/supplier/SupplierProjects";
 import SupplierResults from "../pages/supplier/SupplierResults";
+import { projectsAPI, bidsAPI, blockchainAPI } from "../services/api";
 
 export default function SupplierLayout({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
@@ -16,15 +16,55 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [supplierBids, setSupplierBids] = useState(
-    MOCK_BIDS.filter((bid) => bid.company === (activeUser?.company_name || "Blue Grid Works"))
-  );
+  const [projects, setProjects] = useState([]);
+  const [supplierBids, setSupplierBids] = useState([]);
+  const [supplierResults, setSupplierResults] = useState([]);
   const [supplierProjectFilter, setSupplierProjectFilter] = useState("All");
   const [showBidModal, setShowBidModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [bidDraft, setBidDraft] = useState({ bidAmount: "", proposal: "" });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const supplierProjects = MOCK_PROJECTS.filter((project) => project.status === "Active");
+  useEffect(() => {
+    async function loadSupplierData() {
+      setIsLoading(true);
+      try {
+        const [projectsRes, bidsRes, blockchainRes] = await Promise.all([
+          projectsAPI.getAll("Active"),
+          bidsAPI.getAll(),
+          blockchainAPI.getAll(),
+        ]);
+
+        const projectData = projectsRes.data.results || projectsRes.data || [];
+        const bidData = bidsRes.data.results || bidsRes.data || [];
+        const blockchainData = blockchainRes.data.results || blockchainRes.data || [];
+
+        setProjects(projectData);
+        setSupplierBids(bidData);
+
+        if (activeUser?.id) {
+          const filteredRecords = blockchainData.filter((record) => {
+            if (!record) return false
+            if (record.winner?.id) return record.winner.id === activeUser.id
+            if (typeof record.winner === "string") return record.winner === activeUser.id
+            return record.winner_name === activeUser.full_name
+          })
+          setSupplierResults(filteredRecords)
+        } else {
+          setSupplierResults([])
+        }
+      } catch (error) {
+        console.error("Failed to load supplier data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadSupplierData();
+  }, [activeUser]);
+
+  const supplierProjects = useMemo(() => projects.filter((project) => project.status === "Active"), [projects]);
+
   const pageMeta = useMemo(() => {
     if (currentPage === "available-projects") return { title: "Available Projects", subtitle: "Browse active opportunities and submit proposals" };
     if (currentPage === "my-bids") return { title: "My Bids", subtitle: "Track submitted bids and evaluation status" };
@@ -51,9 +91,9 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
       );
     }
     if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
-    if (currentPage === "results") return <SupplierResults supplierResults={MOCK_RESULTS} />;
+    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} user={activeUser} />;
     return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
-  }, [activeUser, bidDraft, currentPage, selectedProject, showBidModal, supplierBids, supplierProjectFilter, supplierProjects]);
+  }, [activeUser, bidDraft, currentPage, selectedProject, showBidModal, supplierBids, supplierProjectFilter, supplierProjects, supplierResults]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -62,7 +102,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
         <SupplierHeader
           title={pageMeta.title}
           subtitle={pageMeta.subtitle}
-          notifications={MOCK_NOTIFICATIONS.supplier}
+          notifications={[]}
           user={activeUser}
           setSidebarOpen={setSidebarOpen}
           onLogout={onLogout}

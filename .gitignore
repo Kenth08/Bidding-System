@@ -1,0 +1,28 @@
+# Root .gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Django
+backend/.env
+backend/db.sqlite3
+backend/*.log
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# System
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/settings.json
+.idea/

@@ -1,22 +1,66 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\layouts\AdminLayout.jsx
-import { useMemo, useState } from "react";
+// c:\Users\Mico\Bidding-System\frontend\src\layouts\AdminLayout.jsx
+import { useEffect, useMemo, useState } from "react";
 import AdminHeader from "../components/admin/AdminHeader";
 import AdminSidebar from "../components/admin/AdminSidebar";
-import { MOCK_BIDS, MOCK_BLOCKCHAIN_RECORDS, MOCK_NOTIFICATIONS, MOCK_PROJECTS, MOCK_USERS } from "../constants/mockData";
 import AdminBids from "../pages/admin/AdminBids";
 import AdminBlockchain from "../pages/admin/AdminBlockchain";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminProjects from "../pages/admin/AdminProjects";
 import AdminSuppliers from "../pages/admin/AdminSuppliers";
 import AdminUsers from "../pages/admin/AdminUsers";
+import { dashboardAPI, projectsAPI, bidsAPI, usersAPI, blockchainAPI } from "../services/api";
 
 export default function AdminLayout({ currentUser, onLogout }) {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [projects, setProjects] = useState(MOCK_PROJECTS);
-  const [users, setUsers] = useState(MOCK_USERS);
-  const [bids, setBids] = useState(MOCK_BIDS);
-  const [blockchainRecords, setBlockchainRecords] = useState(MOCK_BLOCKCHAIN_RECORDS);
+  const [projects, setProjects] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [bids, setBids] = useState([]);
+  const [blockchainRecords, setBlockchainRecords] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const [statsRes, projectsRes, bidsRes, usersRes, blockchainRes] = await Promise.allSettled([
+          dashboardAPI.getStats(),
+          projectsAPI.getAll(),
+          bidsAPI.getAll(),
+          usersAPI.getAll(),
+          blockchainAPI.getAll(),
+        ]);
+
+        if (statsRes.status === "fulfilled") {
+          setDashboardStats(statsRes.value.data);
+        }
+
+        if (projectsRes.status === "fulfilled") {
+          setProjects(projectsRes.value.data.results || projectsRes.value.data || []);
+        }
+
+        if (bidsRes.status === "fulfilled") {
+          setBids(bidsRes.value.data.results || bidsRes.value.data || []);
+        }
+
+        if (usersRes.status === "fulfilled") {
+          setUsers(usersRes.value.data.results || usersRes.value.data || []);
+        }
+
+        if (blockchainRes.status === "fulfilled") {
+          setBlockchainRecords(blockchainRes.value.data.results || blockchainRes.value.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to load admin data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
+
   const suppliers = useMemo(() => users.filter((user) => user.role === "supplier"), [users]);
 
   const pageMeta = useMemo(() => {
@@ -31,10 +75,10 @@ export default function AdminLayout({ currentUser, onLogout }) {
   const page = useMemo(() => {
     if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} />;
     if (currentPage === "suppliers") return <AdminSuppliers />;
-    if (currentPage === "bids") return <AdminBids bids={bids} setBids={setBids} projects={projects} setProjects={setProjects} onRecordToBlockchain={setBlockchainRecords} />;
+    if (currentPage === "bids") return <AdminBids bids={bids} setBids={setBids} projects={projects} setProjects={setProjects} onRecordToBlockchain={(fn) => setBlockchainRecords((prev) => fn(prev))} />;
     if (currentPage === "users") return <AdminUsers users={users} setUsers={setUsers} currentUser={currentUser} />;
     if (currentPage === "records") return <AdminBlockchain blockchainRecords={blockchainRecords} />;
-    return <AdminDashboard projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
+    return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
   }, [bids, blockchainRecords, currentPage, currentUser, projects, users]);
 
   return (
@@ -44,7 +88,7 @@ export default function AdminLayout({ currentUser, onLogout }) {
         <AdminHeader
           title={pageMeta.title}
           subtitle={pageMeta.subtitle}
-          notifications={MOCK_NOTIFICATIONS.admin}
+          notifications={[]}
           currentUser={currentUser}
           setSidebarOpen={setSidebarOpen}
           onLogout={onLogout}
@@ -52,6 +96,7 @@ export default function AdminLayout({ currentUser, onLogout }) {
           suppliers={suppliers}
           bids={bids}
           blockchainRecords={blockchainRecords}
+          isLoading={isLoading}
         />
         <main className="flex-1 p-6">{page}</main>
       </div>
