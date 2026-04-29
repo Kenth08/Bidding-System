@@ -21,6 +21,13 @@ class LoginView(APIView):
         if not email or not password:
             return Response({"error": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({"error": "Account not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.check_password(password):
+            return Response({"error": "Wrong password."}, status=status.HTTP_401_UNAUTHORIZED)
+
         user = authenticate(request, username=email, password=password)
 
         if not user:

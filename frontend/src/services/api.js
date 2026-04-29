@@ -21,7 +21,15 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
-    if (error.response?.status === 401 && original && !original._retry) {
+    const requestUrl = String(original?.url || '')
+    const isAuthFormRequest = [
+      '/auth/login/',
+      '/auth/register/',
+      '/auth/token/refresh/',
+    ].some((path) => requestUrl.includes(path))
+
+    // Let login/register failures bubble up to the UI so users see the correct warning.
+    if (error.response?.status === 401 && original && !original._retry && !isAuthFormRequest) {
       original._retry = true
       try {
         const refresh = localStorage.getItem('refresh_token')
