@@ -17,7 +17,7 @@ Professional Django backend scaffold, separated from frontend.
 pip install -r requirements.txt
 ```
 
-3. Create `.env` from `.env.example` and update values.
+3. Copy `.env.example` to `.env` and update the Supabase `DATABASE_URL`.
 4. Run migrations:
 
 ```bash
@@ -32,7 +32,7 @@ python manage.py runserver
 
 ## PostgreSQL with Supabase
 
-Set `DATABASE_URL` in `.env` to your Supabase PostgreSQL connection string.
+Set `DATABASE_URL` in `.env` to your Supabase pooler connection string.
 
 ## API base path
 

@@ -9,6 +9,8 @@ venv/
 *.egg-info/
 
 # Django
+/.env
+/.env.example
 backend/.env
 backend/db.sqlite3
 backend/*.log

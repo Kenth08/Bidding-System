@@ -6,7 +6,7 @@ Built for BSIT Capstone 2026 — Davao del Norte State College.
 ## Tech Stack
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Django REST Framework
-- Database: PostgreSQL (local) / Supabase (production)
+- Database: Supabase PostgreSQL
 
 ## Setup
 
@@ -14,6 +14,7 @@ Built for BSIT Capstone 2026 — Davao del Norte State College.
 ```bash
 cd backend
 pip install -r requirements.txt
+copy .env.example .env
 python manage.py migrate
 python manage.py runserver
 ```
