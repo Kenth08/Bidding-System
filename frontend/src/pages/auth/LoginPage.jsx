@@ -105,7 +105,6 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
               />
-              <p className="mt-1.5 text-xs text-slate-400">Admin users can log in with admin@gmail.com.</p>
             </label>
 
             <label className="block">

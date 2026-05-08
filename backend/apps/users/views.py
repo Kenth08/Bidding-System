@@ -28,15 +28,10 @@ class LoginView(APIView):
 
         user = User.objects.filter(email__iexact=email).first()
         if not user:
-            return Response({"error": "Account not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.check_password(password):
-            return Response({"error": "Wrong password."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        user = authenticate(request, username=email, password=password)
-
-        if not user:
-            return Response({"error": "Invalid email or password."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
 
         if user.role == User.Role.SUPPLIER and user.status == User.Status.PENDING:
             return Response({"error": "Your account is pending admin approval."}, status=status.HTTP_403_FORBIDDEN)
