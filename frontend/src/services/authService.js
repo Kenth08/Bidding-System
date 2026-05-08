@@ -5,20 +5,19 @@ export async function loginWithEmail(email, password) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Try Supabase if available, but don't block backend login if it fails
     if (supabase) {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          return { user: null, error: 'Invalid email or password.' };
+      try {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+        if (!error) {
+          // Supabase login successful, continue to backend
         }
-        if (error.message.includes('Email not confirmed')) {
-          return { user: null, error: 'Please verify your email first. Check your inbox for the verification link.' };
-        }
-        return { user: null, error: error.message };
+      } catch (supabaseError) {
+        // Supabase error - continue to backend API
+        console.log('Supabase not configured or error:', supabaseError?.message);
       }
     }
 
