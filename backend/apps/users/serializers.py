@@ -20,6 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
             "company_address",
             "phone",
             "business_type",
+            "business_permit_number",
             "is_staff",
             "is_active",
             "created_at",
@@ -30,6 +31,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    company_name = serializers.CharField(required=True, allow_blank=False)
+    company_address = serializers.CharField(required=True, allow_blank=False)
+    phone = serializers.CharField(required=True, allow_blank=False)
+    business_type = serializers.CharField(required=True, allow_blank=False)
+    business_permit_number = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -42,6 +48,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             "company_address",
             "phone",
             "business_type",
+            "business_permit_number",
         ]
         read_only_fields = ["id"]
 
@@ -55,6 +62,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             company_address=validated_data.get("company_address", ""),
             phone=validated_data.get("phone", ""),
             business_type=validated_data.get("business_type", "Other"),
+            business_permit_number=validated_data.get("business_permit_number", ""),
             role=User.Role.SUPPLIER,
             status=User.Status.PENDING,
         )

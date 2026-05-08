@@ -8,7 +8,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useState } from "react";
-import { authAPI } from "../../services/api";
+import { registerWithEmail } from "../../services/authService";
 
 const BUSINESS_TYPES = [
   "Construction",
@@ -28,6 +28,10 @@ const INITIAL_FORM = {
   companyAddress: "",
   phone: "",
   businessType: "",
+  businessPermitNumber: "",
+  legalDocuments: null,
+  businessPermit: null,
+  philGepsRegistration: null,
 };
 
 export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
@@ -64,15 +68,24 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
     setIsLoading(true);
 
     try {
-      await authAPI.register({
-        full_name: form.fullName,
-        email: form.email,
-        password: form.password,
-        company_name: form.companyName,
-        company_address: form.companyAddress,
-        phone: form.phone,
-        business_type: form.businessType,
-      });
+      const payload = new FormData();
+      payload.append("full_name", form.fullName);
+      payload.append("email", form.email);
+      payload.append("password", form.password);
+      payload.append("company_name", form.companyName);
+      payload.append("company_address", form.companyAddress);
+      payload.append("phone", form.phone);
+      payload.append("business_type", form.businessType);
+      payload.append("business_permit_number", form.businessPermitNumber);
+      if (form.legalDocuments) payload.append("legal_documents", form.legalDocuments);
+      if (form.businessPermit) payload.append("business_permit", form.businessPermit);
+      if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration);
+
+      const { error: registrationError } = await registerWithEmail(payload);
+      if (registrationError) {
+        setError(registrationError);
+        return;
+      }
       setSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.error || "Registration failed.");
@@ -157,6 +170,8 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
               </div>
               <h1 className="mt-4 text-2xl font-bold text-emerald-700">Registration Submitted!</h1>
               <p className="mt-2 text-sm text-slate-500">
+                Check your email for verification.
+                <br />
                 Your account is pending admin approval.
                 <br />
                 Once approved, you can login with your email and password.
@@ -281,6 +296,56 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
                     ))}
                   </select>
                 </label>
+
+                <label className="md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Business Permit Number</span>
+                  <input
+                    type="text"
+                    value={form.businessPermitNumber}
+                    onChange={(event) => updateForm("businessPermitNumber", event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                    placeholder="e.g., BP-2024-123456"
+                  />
+                </label>
+
+                <div className="md:col-span-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Document Upload</p>
+                  <p className="text-xs text-slate-500 mb-3">Upload required documents (PDF or Image files)</p>
+                  
+                  <div className="space-y-3">
+                    <label>
+                      <span className="text-xs font-medium text-slate-600">Legal Documents</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(event) => updateForm("legalDocuments", event.target.files?.[0])}
+                        className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-600 cursor-pointer"
+                      />
+                    </label>
+
+                    <label>
+                      <span className="text-xs font-medium text-slate-600">Business Permit File</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(event) => updateForm("businessPermit", event.target.files?.[0])}
+                        className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-600 cursor-pointer"
+                      />
+                    </label>
+
+                    <label>
+                      <span className="text-xs font-medium text-slate-600">PhilGEPS Registration Certificate</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(event) => updateForm("philGepsRegistration", event.target.files?.[0])}
+                        className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-600 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-3">Files must be less than 10MB each. After registration, your account will be pending admin approval.</p>
+                </div>
 
                 {error ? (
                   <div className="md:col-span-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">

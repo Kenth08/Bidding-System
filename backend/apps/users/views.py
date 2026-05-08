@@ -3,16 +3,21 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
+from config.throttling import LoginRateThrottle
 
 from .permissions import IsAdmin
 from .serializers import UserSerializer, RegisterSerializer
+from apps.projects.models import DocumentUpload
+from apps.projects.audit import log_audit
 
 User = get_user_model()
 
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").lower().strip()
@@ -43,6 +48,7 @@ class LoginView(APIView):
             return Response({"error": "Your account is inactive."}, status=status.HTTP_403_FORBIDDEN)
 
         refresh = RefreshToken.for_user(user)
+        log_audit("LOGIN", user, f"{user.full_name} logged in", "auth", user.id)
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
@@ -52,13 +58,29 @@ class LoginView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            user = serializer.save()
+            file_map = {
+                DocumentUpload.DocumentType.LEGAL_DOCUMENTS: request.FILES.get("legal_documents"),
+                DocumentUpload.DocumentType.BUSINESS_PERMIT: request.FILES.get("business_permit"),
+                DocumentUpload.DocumentType.PHILGEPS_REGISTRATION: request.FILES.get("philgeps_registration"),
+            }
+            for document_type, uploaded_file in file_map.items():
+                if uploaded_file:
+                    DocumentUpload.objects.create(
+                        user=user,
+                        document_type=document_type,
+                        file_name=uploaded_file.name,
+                        file=uploaded_file,
+                        file_size=uploaded_file.size,
+                    )
+            log_audit("CREATE", user, f"Supplier registration submitted for {user.company_name}", "supplier", user.id)
             return Response(
-                {"message": "Registration submitted. Pending admin approval."},
+                {"message": "Registration submitted. Check your email for verification. Pending admin approval."},
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -130,4 +152,5 @@ class UpdateSupplierStatusView(APIView):
 
         supplier.status = normalized
         supplier.save(update_fields=["status", "updated_at"])
+        log_audit("UPDATE", request.user, f"Supplier {supplier.full_name} status changed to {supplier.status}", "supplier", supplier.id)
         return Response(UserSerializer(supplier).data)

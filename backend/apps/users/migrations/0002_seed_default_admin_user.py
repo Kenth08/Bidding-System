@@ -7,7 +7,7 @@ def create_default_admin_user(apps, schema_editor):
     User = apps.get_model("users", "User")
 
     email = getattr(settings, "DEFAULT_ADMIN_EMAIL", "admin@gmail.com")
-    password = getattr(settings, "DEFAULT_ADMIN_PASSWORD", "admiin123")
+    password = getattr(settings, "DEFAULT_ADMIN_PASSWORD", "admin123")
 
     if not User.objects.filter(email=email).exists():
         User.objects.create(

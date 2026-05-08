@@ -7,7 +7,7 @@ import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
-import { suppliersAPI } from "../../services/api";
+import { suppliersAPI, documentAPI } from "../../services/api";
 
 export default function AdminSuppliers() {
   const [suppliers, setSuppliers] = useState([]);
@@ -15,6 +15,7 @@ export default function AdminSuppliers() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [viewingSupplier, setViewingSupplier] = useState(null);
+  const [supplierDocs, setSupplierDocs] = useState([]);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -32,6 +33,23 @@ export default function AdminSuppliers() {
 
     loadSuppliers();
   }, []);
+
+  // Load documents for the supplier when viewingSupplier changes
+  useEffect(() => {
+    async function loadDocs() {
+      if (!viewingSupplier) return setSupplierDocs([]);
+      try {
+        const res = await documentAPI.getAll();
+        const docs = res.data.results || res.data || [];
+        setSupplierDocs(docs.filter((d) => d.user === viewingSupplier.id));
+      } catch (err) {
+        console.error("Failed to fetch documents for supplier", err);
+        setSupplierDocs([]);
+      }
+    }
+
+    loadDocs();
+  }, [viewingSupplier]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -82,6 +100,7 @@ export default function AdminSuppliers() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Email</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Phone</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Business Type</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Permit No.</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Registered</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
@@ -103,6 +122,7 @@ export default function AdminSuppliers() {
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.email}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.phone || "-"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_type || "-"}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_permit_number || "-"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.created_at?.slice(0, 10)}</td>
                 <td className="px-6 py-4"><StatusBadge status={supplier.status || supplier.status_display} /></td>
                 <td className="px-6 py-4">
@@ -132,8 +152,31 @@ export default function AdminSuppliers() {
             <p><span className="font-semibold">Address:</span> {viewingSupplier.company_address || "-"}</p>
             <p><span className="font-semibold">Phone:</span> {viewingSupplier.phone || "-"}</p>
             <p><span className="font-semibold">Business Type:</span> {viewingSupplier.business_type || "-"}</p>
+            <p><span className="font-semibold">Business Permit No.:</span> {viewingSupplier.business_permit_number || "-"}</p>
             <p><span className="font-semibold">Registered Date:</span> {viewingSupplier.created_at?.slice(0, 10)}</p>
             <StatusBadge status={viewingSupplier.status || viewingSupplier.status_display} />
+            <div className="pt-4">
+              <h3 className="text-sm font-semibold text-slate-800">Uploaded Documents</h3>
+              <div className="mt-2 bg-white rounded-md border border-slate-100">
+                {supplierDocs.length === 0 ? (
+                  <div className="p-4 text-sm text-slate-500">No documents uploaded</div>
+                ) : (
+                  <div className="divide-y divide-slate-50">
+                    {supplierDocs.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between px-4 py-3">
+                        <div>
+                          <div className="text-sm font-medium text-slate-800">{doc.file_name}</div>
+                          <div className="text-xs text-slate-500">{doc.document_type} • {new Date(doc.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <div>
+                          <a href={doc.file_url} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-600">Download</a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </Modal>

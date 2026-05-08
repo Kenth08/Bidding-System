@@ -8,6 +8,7 @@ import SupplierDashboard from "../pages/supplier/SupplierDashboard";
 import SupplierMyBids from "../pages/supplier/SupplierMyBids";
 import SupplierProjects from "../pages/supplier/SupplierProjects";
 import SupplierResults from "../pages/supplier/SupplierResults";
+import SupplierProfile from "../pages/supplier/SupplierProfile";
 import { projectsAPI, bidsAPI, blockchainAPI } from "../services/api";
 
 export default function SupplierLayout({ user, currentUser, onLogout }) {
@@ -32,7 +33,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
         const [projectsRes, bidsRes, blockchainRes] = await Promise.all([
           projectsAPI.getAll("Active"),
           bidsAPI.getAll(),
-          blockchainAPI.getAll(),
+          blockchainAPI.getMyResults(),
         ]);
 
         const projectData = projectsRes.data.results || projectsRes.data || [];
@@ -42,17 +43,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
         setProjects(projectData);
         setSupplierBids(bidData);
 
-        if (activeUser?.id) {
-          const filteredRecords = blockchainData.filter((record) => {
-            if (!record) return false
-            if (record.winner?.id) return record.winner.id === activeUser.id
-            if (typeof record.winner === "string") return record.winner === activeUser.id
-            return record.winner_name === activeUser.full_name
-          })
-          setSupplierResults(filteredRecords)
-        } else {
-          setSupplierResults([])
-        }
+        setSupplierResults(blockchainData || []);
       } catch (error) {
         console.error("Failed to load supplier data", error);
       } finally {
@@ -69,6 +60,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
     if (currentPage === "available-projects") return { title: "Available Projects", subtitle: "Browse active opportunities and submit proposals" };
     if (currentPage === "my-bids") return { title: "My Bids", subtitle: "Track submitted bids and evaluation status" };
     if (currentPage === "results") return { title: "Results", subtitle: "View blockchain-verified procurement outcomes" };
+    if (currentPage === "profile") return { title: "My Profile", subtitle: "Manage your profile and uploaded documents" };
     return { title: "Supplier Dashboard", subtitle: "Overview of projects, bids, and latest updates" };
   }, [currentPage]);
 
@@ -92,6 +84,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
     }
     if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
     if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} user={activeUser} />;
+    if (currentPage === "profile") return <SupplierProfile currentUser={activeUser} />;
     return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
   }, [activeUser, bidDraft, currentPage, selectedProject, showBidModal, supplierBids, supplierProjectFilter, supplierProjects, supplierResults]);
 

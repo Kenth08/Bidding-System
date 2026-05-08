@@ -8,6 +8,10 @@ import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminProjects from "../pages/admin/AdminProjects";
 import AdminSuppliers from "../pages/admin/AdminSuppliers";
 import AdminUsers from "../pages/admin/AdminUsers";
+import AdminProcurementPlanning from "../pages/admin/AdminProcurementPlanning";
+import AdminReports from "../pages/admin/AdminReports";
+import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
+import AdminAwarding from "../pages/admin/AdminAwarding";
 import { dashboardAPI, projectsAPI, bidsAPI, usersAPI, blockchainAPI } from "../services/api";
 
 export default function AdminLayout({ currentUser, onLogout }) {
@@ -65,21 +69,29 @@ export default function AdminLayout({ currentUser, onLogout }) {
 
   const pageMeta = useMemo(() => {
     if (currentPage === "projects") return { title: "Project Management", subtitle: "Create, update, and monitor procurement projects" };
+    if (currentPage === "procurement") return { title: "Procurement Planning", subtitle: "Create and manage procurement requests" };
     if (currentPage === "suppliers") return { title: "Supplier Management", subtitle: "Review registrations and supplier status" };
-    if (currentPage === "bids") return { title: "Bid Evaluation", subtitle: "Review proposals and select project winners" };
+    if (currentPage === "bids") return { title: "Bid Evaluation", subtitle: "Review proposals and rank suppliers by bid amount" };
+    if (currentPage === "awarding") return { title: "Awarding", subtitle: "Generate award documents and manage winning bids" };
     if (currentPage === "users") return { title: "User Accounts", subtitle: "Manage access, roles, and account status" };
     if (currentPage === "records") return { title: "Blockchain Records", subtitle: "Inspect immutable procurement ledger entries" };
+    if (currentPage === "reports") return { title: "Reports & Analytics", subtitle: "View procurement and supplier performance reports" };
+    if (currentPage === "audit") return { title: "Audit Logs", subtitle: "Track all system activities and changes" };
     return { title: "Admin Dashboard", subtitle: "Overview of projects, bids, and blockchain activity" };
   }, [currentPage]);
 
   const page = useMemo(() => {
     if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} />;
+    if (currentPage === "procurement") return <AdminProcurementPlanning />;
     if (currentPage === "suppliers") return <AdminSuppliers />;
     if (currentPage === "bids") return <AdminBids bids={bids} setBids={setBids} projects={projects} setProjects={setProjects} onRecordToBlockchain={(fn) => setBlockchainRecords((prev) => fn(prev))} />;
+    if (currentPage === "awarding") return <AdminAwarding bids={bids} projects={projects} />;
     if (currentPage === "users") return <AdminUsers users={users} setUsers={setUsers} currentUser={currentUser} />;
     if (currentPage === "records") return <AdminBlockchain blockchainRecords={blockchainRecords} />;
+    if (currentPage === "reports") return <AdminReports projects={projects} suppliers={suppliers} bids={bids} />;
+    if (currentPage === "audit") return <AdminAuditLogs />;
     return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
-  }, [bids, blockchainRecords, currentPage, currentUser, projects, users]);
+  }, [bids, blockchainRecords, currentPage, currentUser, projects, suppliers, users]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">

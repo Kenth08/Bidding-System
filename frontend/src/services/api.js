@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -50,7 +50,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: (email, password) => api.post('/auth/login/', { email, password }),
-  register: (data) => api.post('/auth/register/', data),
+  register: (data) => api.post('/auth/register/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
   me: () => api.get('/auth/me/'),
   refreshToken: (refresh) => api.post('/auth/token/refresh/', { refresh }),
 }
@@ -63,6 +63,7 @@ export const projectsAPI = {
   create: (data) => api.post('/projects/', data),
   update: (id, data) => api.patch(`/projects/${id}/`, data),
   delete: (id) => api.delete(`/projects/${id}/`),
+  publish: (id) => api.patch(`/projects/${id}/publish/`),
 }
 
 export const dashboardAPI = {
@@ -71,7 +72,8 @@ export const dashboardAPI = {
 
 export const bidsAPI = {
   getAll: () => api.get('/bids/'),
-  create: (data) => api.post('/bids/', data),
+  create: (data) => api.post('/bids/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
+  update: (id, data) => api.patch(`/bids/${id}/`, data),
   markReview: (id) => api.patch(`/bids/${id}/review/`),
   selectWinner: (id) => api.patch(`/bids/${id}/select/`),
   recordBlockchain: (id) => api.post(`/bids/${id}/record/`),
@@ -97,8 +99,39 @@ export const blockchainAPI = {
   // Public — no hash exposed
   getPublic: () => axios.get(`${BASE_URL}/blockchain/public/`),
 
+  // Public hash verification — no auth needed
+  verifyHash: (hash) => axios.get(`${BASE_URL}/blockchain/verify/?hash=${encodeURIComponent(hash)}`),
+
   // Supplier — their own results only, no hash exposed
   getMyResults: () => api.get('/blockchain/supplier/'),
+}
+
+export const awardsAPI = {
+  generateNOA: (bidId) => api.get(`/bids/${bidId}/documents/noa/`),
+  generateNTP: (bidId) => api.get(`/bids/${bidId}/documents/ntp/`),
+  generateResolution: (bidId) => api.get(`/bids/${bidId}/documents/resolution/`),
+}
+
+export const procurementAPI = {
+  getAll: () => api.get('/projects/procurements/'),
+  getOne: (id) => api.get(`/projects/procurements/${id}/`),
+  create: (data) => api.post('/projects/procurements/', data),
+  update: (id, data) => api.patch(`/projects/procurements/${id}/`, data),
+  delete: (id) => api.delete(`/projects/procurements/${id}/`),
+}
+
+export const auditLogAPI = {
+  getAll: () => api.get('/projects/audit-logs/'),
+}
+
+export const reportsAPI = {
+  getProcurement: () => api.get('/reports/procurement/'),
+  getSuppliers: () => api.get('/reports/suppliers/'),
+}
+
+export const documentAPI = {
+  getAll: () => api.get('/projects/documents/'),
+  upload: (data) => api.post('/projects/documents/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
 }
 
 export default api

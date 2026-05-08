@@ -9,7 +9,7 @@ import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 
-const INITIAL_FORM = { title: "", budget: "", deadline: "", requirements: "", status: "Active" };
+const INITIAL_FORM = { title: "", budget: "", deadline: "", requirements: "", status: "Draft" };
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
@@ -30,7 +30,8 @@ export default function AdminProjects({ projects, setProjects }) {
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
     return projects.filter((project) => {
-      const matchesFilter = filter === "All" || project.status === filter;
+      const projStatus = (project.status || "").toString().toLowerCase();
+      const matchesFilter = filter === "All" || projStatus === filter.toLowerCase();
       const matchesSearch = !query || project.title.toLowerCase().includes(query);
       return matchesFilter && matchesSearch;
     });
@@ -43,6 +44,12 @@ export default function AdminProjects({ projects, setProjects }) {
     setShowModal(true);
   }
 
+  function displayStatusText(status) {
+    if (!status) return "";
+    const s = status.toString();
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
   function openEdit(project) {
     setEditingProject(project);
     setForm({
@@ -50,7 +57,7 @@ export default function AdminProjects({ projects, setProjects }) {
       budget: String(project.budget || ""),
       deadline: project.deadline || "",
       requirements: project.requirements || "",
-      status: project.status || "Active",
+      status: displayStatusText(project.status) || "Active",
     });
     setErrors({});
     setShowModal(true);
@@ -126,7 +133,7 @@ export default function AdminProjects({ projects, setProjects }) {
 
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <div className="px-6 pt-4 flex gap-4 border-b border-slate-50">
-          {["All", "Active", "Closed", "Awarded"].map((tab) => (
+          {["All", "Draft", "Active", "Closed", "Awarded"].map((tab) => (
             <button key={tab} onClick={() => setFilter(tab)} className={`pb-3 text-sm font-medium border-b-2 ${filter === tab ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-400"}`}>
               {tab}
             </button>
@@ -160,9 +167,19 @@ export default function AdminProjects({ projects, setProjects }) {
                   <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(project.budget)}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{project.deadline}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{project.requirements?.length > 40 ? `${project.requirements.slice(0, 40)}...` : project.requirements}</td>
-                  <td className="px-6 py-4"><StatusBadge status={project.status} /></td>
+                  <td className="px-6 py-4"><StatusBadge status={displayStatusText(project.status)} /></td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
+                      {(project.status === "draft" || project.status === "Draft") && (
+                        <button onClick={async () => {
+                          try {
+                            const res = await projectsAPI.publish(project.id);
+                            setProjects((prev) => prev.map((p) => (p.id === project.id ? res.data : p)));
+                          } catch (err) {
+                            console.error("Failed to publish project", err);
+                          }
+                        }} className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600">Publish</button>
+                      )}
                       <button onClick={() => openEdit(project)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Pencil className="h-4 w-4" /></button>
                       <button onClick={() => { setDeletingId(project.id); setShowConfirm(true); }} className="p-2 rounded-lg hover:bg-slate-100 text-red-500"><Trash2 className="h-4 w-4" /></button>
                     </div>
@@ -197,14 +214,17 @@ export default function AdminProjects({ projects, setProjects }) {
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Requirements</label>
             <textarea rows={4} value={form.requirements} onChange={(event) => setForm((prev) => ({ ...prev, requirements: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Status</label>
-            <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
-              <option>Active</option>
-              <option>Closed</option>
-              <option>Awarded</option>
-            </select>
-          </div>
+          {editingProject && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Status</label>
+              <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+                <option>Draft</option>
+                <option>Active</option>
+                <option>Closed</option>
+                <option>Awarded</option>
+              </select>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button>
             <button onClick={saveProject} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white" disabled={isSaving}>

@@ -35,6 +35,11 @@ export default function SupplierProjects({
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isProjectClosed = (project) => project.status !== "Active" || new Date(project.deadline).getTime() < new Date().setHours(0, 0, 0, 0);
+
+  const hasSubmittedBid = (projectId) =>
+    submittedProjectIds.includes(projectId) || supplierBids.some((bid) => bid.project === projectId || bid.projectId === projectId);
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return supplierProjects.filter((project) => {
@@ -48,8 +53,18 @@ export default function SupplierProjects({
   }, [search, supplierProjectFilter, supplierProjects]);
 
   function openBid(project) {
+    if (isProjectClosed(project)) {
+      setToast({ message: "Bidding closed for this project.", type: "warning" });
+      return;
+    }
+
+    if (hasSubmittedBid(project.id)) {
+      setToast({ message: "You have already submitted a bid for this project.", type: "warning" });
+      return;
+    }
+
     setSelectedProject(project);
-    setBidDraft({ bidAmount: "", proposal: "" });
+    setBidDraft({ bidAmount: "", proposal: "", quotationDocument: null, technicalDocument: null });
     setErrors({});
     setShowBidModal(true);
   }
@@ -58,16 +73,30 @@ export default function SupplierProjects({
     const next = {};
     if (!bidDraft.bidAmount || Number(bidDraft.bidAmount) <= 0) next.bidAmount = "Enter a valid amount.";
     if (!bidDraft.proposal || bidDraft.proposal.trim().length < 20) next.proposal = "Proposal must be at least 20 characters.";
+    if (!bidDraft.quotationDocument) next.quotationDocument = "Quotation document is required.";
+    if (!bidDraft.technicalDocument) next.technicalDocument = "Technical document is required.";
     setErrors(next);
     if (Object.keys(next).length) return;
 
+    if (isProjectClosed(selectedProject)) {
+      setToast({ message: "Bidding closed for this project.", type: "error" });
+      return;
+    }
+
+    if (hasSubmittedBid(selectedProject.id)) {
+      setToast({ message: "Duplicate bid is not allowed for the same project.", type: "error" });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const payload = {
-        project: selectedProject.id,
-        bid_amount: Number(bidDraft.bidAmount),
-        proposal: bidDraft.proposal.trim(),
-      };
+      const payload = new FormData();
+      payload.append("project", selectedProject.id);
+      payload.append("bid_amount", Number(bidDraft.bidAmount));
+      payload.append("proposal", bidDraft.proposal.trim());
+      payload.append("company_name", activeUser?.company_name || "");
+      if (bidDraft.quotationDocument) payload.append("quotation_document", bidDraft.quotationDocument);
+      if (bidDraft.technicalDocument) payload.append("technical_document", bidDraft.technicalDocument);
       const res = await bidsAPI.create(payload);
       setSupplierBids((prev) => [res.data, ...prev]);
       setSubmittedProjectIds((prev) => [...prev, selectedProject.id]);
@@ -103,14 +132,14 @@ export default function SupplierProjects({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((project) => {
-            const alreadySubmitted = submittedProjectIds.includes(project.id);
+            const alreadySubmitted = hasSubmittedBid(project.id);
             return (
               <div key={project.id} className="rounded-2xl border border-slate-100 bg-white p-4">
                 <div className="flex items-start justify-between gap-3"><h3 className="text-sm font-semibold text-slate-800">{project.title}</h3><StatusBadge status={project.status} /></div>
                 <p className="text-sm text-slate-500 mt-3">Budget: {formatPeso(project.budget)}</p>
                 <p className="text-sm text-slate-500">Deadline: {project.deadline}</p>
                 <p className="mt-3 text-sm text-slate-600 line-clamp-2">{project.requirements}</p>
-                <button disabled={alreadySubmitted} onClick={() => openBid(project)} className={`mt-4 w-full rounded-xl px-3 py-2 text-sm font-semibold ${alreadySubmitted ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>{alreadySubmitted ? "Bid Submitted" : "Submit Bid ->"}</button>
+                <button disabled={alreadySubmitted || isProjectClosed(project)} onClick={() => openBid(project)} className={`mt-4 w-full rounded-xl px-3 py-2 text-sm font-semibold ${alreadySubmitted ? "bg-slate-100 text-slate-400" : isProjectClosed(project) ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>{alreadySubmitted ? "Bid Submitted ✓" : isProjectClosed(project) ? "Closed" : "Submit Bid ->"}</button>
               </div>
             );
           })}
@@ -128,6 +157,16 @@ export default function SupplierProjects({
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Proposal Summary <span className="text-red-400">*</span></label>
             <textarea rows={4} value={bidDraft.proposal || ""} onChange={(event) => setBidDraft((prev) => ({ ...prev, proposal: event.target.value }))} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm" />
             {errors.proposal && <p className="text-xs text-red-500 mt-1">{errors.proposal}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Quotation Document <span className="text-red-400">*</span></label>
+            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={(event) => setBidDraft((prev) => ({ ...prev, quotationDocument: event.target.files?.[0] || null }))} className="w-full text-sm" />
+            {errors.quotationDocument && <p className="text-xs text-red-500 mt-1">{errors.quotationDocument}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Technical Document <span className="text-red-400">*</span></label>
+            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={(event) => setBidDraft((prev) => ({ ...prev, technicalDocument: event.target.files?.[0] || null }))} className="w-full text-sm" />
+            {errors.technicalDocument && <p className="text-xs text-red-500 mt-1">{errors.technicalDocument}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Company Name</label>

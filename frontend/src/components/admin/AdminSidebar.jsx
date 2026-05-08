@@ -1,13 +1,16 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\admin\AdminSidebar.jsx
-import { ChevronRight, FolderKanban, Gavel, LayoutDashboard, Link, Shield, Users, X } from "lucide-react";
+import { ChevronRight, FolderKanban, Gavel, LayoutDashboard, Link, Shield, Users, X, Briefcase, Award, FileText, History } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "users", label: "Users", icon: Users },
   { key: "projects", label: "Projects", icon: FolderKanban },
+  { key: "procurement", label: "Procurement Planning", icon: Briefcase },
   { key: "suppliers", label: "Suppliers", icon: Users },
-  { key: "bids", label: "Bids", icon: Gavel },
+  { key: "bids", label: "Bid Evaluation", icon: Gavel },
+  { key: "awarding", label: "Awarding", icon: Award },
   { key: "records", label: "Blockchain Records", icon: Link },
+  { key: "reports", label: "Reports", icon: FileText },
+  { key: "audit", label: "Audit Logs", icon: History },
 ];
 
 export default function AdminSidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, currentUser }) {

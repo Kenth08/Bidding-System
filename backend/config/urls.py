@@ -1,10 +1,12 @@
 from django.contrib import admin
 from django.urls import include, path
 from django.http import HttpResponse
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.projects.views import DashboardStatsView
+from apps.projects.views import DashboardStatsView, ProcurementReportView, SupplierReportView
 
 
 def favicon_view(request):
@@ -49,11 +51,15 @@ urlpatterns = [
     path("api/projects/", include("apps.projects.urls")),
     path("api/bids/", include("apps.bids.urls")),
     path("api/blockchain/", include("apps.blockchain.urls")),
+    path("api/reports/procurement/", ProcurementReportView.as_view(), name="reports-procurement"),
+    path("api/reports/suppliers/", SupplierReportView.as_view(), name="reports-suppliers"),
     path("api/dashboard/stats/", DashboardStatsView.as_view(), name="dashboard-stats"),
     path("api/v1/health/", HealthView.as_view(), name="health-v1"),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/projects/", include("apps.projects.urls")),
     path("api/v1/bids/", include("apps.bids.urls")),
     path("api/v1/blockchain/", include("apps.blockchain.urls")),
+    path("api/v1/reports/procurement/", ProcurementReportView.as_view(), name="reports-procurement-v1"),
+    path("api/v1/reports/suppliers/", SupplierReportView.as_view(), name="reports-suppliers-v1"),
     path("api/v1/dashboard/stats/", DashboardStatsView.as_view(), name="dashboard-stats-v1"),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

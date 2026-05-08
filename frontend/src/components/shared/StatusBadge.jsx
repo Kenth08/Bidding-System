@@ -1,8 +1,13 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\StatusBadge.jsx
 const STATUS_CLASS_MAP = {
   Active: "border border-emerald-100 bg-emerald-50 text-emerald-700",
+  active: "border border-emerald-100 bg-emerald-50 text-emerald-700",
+  Draft: "border border-slate-200 bg-slate-100 text-slate-600",
+  draft: "border border-slate-200 bg-slate-100 text-slate-600",
   Closed: "border border-slate-200 bg-slate-100 text-slate-500",
+  closed: "border border-slate-200 bg-slate-100 text-slate-500",
   Awarded: "border border-blue-100 bg-blue-50 text-blue-600",
+  awarded: "border border-blue-100 bg-blue-50 text-blue-600",
   Pending: "border border-amber-100 bg-amber-50 text-amber-600",
   Approved: "border border-emerald-100 bg-emerald-50 text-emerald-700",
   Rejected: "border border-red-100 bg-red-50 text-red-500",

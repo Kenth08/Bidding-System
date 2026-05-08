@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path("", views.BlockchainPublicListView.as_view(), name="blockchain-list"),
     path("public/", views.BlockchainPublicListView.as_view(), name="blockchain-public"),
+    path("verify/", views.BlockchainVerifyView.as_view(), name="blockchain-verify"),
 
     path("admin/", views.BlockchainAdminListView.as_view(), name="blockchain-admin"),
     path("admin/<uuid:pk>/", views.BlockchainAdminDetailView.as_view(), name="blockchain-admin-detail"),

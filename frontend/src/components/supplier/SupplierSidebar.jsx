@@ -1,11 +1,12 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\supplier\SupplierSidebar.jsx
-import { CheckCircle, ChevronRight, FileText, FolderOpen, LayoutDashboard, Shield, X } from "lucide-react";
+import { CheckCircle, ChevronRight, FileText, FolderOpen, LayoutDashboard, Shield, X, User } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "available-projects", label: "Available Projects", icon: FolderOpen },
   { key: "my-bids", label: "My Bids", icon: FileText },
   { key: "results", label: "Results", icon: CheckCircle },
+  { key: "profile", label: "My Profile", icon: User },
 ];
 
 export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, currentUser }) {

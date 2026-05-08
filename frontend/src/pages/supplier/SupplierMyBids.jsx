@@ -53,12 +53,12 @@ export default function SupplierMyBids({ supplierBids, onNavigate }) {
                 <tr onClick={() => setExpandedId((prev) => (prev === bid.id ? null : bid.id))} className="hover:bg-slate-50/50 transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">{bid.projectTitle || bid.projectName}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(bid.bidAmount)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{bid.company}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{bid.companyName || bid.supplierCompany || bid.company || "-"}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{bid.submittedAt}</td>
                   <td className="px-6 py-4"><StatusBadge status={bid.status} /></td>
                 </tr>
                 {expandedId === bid.id && (
-                  <tr><td colSpan={5} className="px-6 py-3 bg-slate-50/70 text-sm text-slate-600">{bid.proposal}</td></tr>
+                  <tr><td colSpan={5} className="px-6 py-3 bg-slate-50/70 text-sm text-slate-600">{bid.proposal}{bid.rank ? `\nRank: ${bid.rank}` : ""}</td></tr>
                 )}
               </Fragment>
             ))}

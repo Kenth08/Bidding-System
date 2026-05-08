@@ -1,9 +1,10 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\public\PublicResultsPage.jsx
-import { ArrowLeft, Eye, Shield } from "lucide-react";
+import { ArrowLeft, CheckCircle, Eye, Loader2, Search, Shield, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
-import { blockchainAPI } from "../../services/api";
+import Modal from "../../components/shared/Modal";
+import StatusBadge from "../../components/shared/StatusBadge";
+import api from "../../services/api";
 
 function formatPeso(value) {
   if (typeof value !== "number") {
@@ -18,12 +19,15 @@ export default function PublicResultsPage({ onBack }) {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [verifyHash, setVerifyHash] = useState("");
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
 
   useEffect(() => {
     async function loadRecords() {
       setIsLoading(true);
       try {
-        const res = await blockchainAPI.getPublic();
+        const res = await api.get('/projects/public/results/');
         setRecords(res.data.results || res.data || []);
       } catch (err) {
         console.error("Failed to load public blockchain records", err);
@@ -39,16 +43,14 @@ export default function PublicResultsPage({ onBack }) {
   const normalizedResults = useMemo(
     () =>
       records.map((item) => ({
-        id: item.id,
-        projectName:
-          item.project_title || item.projectTitle || item.project?.title || item.project || "Untitled Project",
-        projectId: item.project_ref_id || item.projectRefId || "N/A",
-        winner: item.winner_name || item.winner || "Not available",
-        companyName:
-          item.winner_company || item.winnerCompany || "Unknown Company",
-        bidAmount: formatPeso(item.bid_amount ?? item.bidAmount ?? "N/A"),
-        awardDate:
-          item.award_date || item.recordedAt || item.recorded_at || "N/A",
+        id: item.project_id || item.project_id || item.id,
+        projectName: item.project_title || "Untitled Project",
+        projectId: item.project_id || "N/A",
+        winner: item.winning_supplier || "Not available",
+        companyName: item.winning_supplier || "Unknown Company",
+        bidAmount: formatPeso(Number(item.winning_bid_amount) || 0),
+        awardDate: item.award_date ? new Date(item.award_date).toLocaleDateString() : "N/A",
+        raw: item,
       })),
     [records]
   );
@@ -62,12 +64,25 @@ export default function PublicResultsPage({ onBack }) {
     return normalizedResults.filter(
       (item) =>
         item.projectName.toLowerCase().includes(query) ||
-        item.winner.toLowerCase().includes(query) ||
-        item.companyName.toLowerCase().includes(query) ||
-        String(item.bidAmount).toLowerCase().includes(query) ||
-        item.projectId.toLowerCase().includes(query)
+          item.winner.toLowerCase().includes(query) ||
+          item.companyName.toLowerCase().includes(query) ||
+          String(item.bidAmount).toLowerCase().includes(query) ||
+          (item.projectId || "").toLowerCase().includes(query)
     );
   }, [normalizedResults, search]);
+
+        const [selectedRecord, setSelectedRecord] = useState(null);
+
+  async function handleVerifyHash() {
+    // Blockchain verification not available in this preview.
+    if (!verifyHash.trim()) return;
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    setTimeout(() => {
+      setVerifyResult({ verified: false, message: "Blockchain verification is not available in this preview. Hash placeholder only." });
+      setVerifyLoading(false);
+    }, 600);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -98,33 +113,87 @@ export default function PublicResultsPage({ onBack }) {
             <span className="text-xs font-semibold uppercase tracking-widest text-emerald-500">Public Access</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Procurement Results</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            All awarded contracts and blockchain-verified outcomes. No login required.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">All awarded contracts and blockchain-verified outcomes. No login required.</p>
         </div>
 
-        <div className="mb-6 flex items-center gap-4 rounded-2xl bg-slate-900 p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
-            <Shield className="h-5 w-5 text-white" />
+        <div className="mb-6 rounded-2xl border border-slate-100 bg-white p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50">
+              <Shield className="h-5 w-5 text-emerald-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Verify Blockchain Record</h3>
+              <p className="mt-0.5 text-xs text-slate-400">Paste a blockchain hash to verify if a procurement record is authentic</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-white">Immutable Blockchain Ledger</p>
-            <p className="mt-0.5 text-xs text-slate-400">
-              All results permanently stored · Cannot be altered · Publicly verifiable
-            </p>
+
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={verifyHash}
+              onChange={(event) => setVerifyHash(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && handleVerifyHash()}
+              placeholder="Paste blockchain hash here (0x...)"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+            />
+            <button
+              onClick={handleVerifyHash}
+              disabled={verifyLoading || !verifyHash.trim()}
+              className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-600 disabled:bg-emerald-300"
+            >
+              {verifyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Verify
+            </button>
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            <span className="text-xs font-medium text-emerald-400">Live</span>
+
+          {verifyResult && (
+            <div className={`mt-4 rounded-xl border p-4 ${verifyResult.verified ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
+              <div className="mb-2 flex items-center gap-2">
+                {verifyResult.verified ? <CheckCircle className="h-5 w-5 text-emerald-500" /> : <XCircle className="h-5 w-5 text-red-500" />}
+                <p className={`text-sm font-semibold ${verifyResult.verified ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {verifyResult.verified ? '✓ Record Verified' : '✗ Record Not Found'}
+                </p>
+              </div>
+              {verifyResult.verified ? (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {[
+                    { label: 'Project', value: verifyResult.project_title },
+                    { label: 'Reference', value: verifyResult.project_ref_id },
+                    { label: 'Winner', value: verifyResult.winner_name },
+                    { label: 'Company', value: verifyResult.winner_company },
+                    { label: 'Bid Amount', value: `₱${Number(verifyResult.bid_amount).toLocaleString()}` },
+                    { label: 'Recorded At', value: new Date(verifyResult.recorded_at).toLocaleDateString() },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-emerald-600">{label}</p>
+                      <p className="text-sm font-semibold text-emerald-800">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-red-600">{verifyResult.message}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mb-6 rounded-2xl bg-slate-900 p-4 text-white">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
+              <Shield className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white">Immutable Blockchain Ledger</p>
+              <p className="mt-0.5 text-xs text-slate-400">All results permanently stored · Cannot be altered · Publicly verifiable</p>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+              <span className="text-xs font-medium text-emerald-400">Live</span>
+            </div>
           </div>
         </div>
 
-        <SearchBar
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search project, winner, company, or amount"
-          className="w-full"
-        />
+        <SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search project, winner, company, or amount" className="w-full" />
 
         {isLoading ? (
           <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">Loading public results...</div>
@@ -140,8 +209,9 @@ export default function PublicResultsPage({ onBack }) {
                     <h2 className="text-base font-bold text-slate-900">{record.projectName}</h2>
                     <p className="mt-1 text-xs text-slate-500">ID: {record.projectId}</p>
                   </div>
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                    Verified
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Verified</div>
+                    <button onClick={() => setSelectedRecord(record)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">Verify</button>
                   </div>
                 </div>
 
@@ -163,22 +233,6 @@ export default function PublicResultsPage({ onBack }) {
                     <p className="text-sm font-semibold text-slate-900">{record.awardDate}</p>
                   </div>
                 </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-emerald-500" />
-                      <span className="text-xs font-semibold text-emerald-600">Blockchain Verified</span>
-                    </div>
-                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 text-xs font-medium px-2 py-1 rounded-md border border-emerald-100">
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                      Verified ✓
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1.5">
-                    This procurement result is permanently recorded on the blockchain and cannot be modified or deleted.
-                  </p>
-                </div>
               </article>
             ))}
           </div>
@@ -187,7 +241,27 @@ export default function PublicResultsPage({ onBack }) {
             <EmptyState title="No public results found" subtitle="Try another keyword or check again once new contracts are awarded." />
           </div>
         )}
+        {selectedRecord && (
+          <Modal isOpen={Boolean(selectedRecord)} onClose={() => setSelectedRecord(null)} title="Award Details" subtitle="Verified Award Information" size="md">
+            <div className="space-y-3 text-sm text-slate-700">
+              <p><span className="font-semibold">Project ID:</span> {selectedRecord.projectId}</p>
+              <p><span className="font-semibold">Project Title:</span> {selectedRecord.projectName}</p>
+              <p><span className="font-semibold">Winning Supplier:</span> {selectedRecord.winner}</p>
+              <p><span className="font-semibold">Bid Amount:</span> {selectedRecord.bidAmount}</p>
+              <p><span className="font-semibold">Award Date:</span> {selectedRecord.awardDate}</p>
+              <div>
+                <p className="text-xs text-slate-400">Hash Value</p>
+                <p className="text-sm font-mono text-slate-700">Blockchain record will be available after integration</p>
+              </div>
+              <div className="pt-2">
+                <StatusBadge status="Verified" />
+                <p className="text-xs text-slate-400 mt-2">Verified — Tamper-evident record</p>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\auth\LoginPage.jsx
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, Shield } from "lucide-react";
 import { useState } from "react";
-import { authAPI } from "../../services/api";
+import { loginWithEmail } from "../../services/authService";
 
 export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
   const [email, setEmail] = useState("");
@@ -22,10 +22,12 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
     setError("");
 
     try {
-      const res = await authAPI.login(email, password);
-      localStorage.setItem("access_token", res.data.access);
-      localStorage.setItem("refresh_token", res.data.refresh);
-      onLogin(res.data.user.role, res.data.user);
+      const { user, error: loginError } = await loginWithEmail(email, password);
+      if (loginError) {
+        setError(loginError);
+        return;
+      }
+      onLogin(user.role, user);
     } catch (err) {
       setError(err.response?.data?.error || "Login failed. Please try again.");
     } finally {
@@ -103,6 +105,7 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
               />
+              <p className="mt-1.5 text-xs text-slate-400">Admin users can log in with admin@gmail.com.</p>
             </label>
 
             <label className="block">

@@ -8,6 +8,9 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from config.throttling import LoginRateThrottle
+
+from apps.projects.models import DocumentUpload
 
 from .serializers import UserSerializer
 
@@ -28,6 +31,7 @@ def _is_admin(user):
 class LoginView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         payload = _json_body(request)
@@ -70,7 +74,7 @@ class RegisterSupplierView(APIView):
     permission_classes = []
 
     def post(self, request):
-        payload = _json_body(request)
+        payload = request.data if hasattr(request, "data") else _json_body(request)
         full_name = str(payload.get("full_name", "")).strip()
         email = str(payload.get("email", "")).strip().lower()
         password = str(payload.get("password", "")).strip()
@@ -98,6 +102,22 @@ class RegisterSupplierView(APIView):
             )
         except IntegrityError:
             return Response({"error": "This email is already registered."}, status=409)
+
+        uploaded_documents = {
+            DocumentUpload.DocumentType.LEGAL_DOCUMENTS: request.FILES.get("legal_documents"),
+            DocumentUpload.DocumentType.BUSINESS_PERMIT: request.FILES.get("business_permit"),
+            DocumentUpload.DocumentType.PHILGEPS_REGISTRATION: request.FILES.get("philgeps_registration"),
+        }
+
+        for document_type, uploaded_file in uploaded_documents.items():
+            if uploaded_file:
+                DocumentUpload.objects.create(
+                    user=user,
+                    document_type=document_type,
+                    file_name=uploaded_file.name,
+                    file=uploaded_file,
+                    file_size=uploaded_file.size,
+                )
 
         return Response({"success": True}, status=201)
 
