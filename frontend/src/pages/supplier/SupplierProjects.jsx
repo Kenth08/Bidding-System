@@ -1,11 +1,11 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\supplier\SupplierProjects.jsx
-import { useMemo, useState } from "react";
-import { bidsAPI } from "../../services/api";
+import { useContext, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
+import { ProcurementContext } from "../../lib/ProcurementContext";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
@@ -26,6 +26,7 @@ export default function SupplierProjects({
   setSelectedProject,
   bidDraft,
   setBidDraft,
+  supplierBids,
   setSupplierBids,
   activeUser,
 }) {
@@ -34,8 +35,11 @@ export default function SupplierProjects({
   const [toast, setToast] = useState(null);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const procurement = useContext(ProcurementContext);
 
   const isProjectClosed = (project) => project.status !== "Active" || new Date(project.deadline).getTime() < new Date().setHours(0, 0, 0, 0);
+
+  const canBid = (project) => (activeUser?.status || activeUser?.supplier_status || "Verified") === "Verified" && !isProjectClosed(project);
 
   const hasSubmittedBid = (projectId) =>
     submittedProjectIds.includes(projectId) || supplierBids.some((bid) => bid.project === projectId || bid.projectId === projectId);
@@ -90,6 +94,11 @@ export default function SupplierProjects({
 
     setIsSubmitting(true);
     try {
+      if ((activeUser?.status || activeUser?.supplier_status) !== "Verified") {
+        setToast({ message: "Only verified suppliers can submit bids.", type: "error" });
+        return;
+      }
+
       const payload = new FormData();
       payload.append("project", selectedProject.id);
       payload.append("bid_amount", Number(bidDraft.bidAmount));
@@ -97,8 +106,29 @@ export default function SupplierProjects({
       payload.append("company_name", activeUser?.company_name || "");
       if (bidDraft.quotationDocument) payload.append("quotation_document", bidDraft.quotationDocument);
       if (bidDraft.technicalDocument) payload.append("technical_document", bidDraft.technicalDocument);
-      const res = await bidsAPI.create(payload);
-      setSupplierBids((prev) => [res.data, ...prev]);
+      if (procurement?.submitBid && selectedProject?.id && activeUser?.id) {
+        const bid = procurement.submitBid(selectedProject.id, activeUser.id, Number(bidDraft.bidAmount), {
+          proposal: bidDraft.proposal.trim(),
+          quotationDocument: bidDraft.quotationDocument?.name,
+          technicalDocument: bidDraft.technicalDocument?.name,
+        });
+        const normalized = {
+          id: bid.id,
+          project: selectedProject.id,
+          projectId: selectedProject.id,
+          projectTitle: selectedProject.title,
+          projectName: selectedProject.title,
+          bidAmount: Number(bidDraft.bidAmount),
+          proposal: bidDraft.proposal.trim(),
+          supplierName: activeUser?.full_name || activeUser?.fullName || activeUser?.company_name || "Supplier",
+          supplierCompany: activeUser?.company_name || "",
+          submittedAt: new Date().toLocaleString(),
+          status: "Submitted",
+          technical_compliance: true,
+          evaluation_remarks: "",
+        };
+        setSupplierBids((prev) => [normalized, ...prev]);
+      }
       setSubmittedProjectIds((prev) => [...prev, selectedProject.id]);
       setShowBidModal(false);
       setToast({ message: "Bid submitted successfully!", type: "success" });
@@ -139,7 +169,7 @@ export default function SupplierProjects({
                 <p className="text-sm text-slate-500 mt-3">Budget: {formatPeso(project.budget)}</p>
                 <p className="text-sm text-slate-500">Deadline: {project.deadline}</p>
                 <p className="mt-3 text-sm text-slate-600 line-clamp-2">{project.requirements}</p>
-                <button disabled={alreadySubmitted || isProjectClosed(project)} onClick={() => openBid(project)} className={`mt-4 w-full rounded-xl px-3 py-2 text-sm font-semibold ${alreadySubmitted ? "bg-slate-100 text-slate-400" : isProjectClosed(project) ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>{alreadySubmitted ? "Bid Submitted ✓" : isProjectClosed(project) ? "Closed" : "Submit Bid ->"}</button>
+                <button disabled={alreadySubmitted || !canBid(project)} onClick={() => openBid(project)} className={`mt-4 w-full rounded-xl px-3 py-2 text-sm font-semibold ${alreadySubmitted ? "bg-slate-100 text-slate-400" : !canBid(project) ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>{alreadySubmitted ? "Bid Submitted ✓" : !canBid(project) ? "Verified Suppliers Only" : "Submit Bid ->"}</button>
               </div>
             );
           })}

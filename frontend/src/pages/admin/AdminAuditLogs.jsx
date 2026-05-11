@@ -1,8 +1,8 @@
 import { Activity, Filter } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
-import { auditLogAPI } from "../../services/api";
+import { ProcurementContext } from "../../lib/ProcurementContext";
 
 const ACTION_TYPES = [
   "LOGIN",
@@ -17,33 +17,19 @@ const ACTION_TYPES = [
 ];
 
 export default function AdminAuditLogs() {
-  const [logs, setLogs] = useState([]);
-  useEffect(() => {
-    async function loadLogs() {
-      try {
-        const res = await auditLogAPI.getAll();
-        const items = res.data.results || res.data || [];
-        setLogs(
-          items.map((item) => ({
-            id: item.id,
-            action: item.action,
-            user: item.user_name || item.user_email || "Unknown",
-            role: item.user_role || "",
-            timestamp: item.created_at,
-            description: item.description,
-            actionType: item.action.toLowerCase(),
-          }))
-        );
-      } catch (error) {
-        console.error("Failed to load audit logs", error);
-      }
-    }
-
-    loadLogs();
-  }, []);
-
+  const procurement = useContext(ProcurementContext);
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState("All");
+
+  const logs = useMemo(() => (procurement?.auditLogs || []).map((item) => ({
+    id: item.id,
+    action: item.action,
+    user: item.user || "Unknown",
+    role: item.role || "",
+    timestamp: item.timestamp,
+    description: item.action,
+    actionType: String(item.action || "").toLowerCase().replace(/\s+/g, "_"),
+  })), [procurement?.auditLogs]);
 
   const filtered = useMemo(() => {
     return logs

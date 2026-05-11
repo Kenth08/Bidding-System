@@ -1,7 +1,8 @@
 // c:\Users\Mico\Bidding-System\frontend\src\pages\admin\AdminProjects.jsx
 import { FolderOpen, Pencil, PlusCircle, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { projectsAPI } from "../../services/api";
+import { useContext, useMemo, useState } from "react";
+import { ProcurementContext } from "../../lib/ProcurementContext";
+import { getStatusLabel, normalizeProject } from "../../lib/procurementStatus";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
@@ -16,6 +17,7 @@ function formatPeso(value) {
 }
 
 export default function AdminProjects({ projects, setProjects }) {
+  const procurement = useContext(ProcurementContext);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -86,12 +88,36 @@ export default function AdminProjects({ projects, setProjects }) {
 
     try {
       if (editingProject) {
-        const res = await projectsAPI.update(editingProject.id, payload);
-        setProjects((prev) => prev.map((item) => (item.id === editingProject.id ? res.data : item)));
+        const saved = procurement?.updateProject
+          ? procurement.updateProject(
+              editingProject.id,
+              {
+                project_title: payload.title,
+                budget: payload.budget,
+                submission_deadline: payload.deadline,
+                technical_specifications: payload.requirements,
+              },
+              "Admin"
+            )
+          : null;
+        const uiProject = normalizeProject(saved || { ...editingProject, ...payload });
+        setProjects((prev) => prev.map((item) => (item.id === editingProject.id ? { ...uiProject, status: getStatusLabel(uiProject.status) } : item)));
         setToast({ message: "Project updated successfully", type: "success" });
       } else {
-        const res = await projectsAPI.create(payload);
-        setProjects((prev) => [res.data, ...prev]);
+        const saved = procurement?.createRequest
+          ? procurement.createRequest(
+              {
+                title: payload.title,
+                budget: payload.budget,
+                deadline: payload.deadline,
+                requirements: payload.requirements,
+                category: "General",
+              },
+              "Admin"
+            )
+          : null;
+        const uiProject = normalizeProject(saved || { ...payload, id: `PRJ-${Date.now()}` });
+        setProjects((prev) => [{ ...uiProject, status: getStatusLabel(uiProject.status) }, ...prev]);
         setToast({ message: "Project created successfully", type: "success" });
       }
       setShowModal(false);
@@ -106,7 +132,7 @@ export default function AdminProjects({ projects, setProjects }) {
   async function confirmDelete() {
     if (!deletingId) return;
     try {
-      await projectsAPI.delete(deletingId);
+      procurement?.deleteProject?.(deletingId, "Admin");
       setProjects((prev) => prev.filter((item) => item.id !== deletingId));
       setToast({ message: "Project deleted", type: "warning" });
     } catch (error) {

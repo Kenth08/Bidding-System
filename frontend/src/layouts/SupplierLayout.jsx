@@ -1,5 +1,5 @@
 // c:\Users\Mico\Bidding-System\frontend\src\layouts\SupplierLayout.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import SupplierProfileModal from "../components/supplier/SupplierProfileModal";
 import SupplierSettingsModal from "../components/supplier/SupplierSettingsModal";
 import SupplierHeader from "../components/supplier/SupplierHeader";
@@ -9,10 +9,12 @@ import SupplierMyBids from "../pages/supplier/SupplierMyBids";
 import SupplierProjects from "../pages/supplier/SupplierProjects";
 import SupplierResults from "../pages/supplier/SupplierResults";
 import SupplierProfile from "../pages/supplier/SupplierProfile";
-import { projectsAPI, bidsAPI, blockchainAPI } from "../services/api";
+import { ProcurementContext } from "../lib/ProcurementContext";
+import { getStatusLabel, normalizeBid, normalizeBlockchainRecord, normalizeProject, normalizeSupplier } from "../lib/procurementStatus";
 
 export default function SupplierLayout({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
+  const procurement = useContext(ProcurementContext);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -24,35 +26,22 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
   const [showBidModal, setShowBidModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [bidDraft, setBidDraft] = useState({ bidAmount: "", proposal: "" });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    async function loadSupplierData() {
-      setIsLoading(true);
-      try {
-        const [projectsRes, bidsRes, blockchainRes] = await Promise.all([
-          projectsAPI.getAll("Active"),
-          bidsAPI.getAll(),
-          blockchainAPI.getMyResults(),
-        ]);
-
-        const projectData = projectsRes.data.results || projectsRes.data || [];
-        const bidData = bidsRes.data.results || bidsRes.data || [];
-        const blockchainData = blockchainRes.data.results || blockchainRes.data || [];
-
-        setProjects(projectData);
-        setSupplierBids(bidData);
-
-        setSupplierResults(blockchainData || []);
-      } catch (error) {
-        console.error("Failed to load supplier data", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadSupplierData();
-  }, [activeUser]);
+    setProjects(procurement.projects.map((project) => ({
+      ...normalizeProject(project),
+      status: getStatusLabel(project.status),
+      deadline: project.submission_deadline || project.deadline || project.bid_opening_date || "",
+      requirements: project.requirements || project.technical_specifications || "",
+    })));
+    setSupplierBids(procurement.bids.map((bid) => ({
+      ...normalizeBid(bid),
+      submittedAt: bid.submittedAt || bid.submitted_at || "",
+    })));
+    setSupplierResults(procurement.blockchainRecords.map((record) => normalizeBlockchainRecord(record)));
+    setIsLoading(false);
+  }, [procurement.projects, procurement.bids, procurement.blockchainRecords]);
 
   const supplierProjects = useMemo(() => projects.filter((project) => project.status === "Active"), [projects]);
 
@@ -77,6 +66,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
           setSelectedProject={setSelectedProject}
           bidDraft={bidDraft}
           setBidDraft={setBidDraft}
+          supplierBids={supplierBids}
           setSupplierBids={setSupplierBids}
           activeUser={activeUser}
         />

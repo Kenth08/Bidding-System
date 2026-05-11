@@ -41,8 +41,8 @@ class LoginView(APIView):
         if not email or not password:
             return Response({"error": "Please enter your email and password."}, status=400)
 
-        user = User.objects.filter(email__iexact=email).first()
-        if not user or not user.check_password(password):
+        user = authenticate(request, username=email, password=password)
+        if not user:
             return Response({"error": "Invalid email or password."}, status=401)
 
         if user.role == User.Role.SUPPLIER and user.status == User.Status.PENDING:

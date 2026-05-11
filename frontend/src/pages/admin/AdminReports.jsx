@@ -1,37 +1,64 @@
 import { Download, FolderOpen, Users, Award, FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
 import StatusBadge from "../../components/shared/StatusBadge";
-import { reportsAPI } from "../../services/api";
+import { ProcurementContext } from "../../lib/ProcurementContext";
+import { normalizeBid, normalizeProject, normalizeSupplier } from "../../lib/procurementStatus";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-export default function AdminReports() {
-  const [procReport, setProcReport] = useState(null);
-  const [suppReport, setSuppReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function AdminReports({ projects = [], suppliers = [], bids = [], blockchainRecords = [] }) {
+  const procurement = useContext(ProcurementContext);
   const [activeTab, setActiveTab] = useState("procurement");
 
-  useEffect(() => {
-    fetchReports();
-  }, []);
+  const procurementProjects = useMemo(() => (projects.length ? projects : procurement.projects).map(normalizeProject), [projects, procurement.projects]);
+  const procurementSuppliers = useMemo(() => (suppliers.length ? suppliers : procurement.suppliers).map(normalizeSupplier), [suppliers, procurement.suppliers]);
+  const procurementBids = useMemo(() => (bids.length ? bids : procurement.bids).map(normalizeBid), [bids, procurement.bids]);
+  const procurementRecords = useMemo(() => (blockchainRecords.length ? blockchainRecords : procurement.blockchainRecords), [blockchainRecords, procurement.blockchainRecords]);
 
-  async function fetchReports() {
-    setLoading(true);
-    try {
-      const [procRes, suppRes] = await Promise.all([reportsAPI.getProcurement(), reportsAPI.getSuppliers()]);
-      setProcReport(procRes.data);
-      setSuppReport(suppRes.data);
-    } catch (error) {
-      console.error("Failed to load reports:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const procReport = useMemo(() => {
+    const awardedProjects = procurementProjects.filter((project) => String(project.status).toLowerCase() === "awarded" || project.status === 5);
+    const awardedAmount = procurementRecords.reduce((sum, record) => sum + Number(record.winning_bid_amount || record.bidAmount || 0), 0);
+    return {
+      summary: {
+        total_projects: procurementProjects.length,
+        active_projects: procurementProjects.filter((project) => String(project.status).toLowerCase() === "active" || project.status === 3).length,
+        awarded_projects: awardedProjects.length,
+        total_bids: procurementBids.length,
+        total_awarded_amount: awardedAmount,
+      },
+      by_procurement_type: Object.entries(procurementProjects.reduce((acc, project) => {
+        const type = project.category || project.procurement_method || "General";
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {})).map(([procurement_type, count]) => ({ procurement_type, count })),
+      recent_awards: procurementRecords.slice(0, 5).map((record) => ({
+        project__title: record.projectTitle || record.project_title,
+        winner__full_name: record.winner_name || record.winner,
+        winner__company_name: record.winner_company || record.winner,
+        bid_amount: Number(record.winning_bid_amount || record.bidAmount || 0),
+        recorded_at: record.recordedAt || record.recorded_at,
+      })),
+    };
+  }, [procurementBids.length, procurementProjects, procurementRecords]);
 
-  if (loading) {
+  const suppReport = useMemo(() => ({
+    summary: {
+      total_suppliers: procurementSuppliers.length,
+      approved: procurementSuppliers.filter((supplier) => supplier.status === "Verified" || supplier.isVerified).length,
+      pending: procurementSuppliers.filter((supplier) => supplier.status === "Pending" || !supplier.isVerified).length,
+      rejected: procurementSuppliers.filter((supplier) => supplier.status === "Rejected").length,
+    },
+    supplier_list: procurementSuppliers.map((supplier) => ({
+      ...supplier,
+      bid_count: procurementBids.filter((bid) => bid.supplierId === supplier.id).length,
+      wins: procurementRecords.filter((record) => record.winner_company === supplier.company_name || record.winner_name === supplier.full_name).length,
+    })),
+  }), [procurementBids, procurementSuppliers, procurementRecords]);
+
+  if (!procReport && !suppReport) {
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between">

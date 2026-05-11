@@ -1,10 +1,11 @@
 import { ArrowLeft, CheckCircle, Eye, Loader2, Search, Shield, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
 import Modal from "../../components/shared/Modal";
 import StatusBadge from "../../components/shared/StatusBadge";
-import api from "../../services/api";
+import { ProcurementContext } from "../../lib/ProcurementContext";
+import { normalizeBlockchainRecord } from "../../lib/procurementStatus";
 
 function formatPeso(value) {
   if (typeof value !== "number") {
@@ -15,43 +16,36 @@ function formatPeso(value) {
 }
 
 export default function PublicResultsPage({ onBack }) {
-  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [verifyHash, setVerifyHash] = useState("");
   const [verifyResult, setVerifyResult] = useState(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
-  useEffect(() => {
-    async function loadRecords() {
-      setIsLoading(true);
-      try {
-        const res = await api.get('/projects/public/results/');
-        setRecords(res.data.results || res.data || []);
-      } catch (err) {
-        console.error("Failed to load public blockchain records", err);
-        setError("Failed to load results. Please refresh.");
-      } finally {
-        setIsLoading(false);
-      }
+  const procurementCtx = useContext(ProcurementContext);
+
+  const records = useMemo(() => {
+    if (procurementCtx && typeof procurementCtx.getPublicRecords === "function") {
+      return procurementCtx.getPublicRecords();
     }
-
-    loadRecords();
-  }, []);
+    return [];
+  }, [procurementCtx]);
 
   const normalizedResults = useMemo(
     () =>
-      records.map((item) => ({
-        id: item.project_id || item.project_id || item.id,
-        projectName: item.project_title || "Untitled Project",
-        projectId: item.project_id || "N/A",
-        winner: item.winning_supplier || "Not available",
-        companyName: item.winning_supplier || "Unknown Company",
-        bidAmount: formatPeso(Number(item.winning_bid_amount) || 0),
-        awardDate: item.award_date ? new Date(item.award_date).toLocaleDateString() : "N/A",
-        raw: item,
-      })),
+      records.map((item) => {
+        const record = normalizeBlockchainRecord(item);
+        return {
+          id: record.id,
+          projectName: record.projectTitle || item.project_title || "Untitled Project",
+          projectId: record.projectId || item.project_id || "N/A",
+          winner: record.winner_name || record.winner || "Not available",
+          companyName: record.winner_company || record.winner_name || "Unknown Company",
+          bidAmount: formatPeso(Number(record.winning_bid_amount) || 0),
+          awardDate: record.recordedAt ? new Date(record.recordedAt).toLocaleDateString() : "N/A",
+          raw: record,
+        };
+      }),
     [records]
   );
 
@@ -71,17 +65,24 @@ export default function PublicResultsPage({ onBack }) {
     );
   }, [normalizedResults, search]);
 
-        const [selectedRecord, setSelectedRecord] = useState(null);
-
   async function handleVerifyHash() {
-    // Blockchain verification not available in this preview.
     if (!verifyHash.trim()) return;
     setVerifyLoading(true);
     setVerifyResult(null);
-    setTimeout(() => {
-      setVerifyResult({ verified: false, message: "Blockchain verification is not available in this preview. Hash placeholder only." });
-      setVerifyLoading(false);
-    }, 600);
+    try {
+      if (procurementCtx && typeof procurementCtx.verifyHash === 'function') {
+        const rec = procurementCtx.verifyHash(verifyHash.trim())
+        if (rec) {
+          setVerifyResult({ verified: true, ...rec })
+          return
+        }
+      }
+      setVerifyResult({ verified: false, message: "Blockchain verification is not available in this preview. Hash placeholder only." })
+    } catch (err) {
+      setVerifyResult({ verified: false, message: 'Verification failed' })
+    } finally {
+      setVerifyLoading(false)
+    }
   }
 
   return (
@@ -197,8 +198,6 @@ export default function PublicResultsPage({ onBack }) {
 
         {isLoading ? (
           <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">Loading public results...</div>
-        ) : error ? (
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center text-red-500">{error}</div>
         ) : filteredResults.length ? (
           <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
             {filteredResults.map((record) => (

@@ -17,7 +17,6 @@ User = get_user_model()
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").lower().strip()
@@ -28,10 +27,15 @@ class LoginView(APIView):
 
         user = User.objects.filter(email__iexact=email).first()
         if not user:
-            return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Account not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not user.check_password(password):
-            return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Wrong password."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user = authenticate(request, username=email, password=password)
+
+        if not user:
+            return Response({"error": "Invalid email or password."}, status=status.HTTP_400_BAD_REQUEST)
 
         if user.role == User.Role.SUPPLIER and user.status == User.Status.PENDING:
             return Response({"error": "Your account is pending admin approval."}, status=status.HTTP_403_FORBIDDEN)
@@ -43,7 +47,11 @@ class LoginView(APIView):
             return Response({"error": "Your account is inactive."}, status=status.HTTP_403_FORBIDDEN)
 
         refresh = RefreshToken.for_user(user)
-        log_audit("LOGIN", user, f"{user.full_name} logged in", "auth", user.id)
+        try:
+            log_audit("LOGIN", user, f"{user.full_name} logged in", "auth", user.id)
+        except Exception:
+            pass  # Silently ignore audit logging errors
+        
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),

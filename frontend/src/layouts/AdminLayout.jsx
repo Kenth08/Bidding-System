@@ -1,5 +1,5 @@
 // c:\Users\Mico\Bidding-System\frontend\src\layouts\AdminLayout.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import AdminHeader from "../components/admin/AdminHeader";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import AdminBids from "../pages/admin/AdminBids";
@@ -12,60 +12,61 @@ import AdminProcurementPlanning from "../pages/admin/AdminProcurementPlanning";
 import AdminReports from "../pages/admin/AdminReports";
 import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
 import AdminAwarding from "../pages/admin/AdminAwarding";
-import { dashboardAPI, projectsAPI, bidsAPI, usersAPI, blockchainAPI } from "../services/api";
+import { usersAPI } from "../services/api";
+import { ProcurementContext } from "../lib/ProcurementContext";
+import { getStatusLabel, normalizeBid, normalizeBlockchainRecord, normalizeProject, normalizeSupplier } from "../lib/procurementStatus";
 
 export default function AdminLayout({ currentUser, onLogout }) {
+  const procurement = useContext(ProcurementContext);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
   const [bids, setBids] = useState([]);
   const [blockchainRecords, setBlockchainRecords] = useState([]);
-  const [dashboardStats, setDashboardStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
+    setProjects(procurement.projects.map((project) => ({
+      ...normalizeProject(project),
+      status: getStatusLabel(project.status),
+      deadline: project.submission_deadline || project.deadline || project.bid_opening_date || "",
+      requirements: project.requirements || project.technical_specifications || "",
+    })));
+    setBids(procurement.bids.map((bid, index) => ({
+      ...normalizeBid(bid),
+      status: bid.status || "Submitted",
+      submittedAt: bid.submittedAt || bid.submitted_at || "",
+      bidAmount: bid.amount,
+      rank: bid.rank || index + 1,
+    })));
+    setBlockchainRecords(procurement.blockchainRecords.map((record) => ({
+      ...normalizeBlockchainRecord(record),
+      recordedAt: record.recordedAt || record.recorded_at || record.timestamp,
+      winner: record.winner_name || record.winner || record.winning_supplier,
+      projectTitle: record.projectTitle || record.project_title,
+    })));
+    setIsLoading(false);
+  }, [procurement.projects, procurement.bids, procurement.blockchainRecords]);
+
+  useEffect(() => {
+    async function loadUsers() {
       try {
-        const [statsRes, projectsRes, bidsRes, usersRes, blockchainRes] = await Promise.allSettled([
-          dashboardAPI.getStats(),
-          projectsAPI.getAll(),
-          bidsAPI.getAll(),
-          usersAPI.getAll(),
-          blockchainAPI.getAll(),
-        ]);
-
-        if (statsRes.status === "fulfilled") {
-          setDashboardStats(statsRes.value.data);
-        }
-
-        if (projectsRes.status === "fulfilled") {
-          setProjects(projectsRes.value.data.results || projectsRes.value.data || []);
-        }
-
-        if (bidsRes.status === "fulfilled") {
-          setBids(bidsRes.value.data.results || bidsRes.value.data || []);
-        }
-
-        if (usersRes.status === "fulfilled") {
-          setUsers(usersRes.value.data.results || usersRes.value.data || []);
-        }
-
-        if (blockchainRes.status === "fulfilled") {
-          setBlockchainRecords(blockchainRes.value.data.results || blockchainRes.value.data || []);
-        }
+        const res = await usersAPI.getAll();
+        const items = res.data.results || res.data || [];
+        setUsers(items);
       } catch (error) {
-        console.error("Failed to load admin data", error);
-      } finally {
-        setIsLoading(false);
+        console.error("Failed to load users", error);
+        setUsers([]);
       }
     }
 
-    loadData();
+    loadUsers();
   }, []);
 
-  const suppliers = useMemo(() => users.filter((user) => user.role === "supplier"), [users]);
+  const suppliers = useMemo(() => procurement.suppliers.map((supplier) => normalizeSupplier(supplier)), [procurement.suppliers]);
+
+  const dashboardStats = procurement.stats;
 
   const pageMeta = useMemo(() => {
     if (currentPage === "projects") return { title: "Project Management", subtitle: "Create, update, and monitor procurement projects" };
@@ -91,7 +92,7 @@ export default function AdminLayout({ currentUser, onLogout }) {
     if (currentPage === "reports") return <AdminReports projects={projects} suppliers={suppliers} bids={bids} />;
     if (currentPage === "audit") return <AdminAuditLogs />;
     return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
-  }, [bids, blockchainRecords, currentPage, currentUser, projects, suppliers, users]);
+  }, [bids, blockchainRecords, currentPage, currentUser, dashboardStats, projects, suppliers, users]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">

@@ -63,7 +63,7 @@ TEMPLATES = [
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/db.sqlite3"),
+        default=os.environ["DATABASE_URL"],
         conn_max_age=600,
         conn_health_checks=True,
     )
@@ -86,8 +86,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        # limit login attempts to 5 per 15 minutes per IP
-        "login": "5/15m",
+        "login": "10/minute",
     },
 }
 

@@ -1,17 +1,19 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminDashboard.jsx
 import StatCard from "../../components/shared/StatCard";
 import StatusBadge from "../../components/shared/StatusBadge";
+import { normalizeProject } from "../../lib/procurementStatus";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
 export default function AdminDashboard({ stats, projects, bids, blockchainRecords, setActivePage }) {
+  const normalizedProjects = (projects || []).map(normalizeProject);
   const counts = stats || {
-    projects: projects.length,
+    projects: normalizedProjects.length,
     bids: bids.length,
-    activeBidding: projects.filter((project) => project.status === "Active").length,
-    awardedContracts: projects.filter((project) => project.status === "Awarded").length,
+    activeBidding: normalizedProjects.filter((project) => project.status === "Active" || project.status === 3).length,
+    awardedContracts: normalizedProjects.filter((project) => project.status === "Awarded" || project.status === 5).length,
     blockchainRecords: blockchainRecords.length,
   };
 
@@ -29,7 +31,7 @@ export default function AdminDashboard({ stats, projects, bids, blockchainRecord
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Recent Projects</h3><p className="text-xs text-slate-400 mt-0.5">Last 5 projects</p></div>
-          <table className="w-full"><thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead><tbody className="divide-y divide-slate-50">{projects.slice(0, 5).map((project) => (<tr key={project.id}><td className="px-6 py-3 text-sm text-slate-700">{project.title}</td><td className="px-6 py-3 text-sm text-slate-600">{formatPeso(project.budget)}</td><td className="px-6 py-3 text-sm text-slate-600">{project.deadline}</td><td className="px-6 py-3"><StatusBadge status={project.status} /></td></tr>))}</tbody></table>
+          <table className="w-full"><thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead><tbody className="divide-y divide-slate-50">{normalizedProjects.slice(0, 5).map((project) => (<tr key={project.id}><td className="px-6 py-3 text-sm text-slate-700">{project.title}</td><td className="px-6 py-3 text-sm text-slate-600">{formatPeso(project.budget)}</td><td className="px-6 py-3 text-sm text-slate-600">{project.deadline}</td><td className="px-6 py-3"><StatusBadge status={project.status} /></td></tr>))}</tbody></table>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5">

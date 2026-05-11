@@ -1,13 +1,29 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\supplier\SupplierResults.jsx
 import { Shield } from "lucide-react";
+import { useContext, useMemo } from "react";
 import EmptyState from "../../components/shared/EmptyState";
+import { ProcurementContext } from "../../lib/ProcurementContext";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
 export default function SupplierResults({ supplierResults }) {
-  if (!supplierResults.length) {
+  const procurement = useContext(ProcurementContext);
+  const results = useMemo(() => {
+    if (supplierResults?.length) return supplierResults;
+    return procurement?.blockchainRecords?.map((record) => ({
+      id: record.id,
+      projectTitle: procurement?.projects?.find((project) => project.id === record.projectId)?.project_title || record.projectId,
+      winner: procurement?.suppliers?.find((supplier) => supplier.id === record.supplierId)?.company_name || record.supplierId,
+      bidAmount: record.winning_bid_amount,
+      awardDate: record.timestamp,
+      isWinner: true,
+      hash: record.hash,
+    })) || [];
+  }, [procurement, supplierResults]);
+
+  if (!results.length) {
     return (
       <div className="bg-white rounded-2xl border border-slate-100">
         <EmptyState title="No results yet" subtitle="Results will appear after project awards are published." />
@@ -28,7 +44,7 @@ export default function SupplierResults({ supplierResults }) {
         <p className="text-sm">Results are blockchain-verified and cannot be altered</p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {supplierResults.map((result) => (
+        {results.map((result) => (
           <div
             key={result.id}
             className={`rounded-2xl border p-4 ${

@@ -18,8 +18,9 @@ def fix_default_admin_password(apps, schema_editor):
     admin_user.role = "admin"
     admin_user.status = "active"
     admin_user.is_staff = True
+    admin_user.is_superuser = True
     admin_user.is_active = True
-    admin_user.save(update_fields=["password", "role", "status", "is_staff", "is_active"])
+    admin_user.save(update_fields=["password", "role", "status", "is_staff", "is_superuser", "is_active"])
 
 
 def restore_default_admin_password(apps, schema_editor):

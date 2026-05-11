@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
@@ -7,6 +7,9 @@ import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 import { procurementAPI } from "../../services/api";
+import { useContext } from "react";
+import { ProcurementContext } from "../../lib/ProcurementContext";
+import { STATUS, getStatusLabel } from "../../lib/procurementStatus";
 
 const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
 
@@ -20,6 +23,7 @@ const INITIAL_REQUEST = {
 };
 
 export default function AdminProcurementPlanning() {
+  const procurement = useContext(ProcurementContext);
   const [requests, setRequests] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
@@ -30,9 +34,33 @@ export default function AdminProcurementPlanning() {
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [approvingId, setApprovingId] = useState(null);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishingId, setPublishingId] = useState(null);
+  const [deadlineDate, setDeadlineDate] = useState(
+    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+  );
 
   useEffect(() => {
     async function loadRequests() {
+      if (procurement?.projects?.length) {
+        setRequests(
+          procurement.projects.map((item) => ({
+            id: item.id,
+            projectTitle: item.project_title,
+            budget: item.budget,
+            procurementType: item.category,
+            technicalSpecifications: item.technical_specifications || item.requirements || '',
+            procurementSchedule: item.bid_opening_date || item.submission_deadline || '',
+            deliveryPeriod: item.delivery,
+            createdAt: item.created_at,
+            status: item.status,
+          }))
+        );
+        return;
+      }
+
       try {
         const res = await procurementAPI.getAll();
         const items = res.data.results || res.data || [];
@@ -46,6 +74,7 @@ export default function AdminProcurementPlanning() {
             procurementSchedule: item.procurement_schedule,
             deliveryPeriod: item.delivery_period,
             createdAt: item.created_at,
+            status: item.status,
           }))
         );
       } catch (error) {
@@ -54,7 +83,7 @@ export default function AdminProcurementPlanning() {
     }
 
     loadRequests();
-  }, []);
+  }, [procurement?.projects]);
 
   function openCreate() {
     setEditingRequest(null);
@@ -98,31 +127,29 @@ export default function AdminProcurementPlanning() {
       };
 
       if (editingRequest) {
-        const res = await procurementAPI.update(editingRequest.id, payload);
-        const saved = res.data;
+        const saved = procurement?.createRequest ? { ...editingRequest, ...payload } : (await procurementAPI.update(editingRequest.id, payload)).data;
         setRequests((prev) => prev.map((item) => (item.id === editingRequest.id ? {
           id: saved.id,
-          projectTitle: saved.project_title,
+          projectTitle: saved.project_title || saved.projectTitle,
           budget: saved.budget,
-          procurementType: saved.procurement_type,
-          technicalSpecifications: saved.technical_specifications,
-          procurementSchedule: saved.procurement_schedule,
-          deliveryPeriod: saved.delivery_period,
-          createdAt: saved.created_at,
+          procurementType: saved.procurement_type || saved.category,
+          technicalSpecifications: saved.technical_specifications || saved.technicalSpecifications,
+          procurementSchedule: saved.procurement_schedule || saved.bid_opening_date || saved.submission_deadline,
+          deliveryPeriod: saved.delivery_period || saved.delivery,
+          createdAt: saved.created_at || saved.createdAt,
         } : item)));
         setToast({ message: "Procurement request updated successfully", type: "success" });
       } else {
-        const res = await procurementAPI.create(payload);
-        const saved = res.data;
+        const saved = procurement?.createRequest ? procurement.createRequest(payload, "Admin") : (await procurementAPI.create(payload)).data;
         setRequests((prev) => [{
           id: saved.id,
-          projectTitle: saved.project_title,
+          projectTitle: saved.project_title || saved.projectTitle,
           budget: saved.budget,
-          procurementType: saved.procurement_type,
-          technicalSpecifications: saved.technical_specifications,
-          procurementSchedule: saved.procurement_schedule,
-          deliveryPeriod: saved.delivery_period,
-          createdAt: saved.created_at,
+          procurementType: saved.procurement_type || saved.category,
+          technicalSpecifications: saved.technical_specifications || saved.technicalSpecifications,
+          procurementSchedule: saved.procurement_schedule || saved.bid_opening_date || saved.submission_deadline,
+          deliveryPeriod: saved.delivery_period || saved.delivery,
+          createdAt: saved.created_at || saved.createdAt,
         }, ...prev]);
         setToast({ message: "Procurement request created successfully", type: "success" });
       }
@@ -141,6 +168,15 @@ export default function AdminProcurementPlanning() {
 
   function handleDelete() {
     if (!deletingId) return;
+    if (procurement?.pushAudit) {
+      setRequests((prev) => prev.filter((item) => item.id !== deletingId));
+      procurement.pushAudit("Admin", `Deleted procurement request ${deletingId}`);
+      setToast({ message: "Procurement request deleted", type: "success" });
+      setShowConfirm(false);
+      setDeletingId(null);
+      return;
+    }
+
     procurementAPI.delete(deletingId)
       .then(() => {
         setRequests((prev) => prev.filter((item) => item.id !== deletingId));
@@ -154,6 +190,39 @@ export default function AdminProcurementPlanning() {
         setShowConfirm(false);
         setDeletingId(null);
       });
+  }
+
+  function handleApprove() {
+    if (!approvingId || !procurement?.approveRequest) return;
+    procurement.approveRequest(approvingId, "Admin", true);
+    setRequests((prev) =>
+      prev.map((item) =>
+        item.id === approvingId ? { ...item, status: STATUS.APPROVED } : item
+      )
+    );
+    setToast({ message: "Procurement request approved successfully", type: "success" });
+    setShowApproveConfirm(false);
+    setApprovingId(null);
+  }
+
+  function handlePublish() {
+    if (!publishingId || !procurement?.publishProject) return;
+    const deadlineDateTime = new Date(deadlineDate).toISOString();
+    procurement.publishProject(publishingId, "Admin", deadlineDateTime);
+    setRequests((prev) =>
+      prev.map((item) =>
+        item.id === publishingId ? { ...item, status: STATUS.OPEN } : item
+      )
+    );
+    setToast({
+      message: `Project published for bidding (Deadline: ${new Date(deadlineDate).toLocaleDateString()})`,
+      type: "success",
+    });
+    setShowPublishModal(false);
+    setPublishingId(null);
+    setDeadlineDate(
+      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+    );
   }
 
   const filtered = requests.filter((request) => {
@@ -188,7 +257,7 @@ export default function AdminProcurementPlanning() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project Title</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Delivery Period</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Created</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
             </tr>
@@ -208,10 +277,36 @@ export default function AdminProcurementPlanning() {
                     ₱{new Intl.NumberFormat("en-PH", { maximumFractionDigits: 0 }).format(request.budget)}
                   </td>
                   <td className="px-6 py-4 text-sm"><StatusBadge status={request.procurementType} /></td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{request.deliveryPeriod}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <StatusBadge status={getStatusLabel(request.status)} />
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{new Date(request.createdAt).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {request.status === STATUS.PENDING_REVIEW && (
+                        <button
+                          onClick={() => {
+                            setApprovingId(request.id);
+                            setShowApproveConfirm(true);
+                          }}
+                          className="rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Approve
+                        </button>
+                      )}
+                      {request.status === STATUS.APPROVED && (
+                        <button
+                          onClick={() => {
+                            setPublishingId(request.id);
+                            setShowPublishModal(true);
+                          }}
+                          className="rounded-lg bg-blue-50 border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-1"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          Publish for Bidding
+                        </button>
+                      )}
                       <button
                         onClick={() => openEdit(request)}
                         className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
@@ -338,6 +433,54 @@ export default function AdminProcurementPlanning() {
         message="This action cannot be undone."
         confirmLabel="Delete"
       />
+
+      <ConfirmDialog
+        isOpen={showApproveConfirm}
+        onClose={() => setShowApproveConfirm(false)}
+        onConfirm={handleApprove}
+        title="Approve this procurement request?"
+        message="This will move the project to 'Approved' status. You can then publish it for bidding."
+        confirmLabel="Approve"
+      />
+
+      <Modal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        title="Publish Project for Bidding"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+              Bid Submission Deadline
+            </label>
+            <input
+              type="date"
+              value={deadlineDate}
+              onChange={(e) => setDeadlineDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+            />
+            <p className="text-xs text-slate-500 mt-1.5">Suppliers will have until this date to submit their bids.</p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowPublishModal(false)}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handlePublish}
+              className="flex-1 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+            >
+              Publish Now
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>

@@ -8,8 +8,11 @@ import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 import { suppliersAPI, documentAPI } from "../../services/api";
+import { useContext } from "react";
+import { ProcurementContext } from "../../lib/ProcurementContext";
 
 export default function AdminSuppliers() {
+  const procurement = useContext(ProcurementContext);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -20,6 +23,23 @@ export default function AdminSuppliers() {
 
   useEffect(() => {
     async function loadSuppliers() {
+      if (procurement?.suppliers?.length) {
+        setSuppliers(procurement.suppliers.map((item) => ({
+          id: item.id,
+          full_name: item.full_name || item.company_name,
+          company_name: item.company_name,
+          email: item.email || '',
+          phone: item.phone || '',
+          business_type: item.business_type || '',
+          business_permit_number: item.business_permit_number || '',
+          created_at: item.created_at,
+          status: item.status,
+          status_display: item.status,
+        })));
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         const res = await suppliersAPI.getAll();
@@ -62,9 +82,20 @@ export default function AdminSuppliers() {
 
   async function changeStatus(id, status) {
     try {
-      await suppliersAPI.updateStatus(id, status);
-      setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status } : supplier)));
-      setToast({ message: status === "Approved" ? "Supplier approved" : "Supplier rejected", type: status === "Approved" ? "success" : "warning" });
+      const isApproved = status === 'approved';
+      const backendStatus = isApproved ? 'approved' : 'rejected';
+      const localStatus = isApproved ? 'Verified' : 'Rejected';
+
+      await suppliersAPI.updateStatus(id, backendStatus);
+
+      if (procurement?.updateSupplierStatus) {
+        procurement.updateSupplierStatus(id, localStatus, 'Admin');
+      }
+
+      setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status: localStatus } : supplier)));
+      const message = isApproved ? "Supplier approved successfully" : "Supplier rejected successfully";
+      const type = isApproved ? "success" : "warning";
+      setToast({ message, type });
     } catch (error) {
       console.error("Failed to update supplier status", error);
       setToast({ message: "Failed to update supplier status.", type: "error" });
@@ -128,7 +159,7 @@ export default function AdminSuppliers() {
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
                     <button onClick={() => setViewingSupplier(supplier)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Eye className="h-4 w-4" /></button>
-                    {supplier.status !== "Approved" && (
+                    {supplier.status !== "Verified" && supplier.status !== "approved" && (
                       <button onClick={() => changeStatus(supplier.id, "approved")} className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600">Approve</button>
                     )}
                     {supplier.status !== "Rejected" && (

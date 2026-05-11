@@ -18,6 +18,7 @@ def create_default_admin_user(apps, schema_editor):
             status="active",
             is_staff=True,
             is_active=True,
+            is_superuser=True,
         )
 
 

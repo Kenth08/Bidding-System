@@ -13,8 +13,12 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import { useContext } from 'react'
+import { ProcurementContext } from '../../lib/ProcurementContext'
 
 export default function LandingPage({ onAdminLogin, onViewResults, onRegister }) {
+  const procurementCtx = useContext(ProcurementContext)
+
   return (
     <div className="bg-white">
       <nav className="fixed left-0 right-0 top-0 z-50 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
@@ -96,6 +100,27 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
               A blockchain-based e-procurement platform that ensures fair bidding, tamper-proof records, and full
               transparency for government and corporate procurement.
             </p>
+
+            {/* Small stats from procurement state */}
+            {(() => {
+              const stats = procurementCtx?.stats || { totalProjects: 0, totalBids: 0, activeBidding: 0 }
+              return (
+                <div className="mb-6 mt-2 flex items-center gap-3">
+                  <div className="rounded-xl bg-slate-800 p-3 text-xs">
+                    <p className="text-xs text-slate-400">Total Projects</p>
+                    <p className="text-sm font-semibold text-white">{stats.totalProjects}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-800 p-3 text-xs">
+                    <p className="text-xs text-slate-400">Total Bids</p>
+                    <p className="text-sm font-semibold text-white">{stats.totalBids}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-800 p-3 text-xs">
+                    <p className="text-xs text-slate-400">Active Bidding</p>
+                    <p className="text-sm font-semibold text-white">{stats.activeBidding}</p>
+                  </div>
+                </div>
+              )
+            })()}
 
             <div className="flex flex-wrap items-center gap-4">
               <button

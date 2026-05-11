@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { ProcurementProvider } from "./lib/ProcurementContext";
 import "./index.css";
 
 class RootErrorBoundary extends React.Component {
@@ -55,7 +56,9 @@ class RootErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <RootErrorBoundary>
-      <App />
+      <ProcurementProvider>
+        <App />
+      </ProcurementProvider>
     </RootErrorBoundary>
   </React.StrictMode>
 );

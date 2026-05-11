@@ -1,17 +1,19 @@
 import { FileText, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import AwardDocumentModal from "../../components/shared/AwardDocumentModal";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
-import { awardsAPI } from "../../services/api";
+import { ProcurementContext } from "../../lib/ProcurementContext";
+import { normalizeBid } from "../../lib/procurementStatus";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
 export default function AdminAwarding({ bids = [], projects = [] }) {
+  const procurement = useContext(ProcurementContext);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
   const [docModal, setDocModal] = useState({ open: false, data: null });
@@ -28,9 +30,10 @@ export default function AdminAwarding({ bids = [], projects = [] }) {
         );
       })
       .map((bid) => {
-        const project = projects.find((projectItem) => projectItem.id === bid.project || projectItem.title === bid.projectTitle || projectItem.title === bid.projectName);
+        const normalizedBid = normalizeBid(bid);
+        const project = projects.find((projectItem) => projectItem.id === normalizedBid.projectId || projectItem.title === normalizedBid.projectTitle || projectItem.title === normalizedBid.projectName);
         return {
-          ...bid,
+          ...normalizedBid,
           projectDetails: project || {},
         };
       });
@@ -39,11 +42,24 @@ export default function AdminAwarding({ bids = [], projects = [] }) {
   async function handleGenerateDocument(bidId, type) {
     setDocLoading(`${bidId}-${type}`);
     try {
-      let response;
-      if (type === 'noa') response = await awardsAPI.generateNOA(bidId);
-      else if (type === 'ntp') response = await awardsAPI.generateNTP(bidId);
-      else response = await awardsAPI.generateResolution(bidId);
-      setDocModal({ open: true, data: response.data });
+      const bid = procurement?.bids?.find((item) => item.id === bidId);
+      if (!bid) throw new Error("Bid not found");
+      const project = procurement?.projects?.find((item) => item.id === bid.projectId);
+      const document = {
+        type,
+        projectId: bid.projectId,
+        projectTitle: project?.project_title || bid.projectTitle,
+        winner: bid.supplierName,
+        company: bid.supplierCompany,
+        amount: bid.amount,
+        generatedAt: new Date().toISOString(),
+        title:
+          type === "noa" ? "Notice of Award"
+          : type === "ntp" ? "Notice to Proceed"
+          : "Resolution to Award",
+      };
+      setDocModal({ open: true, data: document });
+      procurement?.pushAudit?.("Admin", `Generated ${document.title} for ${bid.projectId}`);
     } catch (error) {
       console.error('Failed to generate award document', error);
       setToast({ message: 'Failed to generate document', type: 'error' });
