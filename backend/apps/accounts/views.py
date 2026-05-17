@@ -8,7 +8,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from config.throttling import LoginRateThrottle
+from config.throttling import LoginRateThrottle, SignupRateThrottle
 
 from apps.projects.models import DocumentUpload
 
@@ -72,6 +72,7 @@ class LogoutView(APIView):
 class RegisterSupplierView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [SignupRateThrottle]
 
     def post(self, request):
         payload = request.data if hasattr(request, "data") else _json_body(request)

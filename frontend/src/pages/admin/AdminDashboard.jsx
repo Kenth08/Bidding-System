@@ -12,8 +12,8 @@ export default function AdminDashboard({ stats, projects, bids, blockchainRecord
   const counts = stats || {
     projects: normalizedProjects.length,
     bids: bids.length,
-    activeBidding: normalizedProjects.filter((project) => project.status === "Active" || project.status === 3).length,
-    awardedContracts: normalizedProjects.filter((project) => project.status === "Awarded" || project.status === 5).length,
+    activeBidding: normalizedProjects.filter((project) => ["active", "open for bidding"].includes(String(project.status || "").toLowerCase()) || project.status === 3).length,
+    awardedContracts: normalizedProjects.filter((project) => String(project.status || "").toLowerCase() === "awarded" || project.status === 5).length,
     blockchainRecords: blockchainRecords.length,
   };
 

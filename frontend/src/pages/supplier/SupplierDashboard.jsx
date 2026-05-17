@@ -6,8 +6,8 @@ export default function SupplierDashboard({ supplierProjects, supplierBids, user
   const stats = {
     available: supplierProjects.length,
     myBids: supplierBids.length,
-    review: supplierBids.filter((bid) => bid.status === "Under Review").length,
-    results: supplierBids.filter((bid) => ["Selected", "Rejected"].includes(bid.status)).length,
+    review: supplierBids.filter((bid) => String(bid.status || "").toLowerCase() === "under_evaluation").length,
+    results: supplierBids.filter((bid) => ["won", "lost"].includes(String(bid.status || "").toLowerCase())).length,
   };
 
   return (

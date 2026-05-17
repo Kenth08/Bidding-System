@@ -1,4 +1,4 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\auth\LoginPage.jsx
+// Unified login page
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, Shield } from "lucide-react";
 import { useState } from "react";
 import { loginWithEmail } from "../../services/authService";
@@ -12,24 +12,26 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
-
     if (!email || !password) {
       setError("Please enter your email and password.");
       return;
     }
-
     setIsLoading(true);
     setError("");
-
     try {
       const { user, error: loginError } = await loginWithEmail(email, password);
       if (loginError) {
         setError(loginError);
         return;
       }
-      onLogin(user.role, user);
+      const role = user?.role;
+      if (role === "admin" || role === "school_head" || role === "supplier") {
+        onLogin(role, user);
+        return;
+      }
+      setError("Invalid email or password");
     } catch (err) {
-      setError(err.response?.data?.error || "Login failed. Please try again.");
+      setError(err?.response?.data?.error || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -71,9 +73,7 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
             <br />
             Immutable.
           </h2>
-          <p className="mb-8 text-sm text-slate-400">
-            A blockchain-powered procurement platform built for fairness and full auditability.
-          </p>
+          <p className="mb-8 text-sm text-slate-400">A blockchain-powered procurement platform built for fairness and full auditability.</p>
 
           <div className="space-y-3">
             {["Immutable blockchain records", "Role-based access control", "Real-time bid monitoring"].map((feature) => (
@@ -91,7 +91,7 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
       <div className="flex min-h-screen flex-1 flex-col items-center justify-center bg-white px-6 py-8 lg:px-12">
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
             <p className="mt-1 text-sm text-slate-500">Sign in to your account</p>
           </div>
 
@@ -100,7 +100,7 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email Address</span>
               <input
                 type="email"
-                placeholder="Enter your email"
+                placeholder="Email Address"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
@@ -137,9 +137,8 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
               {isLoading ? "Signing In..." : "Sign In"}
             </button>
 
-            {error ? (
-              <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
-            ) : null}
+            {error ? <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div> : null}
+
             <p className="mt-4 text-center text-sm text-slate-500">
               Don’t have an account?{' '}
               <button type="button" onClick={onGoToRegister} className="font-medium text-emerald-600 hover:text-emerald-700">

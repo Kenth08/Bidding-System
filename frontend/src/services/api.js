@@ -10,7 +10,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token')
+    const token = sessionStorage.getItem('access_token')
     if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   },
@@ -32,15 +32,19 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && original && !original._retry && !isAuthFormRequest) {
       original._retry = true
       try {
-        const refresh = localStorage.getItem('refresh_token')
+        const refresh = sessionStorage.getItem('refresh_token')
         if (!refresh) throw new Error('No refresh token')
         const res = await axios.post(`${BASE_URL}/auth/token/refresh/`, { refresh })
-        localStorage.setItem('access_token', res.data.access)
+        sessionStorage.setItem('access_token', res.data.access)
         original.headers.Authorization = `Bearer ${res.data.access}`
         return api(original)
       } catch {
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
+        localStorage.removeItem('current_supplier')
+        sessionStorage.removeItem('access_token')
+        sessionStorage.removeItem('refresh_token')
+        sessionStorage.removeItem('current_supplier')
         window.location.href = '/'
       }
     }
@@ -71,12 +75,19 @@ export const dashboardAPI = {
 }
 
 export const bidsAPI = {
-  getAll: () => api.get('/bids/'),
+  getAll: (params = {}) => api.get('/bids/', { params }),
   create: (data) => api.post('/bids/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
   update: (id, data) => api.patch(`/bids/${id}/`, data),
   markReview: (id) => api.patch(`/bids/${id}/review/`),
   selectWinner: (id) => api.patch(`/bids/${id}/select/`),
   recordBlockchain: (id) => api.post(`/bids/${id}/record/`),
+}
+
+export const notificationsAPI = {
+  getAll: () => api.get('/notifications/'),
+  getUnreadCount: () => api.get('/notifications/unread-count/'),
+  markAllRead: () => api.patch('/notifications/read-all/'),
+  markOneRead: (id) => api.patch(`/notifications/${id}/read/`),
 }
 
 export const suppliersAPI = {
@@ -113,11 +124,15 @@ export const awardsAPI = {
 }
 
 export const procurementAPI = {
-  getAll: () => api.get('/projects/procurements/'),
-  getOne: (id) => api.get(`/projects/procurements/${id}/`),
-  create: (data) => api.post('/projects/procurements/', data),
-  update: (id, data) => api.patch(`/projects/procurements/${id}/`, data),
-  delete: (id) => api.delete(`/projects/procurements/${id}/`),
+  getAll: () => api.get('/procurement-requests/'),
+  getOne: (id) => api.get(`/procurement-requests/${id}/`),
+  create: (data) => api.post('/procurement-requests/', data),
+  update: (id, data) => api.patch(`/procurement-requests/${id}/`, data),
+  delete: (id) => api.delete(`/procurement-requests/${id}/`),
+  review: (id, action, remarks = '') => api.patch(`/procurement-requests/${id}/review/`, { action, remarks }),
+  approve: (id, remarks = '') => api.patch(`/procurement-requests/${id}/review/`, { action: 'approved', remarks }),
+  reject: (id, reason) => api.patch(`/procurement-requests/${id}/review/`, { action: 'rejected', remarks: reason }),
+  returnForRevision: (id, notes) => api.patch(`/procurement-requests/${id}/review/`, { action: 'revision_required', remarks: notes }),
 }
 
 export const auditLogAPI = {

@@ -1,11 +1,11 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\supplier\SupplierHeader.jsx
 import { Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutsideClick } from "../../hooks/useOutsideClick";
 import NotificationPanel from "../shared/NotificationPanel";
 import SupplierSearchDropdown from "./SupplierSearchDropdown";
 
-function SupplierProfileDropdown({ user, onLogout, unreadCount, onOpenProfile, onOpenSettings }) {
+function SupplierProfileDropdown({ user, onLogout, onOpenProfile, onOpenSettings }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const displayName = user?.full_name || user?.fullName || "Supplier User";
@@ -69,7 +69,6 @@ function SupplierProfileDropdown({ user, onLogout, unreadCount, onOpenProfile, o
             <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50">
               <Bell className="h-4 w-4 text-slate-400" />
               <span>Notifications</span>
-              {unreadCount ? <span className="ml-auto rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-500">{unreadCount}</span> : null}
             </button>
           </div>
 
@@ -92,16 +91,12 @@ function SupplierProfileDropdown({ user, onLogout, unreadCount, onOpenProfile, o
   );
 }
 
-export default function SupplierHeader({ title, subtitle, notifications, user, setSidebarOpen, onLogout, projects = [], bids = [], onOpenProfile, onOpenSettings }) {
-  const [showNotifications, setShowNotifications] = useState(false);
+export default function SupplierHeader({ title, subtitle, notifications, user, setSidebarOpen, onLogout, projects = [], bids = [], onOpenProfile, onOpenSettings, onNotificationNavigate }) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [notificationItems, setNotificationItems] = useState(notifications || []);
-  const notificationRef = useRef(null);
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  useOutsideClick(notificationRef, () => setShowNotifications(false));
   useOutsideClick(searchRef, () => {
     setShowSearch(false);
     setSearchQuery("");
@@ -119,11 +114,6 @@ export default function SupplierHeader({ title, subtitle, notifications, user, s
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-
-  const unreadCount = useMemo(
-    () => notificationItems.filter((item) => !item.read).length,
-    [notificationItems]
-  );
 
   const displayDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -194,28 +184,11 @@ export default function SupplierHeader({ title, subtitle, notifications, user, s
           ) : null}
         </div>
 
-        <div className="relative" ref={notificationRef}>
-          <button
-            type="button"
-            onClick={() => setShowNotifications((prev) => !prev)}
-            className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            {unreadCount ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-red-400" /> : null}
-          </button>
-
-          {showNotifications ? (
-            <NotificationPanel
-              notifications={notificationItems}
-              onMarkAllRead={() => setNotificationItems((prev) => prev.map((item) => ({ ...item, read: true })))}
-            />
-          ) : null}
-        </div>
+        <NotificationPanel onNavigate={onNotificationNavigate} />
 
         <div className="h-5 w-px bg-slate-200" />
 
-        <SupplierProfileDropdown user={user} onLogout={onLogout} unreadCount={unreadCount} onOpenProfile={onOpenProfile} onOpenSettings={onOpenSettings} />
+        <SupplierProfileDropdown user={user} onLogout={onLogout} onOpenProfile={onOpenProfile} onOpenSettings={onOpenSettings} />
       </div>
     </header>
   );

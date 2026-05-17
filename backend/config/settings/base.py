@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.projects",
     "apps.bids",
     "apps.blockchain",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -94,8 +95,14 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "config.throttling.GeneralUserRateThrottle",
+    ],
     "DEFAULT_THROTTLE_RATES": {
-        "login": "10/minute",
+        "login": "5/15min",      # 5 attempts per 15 minutes for login
+        "signup": "10/hour",      # 10 signup attempts per hour per IP
+        "anon": "100/hour",       # 100 requests per hour for anonymous users
+        "user": "1000/hour",      # 1000 requests per hour for authenticated users
     },
 }
 
@@ -133,3 +140,45 @@ STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ============================================================================
+# SECURITY & ENVIRONMENT CONFIGURATION
+# ============================================================================
+
+# Supabase Integration - Service Role Key (keep confidential)
+# Only used server-side for admin operations, never expose to frontend
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+# Security Headers (configure in production)
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").strip().lower() == "true"
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
+
+# Cookie Security (set to True in production with HTTPS)
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").strip().lower() == "true"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False").strip().lower() == "true"
+CSRF_COOKIE_HTTPONLY = True
+
+# Logging Configuration
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("LOG_LEVEL", "INFO"),
+    },
+}

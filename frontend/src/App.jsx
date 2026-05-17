@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "./layouts/AdminLayout";
 import SupplierLayout from "./layouts/SupplierLayout";
+import SchoolHeadLayout from "./layouts/SchoolHeadLayout";
 import LoginPage from "./pages/auth/LoginPage";
 import LandingPage from "./pages/public/LandingPage";
 import PublicResultsPage from "./pages/public/PublicResultsPage";
@@ -39,7 +40,11 @@ export default function App() {
 
   useEffect(() => {
     async function restoreSession() {
-      const accessToken = localStorage.getItem("access_token");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("current_supplier");
+
+      const accessToken = sessionStorage.getItem("access_token");
       if (!accessToken) {
         setIsInitializing(false);
         return;
@@ -59,7 +64,7 @@ export default function App() {
               company_name: localSupplier.company_name || backendUser.company_name,
               status: localSupplier.status || "Verified",
             };
-            localStorage.setItem("current_supplier", JSON.stringify(trustedSupplier));
+            sessionStorage.setItem("current_supplier", JSON.stringify(trustedSupplier));
             setCurrentUser(trustedSupplier);
             setCurrentScreen("supplier");
             return;
@@ -69,7 +74,7 @@ export default function App() {
         setCurrentUser(backendUser);
         setCurrentScreen(backendUser.role);
       } catch {
-        const currentSupplierJson = localStorage.getItem("current_supplier");
+        const currentSupplierJson = sessionStorage.getItem("current_supplier");
         if (currentSupplierJson) {
           try {
             const currentSupplier = JSON.parse(currentSupplierJson);
@@ -90,8 +95,9 @@ export default function App() {
           }
         }
 
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("refresh_token");
+        sessionStorage.removeItem("current_supplier");
         setCurrentUser(null);
         setCurrentScreen("landing");
       } finally {
@@ -108,8 +114,9 @@ export default function App() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("access_token");
+    sessionStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("current_supplier");
     setCurrentUser(null);
     setCurrentScreen("landing");
   }
@@ -165,6 +172,10 @@ export default function App() {
 
   if (currentScreen === "supplier") {
     return <SupplierLayout user={currentUser} currentUser={currentUser} onLogout={handleLogout} />;
+  }
+
+  if (currentScreen === "school_head") {
+    return <SchoolHeadLayout user={currentUser} currentUser={currentUser} onLogout={handleLogout} />;
   }
 
   return <LandingPage onAdminLogin={() => setCurrentScreen("login")} onViewResults={() => setCurrentScreen("public-results")} onRegister={() => setCurrentScreen("register")} />;

@@ -24,7 +24,7 @@ export default function AdminReports({ projects = [], suppliers = [], bids = [],
     return {
       summary: {
         total_projects: procurementProjects.length,
-        active_projects: procurementProjects.filter((project) => String(project.status).toLowerCase() === "active" || project.status === 3).length,
+        active_projects: procurementProjects.filter((project) => ["active", "open for bidding"].includes(String(project.status).toLowerCase()) || project.status === 3).length,
         awarded_projects: awardedProjects.length,
         total_bids: procurementBids.length,
         total_awarded_amount: awardedAmount,
@@ -49,7 +49,7 @@ export default function AdminReports({ projects = [], suppliers = [], bids = [],
       total_suppliers: procurementSuppliers.length,
       approved: procurementSuppliers.filter((supplier) => supplier.status === "Verified" || supplier.isVerified).length,
       pending: procurementSuppliers.filter((supplier) => supplier.status === "Pending" || !supplier.isVerified).length,
-      rejected: procurementSuppliers.filter((supplier) => supplier.status === "Rejected").length,
+      rejected: procurementSuppliers.filter((supplier) => String(supplier.status || "").toLowerCase() === "rejected").length,
     },
     supplier_list: procurementSuppliers.map((supplier) => ({
       ...supplier,

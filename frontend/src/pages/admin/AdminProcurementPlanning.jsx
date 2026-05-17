@@ -1,30 +1,42 @@
-import { Plus, Trash2, CheckCircle2, Send } from "lucide-react";
-import { useEffect, useState } from "react";
+// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminProcurementPlanning.jsx
+import { CheckCircle2, Info, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
+import { getStatusLabel } from "../../lib/procurementStatus";
 import { procurementAPI } from "../../services/api";
-import { useContext } from "react";
-import { ProcurementContext } from "../../lib/ProcurementContext";
-import { STATUS, getStatusLabel } from "../../lib/procurementStatus";
 
 const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
 
 const INITIAL_REQUEST = {
   projectTitle: "",
   budget: "",
+  deadline: "",
+  publicResultExpiryDate: "",
   procurementType: "Goods",
   technicalSpecifications: "",
   procurementSchedule: "",
   deliveryPeriod: "",
 };
 
-export default function AdminProcurementPlanning() {
-  const procurement = useContext(ProcurementContext);
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  const dateValue = new Date(value);
+  if (Number.isNaN(dateValue.getTime())) return value;
+  return dateValue.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
+export default function AdminProcurementPlanning({ onOpenProjects }) {
   const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
   const [form, setForm] = useState(INITIAL_REQUEST);
@@ -34,67 +46,48 @@ export default function AdminProcurementPlanning() {
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
-  const [approvingId, setApprovingId] = useState(null);
-  const [showPublishModal, setShowPublishModal] = useState(false);
-  const [publishingId, setPublishingId] = useState(null);
-  const [deadlineDate, setDeadlineDate] = useState(
-    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-  );
+
+  async function loadRequests() {
+    setLoading(true);
+    try {
+      const response = await procurementAPI.getAll();
+      const items = response.data.results || response.data || [];
+      setRequests(items);
+    } catch (error) {
+      console.error("Failed to load procurement requests", error);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadRequests() {
-      if (procurement?.projects?.length) {
-        setRequests(
-          procurement.projects.map((item) => ({
-            id: item.id,
-            projectTitle: item.project_title,
-            budget: item.budget,
-            procurementType: item.category,
-            technicalSpecifications: item.technical_specifications || item.requirements || '',
-            procurementSchedule: item.bid_opening_date || item.submission_deadline || '',
-            deliveryPeriod: item.delivery,
-            createdAt: item.created_at,
-            status: item.status,
-          }))
-        );
-        return;
-      }
-
-      try {
-        const res = await procurementAPI.getAll();
-        const items = res.data.results || res.data || [];
-        setRequests(
-          items.map((item) => ({
-            id: item.id,
-            projectTitle: item.project_title,
-            budget: item.budget,
-            procurementType: item.procurement_type,
-            technicalSpecifications: item.technical_specifications,
-            procurementSchedule: item.procurement_schedule,
-            deliveryPeriod: item.delivery_period,
-            createdAt: item.created_at,
-            status: item.status,
-          }))
-        );
-      } catch (error) {
-        console.error("Failed to load procurement requests", error);
-      }
-    }
-
     loadRequests();
-  }, [procurement?.projects]);
+  }, []);
 
   function openCreate() {
     setEditingRequest(null);
-    setForm(INITIAL_REQUEST);
+    setForm({
+      ...INITIAL_REQUEST,
+      deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      publicResultExpiryDate: new Date(Date.now() + 44 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    });
     setErrors({});
     setShowModal(true);
   }
 
   function openEdit(request) {
     setEditingRequest(request);
-    setForm({ ...request });
+    setForm({
+      projectTitle: request.title || request.project_title || "",
+      budget: String(request.budget || ""),
+      deadline: String(request.deadline || request.submission_deadline || "").slice(0, 10),
+      publicResultExpiryDate: String(request.public_result_expiry_date || "").slice(0, 10),
+      procurementType: request.procurement_type || request.category || "Goods",
+      technicalSpecifications: request.technical_specifications || request.requirements || "",
+      procurementSchedule: request.procurement_schedule || "",
+      deliveryPeriod: request.delivery_period || request.delivery || "",
+    });
     setErrors({});
     setShowModal(true);
   }
@@ -103,9 +96,19 @@ export default function AdminProcurementPlanning() {
     const nextErrors = {};
     if (!form.projectTitle.trim()) nextErrors.projectTitle = "Project title is required.";
     if (!form.budget || Number(form.budget) <= 0) nextErrors.budget = "Budget is required.";
+    if (!form.deadline) nextErrors.deadline = "Bidding deadline is required.";
+    if (!form.publicResultExpiryDate) nextErrors.publicResultExpiryDate = "Public result expiry date is required.";
+    // Validate dates: deadline must be in the future; expiry must be after deadline
+    try {
+      const dl = new Date(form.deadline);
+      const pr = new Date(form.publicResultExpiryDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (dl <= today) nextErrors.deadline = "Bidding deadline must be a future date.";
+      if (pr <= dl) nextErrors.publicResultExpiryDate = "Public result expiry must be after the bidding deadline.";
+    } catch (e) {}
     if (!form.procurementType) nextErrors.procurementType = "Procurement type is required.";
     if (!form.technicalSpecifications.trim()) nextErrors.technicalSpecifications = "Technical specifications are required.";
-    if (!form.procurementSchedule.trim()) nextErrors.procurementSchedule = "Procurement schedule is required.";
     if (!form.deliveryPeriod.trim()) nextErrors.deliveryPeriod = "Delivery period is required.";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -115,46 +118,29 @@ export default function AdminProcurementPlanning() {
     if (!validateForm()) return;
 
     setIsSaving(true);
+    const payload = {
+      title: form.projectTitle.trim(),
+      budget: Number(form.budget),
+      deadline: form.deadline,
+      public_result_expiry_date: form.publicResultExpiryDate || null,
+      procurement_type: form.procurementType,
+      technical_specifications: form.technicalSpecifications.trim(),
+      procurement_schedule: form.procurementSchedule.trim(),
+      delivery_period: form.deliveryPeriod.trim(),
+    };
 
     try {
-      const payload = {
-        project_title: form.projectTitle,
-        budget: Number(form.budget),
-        procurement_type: form.procurementType,
-        technical_specifications: form.technicalSpecifications,
-        procurement_schedule: form.procurementSchedule,
-        delivery_period: form.deliveryPeriod,
-      };
-
       if (editingRequest) {
-        const saved = procurement?.createRequest ? { ...editingRequest, ...payload } : (await procurementAPI.update(editingRequest.id, payload)).data;
-        setRequests((prev) => prev.map((item) => (item.id === editingRequest.id ? {
-          id: saved.id,
-          projectTitle: saved.project_title || saved.projectTitle,
-          budget: saved.budget,
-          procurementType: saved.procurement_type || saved.category,
-          technicalSpecifications: saved.technical_specifications || saved.technicalSpecifications,
-          procurementSchedule: saved.procurement_schedule || saved.bid_opening_date || saved.submission_deadline,
-          deliveryPeriod: saved.delivery_period || saved.delivery,
-          createdAt: saved.created_at || saved.createdAt,
-        } : item)));
+        await procurementAPI.update(editingRequest.id, payload);
         setToast({ message: "Procurement request updated successfully", type: "success" });
       } else {
-        const saved = procurement?.createRequest ? procurement.createRequest(payload, "Admin") : (await procurementAPI.create(payload)).data;
-        setRequests((prev) => [{
-          id: saved.id,
-          projectTitle: saved.project_title || saved.projectTitle,
-          budget: saved.budget,
-          procurementType: saved.procurement_type || saved.category,
-          technicalSpecifications: saved.technical_specifications || saved.technicalSpecifications,
-          procurementSchedule: saved.procurement_schedule || saved.bid_opening_date || saved.submission_deadline,
-          deliveryPeriod: saved.delivery_period || saved.delivery,
-          createdAt: saved.created_at || saved.createdAt,
-        }, ...prev]);
+        await procurementAPI.create(payload);
         setToast({ message: "Procurement request created successfully", type: "success" });
       }
       setShowModal(false);
+      await loadRequests();
     } catch (error) {
+      console.error(error);
       setToast({ message: "Failed to save procurement request.", type: "error" });
     } finally {
       setIsSaving(false);
@@ -166,76 +152,38 @@ export default function AdminProcurementPlanning() {
     setShowConfirm(true);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deletingId) return;
-    if (procurement?.pushAudit) {
+
+    try {
+      await procurementAPI.delete(deletingId);
       setRequests((prev) => prev.filter((item) => item.id !== deletingId));
-      procurement.pushAudit("Admin", `Deleted procurement request ${deletingId}`);
       setToast({ message: "Procurement request deleted", type: "success" });
-      setShowConfirm(false);
+    } catch (error) {
+      console.error(error);
+      setToast({ message: "Failed to delete procurement request.", type: "error" });
+    } finally {
       setDeletingId(null);
-      return;
+      setShowConfirm(false);
     }
-
-    procurementAPI.delete(deletingId)
-      .then(() => {
-        setRequests((prev) => prev.filter((item) => item.id !== deletingId));
-        setToast({ message: "Procurement request deleted", type: "success" });
-      })
-      .catch((error) => {
-        console.error("Failed to delete procurement request", error);
-        setToast({ message: "Failed to delete procurement request.", type: "error" });
-      })
-      .finally(() => {
-        setShowConfirm(false);
-        setDeletingId(null);
-      });
   }
 
-  function handleApprove() {
-    if (!approvingId || !procurement?.approveRequest) return;
-    procurement.approveRequest(approvingId, "Admin", true);
-    setRequests((prev) =>
-      prev.map((item) =>
-        item.id === approvingId ? { ...item, status: STATUS.APPROVED } : item
-      )
-    );
-    setToast({ message: "Procurement request approved successfully", type: "success" });
-    setShowApproveConfirm(false);
-    setApprovingId(null);
-  }
-
-  function handlePublish() {
-    if (!publishingId || !procurement?.publishProject) return;
-    const deadlineDateTime = new Date(deadlineDate).toISOString();
-    procurement.publishProject(publishingId, "Admin", deadlineDateTime);
-    setRequests((prev) =>
-      prev.map((item) =>
-        item.id === publishingId ? { ...item, status: STATUS.OPEN } : item
-      )
-    );
-    setToast({
-      message: `Project published for bidding (Deadline: ${new Date(deadlineDate).toLocaleDateString()})`,
-      type: "success",
+  const filtered = useMemo(() => {
+    return requests.filter((request) => {
+      return (
+        safeStr(request.project_title || request.title).includes(safeStr(search)) ||
+        safeStr(request.procurement_type || request.category).includes(safeStr(search)) ||
+        safeStr(request.created_by_name).includes(safeStr(search))
+      );
     });
-    setShowPublishModal(false);
-    setPublishingId(null);
-    setDeadlineDate(
-      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-    );
-  }
-
-  const filtered = requests.filter((request) => {
-    const query = search.toLowerCase();
-    return request.projectTitle.toLowerCase().includes(query) || request.procurementType.toLowerCase().includes(query);
-  });
+  }, [requests, search]);
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-slate-900">Procurement Planning</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Create and manage procurement requests</p>
+          <p className="mt-0.5 text-sm text-slate-500">Create and manage procurement requests</p>
         </div>
         <button
           onClick={openCreate}
@@ -246,16 +194,24 @@ export default function AdminProcurementPlanning() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        <div className="px-6 py-3 border-b border-slate-50">
+      <div className="mb-5 flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-5 py-3.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+          <Info className="h-4 w-4 text-emerald-500" />
+        </div>
+        <p className="text-sm text-slate-600">Approved requests are automatically published as projects.</p>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+        <div className="border-b border-slate-50 px-6 py-3">
           <SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title or type" />
         </div>
 
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-100">
+            <tr className="border-b border-slate-100 bg-slate-50/50">
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project Title</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Type</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Created</th>
@@ -263,62 +219,38 @@ export default function AdminProcurementPlanning() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filtered.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Loading procurement requests...</td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7}>
                   <EmptyState title="No procurement requests yet" subtitle="Create a new procurement request to get started." />
                 </td>
               </tr>
             ) : (
               filtered.map((request) => (
-                <tr key={request.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-800">{request.projectTitle}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    ₱{new Intl.NumberFormat("en-PH", { maximumFractionDigits: 0 }).format(request.budget)}
-                  </td>
-                  <td className="px-6 py-4 text-sm"><StatusBadge status={request.procurementType} /></td>
-                  <td className="px-6 py-4 text-sm">
-                    <StatusBadge status={getStatusLabel(request.status)} />
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{new Date(request.createdAt).toLocaleDateString()}</td>
+                <tr key={request.id} className="transition-colors hover:bg-slate-50/50">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-800">{request.project_title || request.title}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">₱{new Intl.NumberFormat("en-PH", { maximumFractionDigits: 0 }).format(request.budget || 0)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatDate(request.deadline || request.submission_deadline)}</td>
+                  <td className="px-6 py-4 text-sm"><StatusBadge status={request.procurement_type || request.category || "Goods"} /></td>
+                  <td className="px-6 py-4 text-sm"><StatusBadge status={request.status} /></td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatDate(request.created_at)}</td>
                   <td className="px-6 py-4">
-                    <div className="flex gap-2 flex-wrap">
-                      {request.status === STATUS.PENDING_REVIEW && (
-                        <button
-                          onClick={() => {
-                            setApprovingId(request.id);
-                            setShowApproveConfirm(true);
-                          }}
-                          className="rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Approve
+                    <div className="flex gap-2">
+                      {(getStatusLabel(request.status) === "Pending Review" || getStatusLabel(request.status) === "Revision Required") ? (
+                        <button onClick={() => openEdit(request)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">Edit</button>
+                      ) : null}
+                      {getStatusLabel(request.status) === "Approved" ? (
+                        <button onClick={() => onOpenProjects?.()} className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50">View Project</button>
+                      ) : null}
+                      {getStatusLabel(request.status) !== "Approved" ? (
+                        <button onClick={() => confirmDelete(request.id)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+                          <Trash2 className="h-4 w-4" />
                         </button>
-                      )}
-                      {request.status === STATUS.APPROVED && (
-                        <button
-                          onClick={() => {
-                            setPublishingId(request.id);
-                            setShowPublishModal(true);
-                          }}
-                          className="rounded-lg bg-blue-50 border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-1"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                          Publish for Bidding
-                        </button>
-                      )}
-                      <button
-                        onClick={() => openEdit(request)}
-                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => confirmDelete(request.id)}
-                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -328,83 +260,123 @@ export default function AdminProcurementPlanning() {
         </table>
       </div>
 
+      <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-5 py-3.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        </div>
+        <p className="text-sm text-slate-600">Requests move to School Head review after creation.</p>
+      </div>
+
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRequest ? "Edit Procurement Request" : "New Procurement Request"} size="lg">
-        <form onSubmit={(e) => { e.preventDefault(); saveRequest(); }} className="space-y-4">
-          <label>
+        <form onSubmit={(event) => { event.preventDefault(); saveRequest(); }} className="space-y-4">
+          <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Project Title</span>
             <input
               type="text"
               value={form.projectTitle}
-              onChange={(e) => setForm({ ...form, projectTitle: e.target.value })}
+              onChange={(event) => setForm((prev) => ({ ...prev, projectTitle: event.target.value }))}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
               placeholder="Enter project title"
             />
-            {errors.projectTitle && <p className="text-xs text-red-600 mt-1">{errors.projectTitle}</p>}
+            {errors.projectTitle && <p className="mt-1 text-xs text-red-600">{errors.projectTitle}</p>}
           </label>
 
-          <label>
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Budget (₱)</span>
-            <input
-              type="number"
-              value={form.budget}
-              onChange={(e) => setForm({ ...form, budget: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              placeholder="Enter budget"
-              min="0"
-              step="1000"
-            />
-            {errors.budget && <p className="text-xs text-red-600 mt-1">{errors.budget}</p>}
-          </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Budget (₱)</span>
+              <input
+                type="number"
+                value={form.budget}
+                onChange={(event) => setForm((prev) => ({ ...prev, budget: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                placeholder="Enter budget"
+                min="0"
+                step="1000"
+              />
+              {errors.budget && <p className="mt-1 text-xs text-red-600">{errors.budget}</p>}
+            </label>
 
-          <label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Bidding Closes On</span>
+              <input
+                type="date"
+                value={form.deadline}
+                onChange={(event) => setForm((prev) => ({ ...prev, deadline: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+              />
+              {errors.deadline && <p className="mt-1 text-xs text-red-600">{errors.deadline}</p>}
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Public Result Visible Until</span>
+              <input
+                type="date"
+                value={form.publicResultExpiryDate}
+                onChange={(event) => setForm((prev) => ({ ...prev, publicResultExpiryDate: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+              />
+              <p className="mt-1 text-xs text-slate-400">Set how long the awarded result stays visible to the public</p>
+              {errors.publicResultExpiryDate && <p className="mt-1 text-xs text-red-600">{errors.publicResultExpiryDate}</p>}
+            </label>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm text-slate-700">Bidding closes on {form.deadline || "—"}.</p>
+            <p className="text-sm text-slate-700">Public result will be visible until {form.publicResultExpiryDate || "—"}.</p>
+          </div>
+
+          <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span>
             <select
               value={form.procurementType}
-              onChange={(e) => setForm({ ...form, procurementType: e.target.value })}
+              onChange={(event) => setForm((prev) => ({ ...prev, procurementType: event.target.value }))}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
             >
               {PROCUREMENT_TYPES.map((type) => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
-            {errors.procurementType && <p className="text-xs text-red-600 mt-1">{errors.procurementType}</p>}
+            {errors.procurementType && <p className="mt-1 text-xs text-red-600">{errors.procurementType}</p>}
           </label>
 
-          <label>
+          <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span>
             <textarea
               value={form.technicalSpecifications}
-              onChange={(e) => setForm({ ...form, technicalSpecifications: e.target.value })}
+              onChange={(event) => setForm((prev) => ({ ...prev, technicalSpecifications: event.target.value }))}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
               placeholder="Describe technical specifications"
               rows="3"
             />
-            {errors.technicalSpecifications && <p className="text-xs text-red-600 mt-1">{errors.technicalSpecifications}</p>}
+            {errors.technicalSpecifications && <p className="mt-1 text-xs text-red-600">{errors.technicalSpecifications}</p>}
           </label>
 
-          <label>
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Schedule</span>
-            <input
-              type="text"
-              value={form.procurementSchedule}
-              onChange={(e) => setForm({ ...form, procurementSchedule: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              placeholder="e.g., Q1 2026, Immediate, etc."
-            />
-            {errors.procurementSchedule && <p className="text-xs text-red-600 mt-1">{errors.procurementSchedule}</p>}
-          </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Schedule</span>
+              <input
+                type="text"
+                value={form.procurementSchedule}
+                onChange={(event) => setForm((prev) => ({ ...prev, procurementSchedule: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                placeholder="e.g., Q1 2026, Immediate, etc."
+              />
+            </label>
 
-          <label>
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period</span>
-            <input
-              type="text"
-              value={form.deliveryPeriod}
-              onChange={(e) => setForm({ ...form, deliveryPeriod: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-              placeholder="e.g., 30 days, 6 months, etc."
-            />
-            {errors.deliveryPeriod && <p className="text-xs text-red-600 mt-1">{errors.deliveryPeriod}</p>}
-          </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period</span>
+              <input
+                type="text"
+                value={form.deliveryPeriod}
+                onChange={(event) => setForm((prev) => ({ ...prev, deliveryPeriod: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                placeholder="e.g., 30 days, 6 months, etc."
+              />
+              {errors.deliveryPeriod && <p className="mt-1 text-xs text-red-600">{errors.deliveryPeriod}</p>}
+            </label>
+          </div>
 
           <div className="flex gap-3 pt-4">
             <button
@@ -433,54 +405,6 @@ export default function AdminProcurementPlanning() {
         message="This action cannot be undone."
         confirmLabel="Delete"
       />
-
-      <ConfirmDialog
-        isOpen={showApproveConfirm}
-        onClose={() => setShowApproveConfirm(false)}
-        onConfirm={handleApprove}
-        title="Approve this procurement request?"
-        message="This will move the project to 'Approved' status. You can then publish it for bidding."
-        confirmLabel="Approve"
-      />
-
-      <Modal
-        isOpen={showPublishModal}
-        onClose={() => setShowPublishModal(false)}
-        title="Publish Project for Bidding"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-              Bid Submission Deadline
-            </label>
-            <input
-              type="date"
-              value={deadlineDate}
-              onChange={(e) => setDeadlineDate(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-            />
-            <p className="text-xs text-slate-500 mt-1.5">Suppliers will have until this date to submit their bids.</p>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowPublishModal(false)}
-              className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handlePublish}
-              className="flex-1 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
-            >
-              Publish Now
-            </button>
-          </div>
-        </div>
-      </Modal>
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>

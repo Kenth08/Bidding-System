@@ -6,16 +6,26 @@ export const STATUS = {
   CLOSED: 4,
   AWARDED: 5,
   REJECTED: 6,
+  REVISION_REQUIRED: 7,
+  BID_SUBMITTED: 8,
+  BID_UNDER_EVALUATION: 9,
+  BID_WON: 10,
+  BID_LOST: 11,
 };
 
 export const STATUS_TEXT = {
   [STATUS.DRAFT]: "Draft",
   [STATUS.PENDING_REVIEW]: "Pending Review",
   [STATUS.APPROVED]: "Approved",
-  [STATUS.OPEN]: "Active",
+  [STATUS.OPEN]: "Open for Bidding",
   [STATUS.CLOSED]: "Closed",
   [STATUS.AWARDED]: "Awarded",
   [STATUS.REJECTED]: "Rejected",
+  [STATUS.REVISION_REQUIRED]: "Revision Required",
+  [STATUS.BID_SUBMITTED]: "Submitted",
+  [STATUS.BID_UNDER_EVALUATION]: "Under Evaluation",
+  [STATUS.BID_WON]: "Won",
+  [STATUS.BID_LOST]: "Lost",
 };
 
 export function normalizeStatusCode(value) {
@@ -29,6 +39,11 @@ export function normalizeStatusCode(value) {
   if (text === "closed" || text === "closed for evaluation" || text === "closed_for_evaluation") return STATUS.CLOSED;
   if (text === "awarded" || text === "selected" || text === "won") return STATUS.AWARDED;
   if (text === "rejected" || text === "reject") return STATUS.REJECTED;
+  if (text === "revision required" || text === "revision_required" || text === "revise") return STATUS.REVISION_REQUIRED;
+  if (text === "submitted") return STATUS.BID_SUBMITTED;
+  if (text === "under evaluation" || text === "under_evaluation" || text === "under review") return STATUS.BID_UNDER_EVALUATION;
+  if (text === "won" || text === "selected") return STATUS.BID_WON;
+  if (text === "lost") return STATUS.BID_LOST;
   return STATUS.DRAFT;
 }
 
@@ -54,6 +69,7 @@ export function normalizeProject(project = {}) {
     deadline,
     submission_deadline: deadline,
     bid_opening_date: project.bid_opening_date || null,
+    awarded_at: project.awarded_at || null,
     status,
     status_label: getStatusLabel(status),
     created_at: project.created_at || new Date().toISOString(),
@@ -95,7 +111,7 @@ export function normalizeBid(bid = {}) {
     bidAmount: Number(bid.bidAmount ?? amount),
     submitted_at: bid.submitted_at || bid.submittedAt || new Date().toISOString(),
     submittedAt: bid.submittedAt || bid.submitted_at || new Date().toISOString(),
-    status: bid.status || "Submitted",
+    status: bid.status || "submitted",
     technical_compliance: Boolean(bid.technical_compliance ?? true),
     evaluation_remarks: bid.evaluation_remarks || "",
     rank: bid.rank || null,

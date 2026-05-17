@@ -16,6 +16,10 @@ const ACTION_TYPES = [
   "RECORD_BLOCKCHAIN",
 ];
 
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
 export default function AdminAuditLogs() {
   const procurement = useContext(ProcurementContext);
   const [search, setSearch] = useState("");
@@ -34,10 +38,11 @@ export default function AdminAuditLogs() {
   const filtered = useMemo(() => {
     return logs
       .filter((log) => {
-        const matchesSearch = search === "" || 
-          log.description.toLowerCase().includes(search.toLowerCase()) ||
-          log.user.toLowerCase().includes(search.toLowerCase()) ||
-          log.action.toLowerCase().includes(search.toLowerCase());
+        const query = safeStr(search);
+        const matchesSearch = query === "" || 
+          safeStr(log.description).includes(query) ||
+          safeStr(log.user).includes(query) ||
+          safeStr(log.action).includes(query);
         
         const matchesFilter = filterAction === "All" || log.action === filterAction;
         

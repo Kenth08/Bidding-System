@@ -9,20 +9,24 @@ const ICON_MAP = {
   record: Shield,
 };
 
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
 export default function AdminSearchDropdown({ query, onQueryChange, projects, suppliers, bids, blockchainRecords, onSelectResult }) {
   const results = useMemo(() => {
     if (!query.trim()) {
       return { project: [], supplier: [], bid: [], record: [] };
     }
 
-    const q = query.toLowerCase();
+    const q = safeStr(query);
 
     return {
-      project: projects.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)),
-      supplier: suppliers.filter((s) => s.name.toLowerCase().includes(q) || s.company.toLowerCase().includes(q)),
-      bid: bids.filter((b) => b.projectName.toLowerCase().includes(q) || b.supplierName.toLowerCase().includes(q)),
+      project: projects.filter((p) => safeStr(p.name || p.title).includes(q) || safeStr(p.id).includes(q)),
+      supplier: suppliers.filter((s) => safeStr(s.name || s.full_name).includes(q) || safeStr(s.company || s.company_name).includes(q)),
+      bid: bids.filter((b) => safeStr(b.projectName || b.projectTitle).includes(q) || safeStr(b.supplierName || b.supplier_name).includes(q)),
       record: blockchainRecords.filter(
-        (r) => r.projectId.toLowerCase().includes(q) || r.winner.toLowerCase().includes(q) || r.hash.toLowerCase().includes(q)
+        (r) => safeStr(r.projectId || r.project_id).includes(q) || safeStr(r.winner || r.winner_name).includes(q) || safeStr(r.hash).includes(q)
       ),
     };
   }, [query, projects, suppliers, bids, blockchainRecords]);

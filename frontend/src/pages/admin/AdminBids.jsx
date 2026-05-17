@@ -16,6 +16,10 @@ function getProjectKey(bid) {
   return bid.projectId || bid.project || bid.projectTitle || bid.projectName;
 }
 
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
 export default function AdminBids({ bids = [], setBids, onRecordToBlockchain }) {
   const procurement = useContext(ProcurementContext);
   const [expandedBid, setExpandedBid] = useState(null);
@@ -30,11 +34,14 @@ export default function AdminBids({ bids = [], setBids, onRecordToBlockchain }) 
   const [reviewDrafts, setReviewDrafts] = useState({});
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
     const listed = bids.filter((bid) => {
-      const statusMatch = filter === "All" || bid.status === filter;
-      const text = `${bid.supplierName} ${bid.projectTitle || bid.projectName}`.toLowerCase();
-      return statusMatch && (!query || text.includes(query));
+      const statusMatch = filter === "All" || safeStr(bid.status) === safeStr(filter);
+      const searchMatch =
+        safeStr(bid.supplierName).includes(safeStr(search)) ||
+        safeStr(bid.projectTitle).includes(safeStr(search)) ||
+        safeStr(bid.projectName).includes(safeStr(search)) ||
+        safeStr(bid.company || bid.supplierCompany || bid.company_name).includes(safeStr(search));
+      return statusMatch && searchMatch;
     });
 
     return listed

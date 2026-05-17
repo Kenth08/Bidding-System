@@ -1,31 +1,43 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\supplier\SupplierResults.jsx
 import { Shield } from "lucide-react";
-import { useContext, useMemo } from "react";
+import { useMemo } from "react";
 import EmptyState from "../../components/shared/EmptyState";
-import { ProcurementContext } from "../../lib/ProcurementContext";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-export default function SupplierResults({ supplierResults }) {
-  const procurement = useContext(ProcurementContext);
+function formatDateTime(value) {
+  if (!value) return "—";
+  const dateValue = new Date(value);
+  if (Number.isNaN(dateValue.getTime())) return value;
+  return dateValue.toLocaleString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function SupplierResults({ supplierResults = [], supplierBids = [] }) {
   const results = useMemo(() => {
-    if (supplierResults?.length) return supplierResults;
-    return procurement?.blockchainRecords?.map((record) => ({
-      id: record.id,
-      projectTitle: procurement?.projects?.find((project) => project.id === record.projectId)?.project_title || record.projectId,
-      winner: procurement?.suppliers?.find((supplier) => supplier.id === record.supplierId)?.company_name || record.supplierId,
-      bidAmount: record.winning_bid_amount,
-      awardDate: record.timestamp,
-      isWinner: true,
-      hash: record.hash,
-    })) || [];
-  }, [procurement, supplierResults]);
+    const bids = supplierBids.length ? supplierBids : supplierResults;
+    return bids.map((bid) => ({
+      id: bid.id,
+      projectTitle: bid.projectTitle || bid.projectName,
+      projectId: bid.projectId || bid.project,
+      winnerName: bid.awardedWinnerName || bid.winner_name || bid.winner || "Not selected yet",
+      winnerCompany: bid.awardedWinnerCompany || bid.winner_company || "Not selected yet",
+      bidAmount: bid.bidAmount || bid.bid_amount,
+      submittedAt: bid.submittedAt || bid.submitted_at,
+      status: String(bid.status || "").toLowerCase(),
+      isWinner: String(bid.status || "").toLowerCase() === "won",
+    }));
+  }, [supplierBids, supplierResults]);
 
   if (!results.length) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-100">
+      <div className="rounded-2xl border border-slate-100 bg-white">
         <EmptyState title="No results yet" subtitle="Results will appear after project awards are published." />
       </div>
     );
@@ -33,50 +45,59 @@ export default function SupplierResults({ supplierResults }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-slate-900">Results</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Blockchain-verified outcomes</p>
+          <p className="mt-0.5 text-sm text-slate-500">See who won each project you submitted bids for</p>
         </div>
       </div>
-      <div className="mb-5 rounded-2xl bg-slate-900 text-white p-4 flex items-center gap-3">
+
+      <div className="mb-5 flex items-center gap-3 rounded-2xl bg-slate-900 p-4 text-white">
         <Shield className="h-5 w-5 text-emerald-400" />
         <p className="text-sm">Results are blockchain-verified and cannot be altered</p>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {results.map((result) => (
           <div
             key={result.id}
-            className={`rounded-2xl border p-4 ${
-              result.isWinner ? "border-emerald-200 bg-emerald-50/60" : "border-slate-100 bg-white"
-            }`}
+            className={`rounded-2xl border p-4 ${result.isWinner ? "border-emerald-200 bg-emerald-50/60" : "border-slate-100 bg-white"}`}
           >
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-800">{result.projectTitle || result.projectName}</h3>
               <span
-                className={`text-xs font-semibold px-2 py-1 rounded-md ${
-                  result.isWinner ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-                }`}
+                className={`rounded-md px-2 py-1 text-xs font-semibold ${result.isWinner ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
               >
-                {result.isWinner ? "You Won" : "Not Selected"}
+                {result.isWinner ? "Won" : "Lost"}
               </span>
             </div>
-            <div className="mt-3 text-sm text-slate-600 space-y-1">
-              <p>Winner: {result.winner}</p>
-              <p>Bid Amount: {formatPeso(result.bidAmount)}</p>
-              <p>Award Date: {result.awardDate}</p>
+
+            <div className="mt-3 space-y-1 text-sm text-slate-600">
+              <p>Winner: {result.winnerName}</p>
+              <p>Company: {result.winnerCompany || "—"}</p>
+              <p>Your Bid Amount: {formatPeso(result.bidAmount)}</p>
+              <p>Submitted At: {formatDateTime(result.submittedAt)}</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 mt-3 border border-slate-100">
+
+            <div className={`mt-3 rounded-xl border p-3 ${result.isWinner ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
+              <p className={`text-sm font-semibold ${result.isWinner ? "text-emerald-700" : "text-red-600"}`}>
+                {result.isWinner
+                  ? "Congratulations! Your bid was selected as the winning bid."
+                  : "Thank you for participating. Another supplier was selected for this project."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                  <Shield className="h-3.5 w-3.5 text-emerald-500" />
                   <span className="text-xs font-semibold text-slate-600">Blockchain Verified</span>
                 </div>
-                <span className="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                <span className="rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
                   Verified ✓
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1.5">Result permanently recorded. Cannot be altered.</p>
+              <p className="mt-1.5 text-xs text-slate-400">Result permanently recorded. Cannot be altered.</p>
             </div>
           </div>
         ))}

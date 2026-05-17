@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.projects.views import DashboardStatsView, ProcurementReportView, SupplierReportView
+from apps.projects.views import DashboardStatsView, ProcurementReportView, SupplierReportView, PublicResultsView
 
 
 def favicon_view(request):
@@ -57,9 +57,12 @@ urlpatterns = [
     path("api/v1/health/", HealthView.as_view(), name="health-v1"),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/projects/", include("apps.projects.urls")),
+    path("api/v1/procurement-requests/", include("apps.projects.procurement_urls")),
     path("api/v1/bids/", include("apps.bids.urls")),
     path("api/v1/blockchain/", include("apps.blockchain.urls")),
+    path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/reports/procurement/", ProcurementReportView.as_view(), name="reports-procurement-v1"),
     path("api/v1/reports/suppliers/", SupplierReportView.as_view(), name="reports-suppliers-v1"),
     path("api/v1/dashboard/stats/", DashboardStatsView.as_view(), name="dashboard-stats-v1"),
+    path("api/v1/public/results/", PublicResultsView.as_view(), name="public-results-v1"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

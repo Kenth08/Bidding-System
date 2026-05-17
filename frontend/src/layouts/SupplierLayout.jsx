@@ -11,6 +11,7 @@ import SupplierResults from "../pages/supplier/SupplierResults";
 import SupplierProfile from "../pages/supplier/SupplierProfile";
 import { ProcurementContext } from "../lib/ProcurementContext";
 import { getStatusLabel, normalizeBid, normalizeBlockchainRecord, normalizeProject, normalizeSupplier } from "../lib/procurementStatus";
+import { bidsAPI, projectsAPI } from "../services/api";
 
 export default function SupplierLayout({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
@@ -22,28 +23,55 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
   const [projects, setProjects] = useState([]);
   const [supplierBids, setSupplierBids] = useState([]);
   const [supplierResults, setSupplierResults] = useState([]);
-  const [supplierProjectFilter, setSupplierProjectFilter] = useState("All");
-  const [showBidModal, setShowBidModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [bidDraft, setBidDraft] = useState({ bidAmount: "", proposal: "" });
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    setProjects(procurement.projects.map((project) => ({
-      ...normalizeProject(project),
-      status: getStatusLabel(project.status),
-      deadline: project.submission_deadline || project.deadline || project.bid_opening_date || "",
-      requirements: project.requirements || project.technical_specifications || "",
-    })));
-    setSupplierBids(procurement.bids.map((bid) => ({
-      ...normalizeBid(bid),
-      submittedAt: bid.submittedAt || bid.submitted_at || "",
-    })));
-    setSupplierResults(procurement.blockchainRecords.map((record) => normalizeBlockchainRecord(record)));
-    setIsLoading(false);
-  }, [procurement.projects, procurement.bids, procurement.blockchainRecords]);
+  function handleNotificationNavigate(link) {
+    const path = String(link || "");
+    if (path.startsWith("/supplier/projects")) setCurrentPage("available-projects");
+    if (path.startsWith("/supplier/profile")) setCurrentPage("profile");
+    if (path.startsWith("/supplier/bids")) setCurrentPage("my-bids");
+  }
 
-  const supplierProjects = useMemo(() => projects.filter((project) => project.status === "Active"), [projects]);
+  useEffect(() => {
+    async function loadSupplierData() {
+      setIsLoading(true);
+      try {
+        const [projectResponse, bidResponse] = await Promise.all([
+          projectsAPI.getAll(),
+          bidsAPI.getAll({ supplier: "me" }),
+        ]);
+        const projectItems = projectResponse.data.results || projectResponse.data || [];
+        const bidItems = bidResponse.data.results || bidResponse.data || [];
+
+        setProjects(projectItems.map((project) => ({
+          ...normalizeProject(project),
+          status: getStatusLabel(project.status),
+          deadline: project.deadline || project.submission_deadline || project.bid_opening_date || "",
+          requirements: project.requirements || project.technical_specifications || "",
+          bid_count: project.bid_count || 0,
+        })));
+        setSupplierBids(bidItems.map((bid) => ({
+          ...normalizeBid(bid),
+          submittedAt: bid.submittedAt || bid.submitted_at || "",
+          bidAmount: bid.bidAmount || bid.bid_amount || bid.amount || 0,
+        })));
+      } catch (error) {
+        console.error("Failed to load supplier data", error);
+        setProjects([]);
+        setSupplierBids([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadSupplierData();
+  }, [activeUser?.id]);
+
+  useEffect(() => {
+    setSupplierResults(procurement.blockchainRecords.map((record) => normalizeBlockchainRecord(record)));
+  }, [procurement.blockchainRecords]);
+
+  const supplierProjects = useMemo(() => projects.filter((project) => getStatusLabel(project.status) === "Open for Bidding"), [projects]);
 
   const pageMeta = useMemo(() => {
     if (currentPage === "available-projects") return { title: "Available Projects", subtitle: "Browse active opportunities and submit proposals" };
@@ -58,25 +86,18 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
       return (
         <SupplierProjects
           supplierProjects={supplierProjects}
-          supplierProjectFilter={supplierProjectFilter}
-          setSupplierProjectFilter={setSupplierProjectFilter}
-          showBidModal={showBidModal}
-          setShowBidModal={setShowBidModal}
-          selectedProject={selectedProject}
-          setSelectedProject={setSelectedProject}
-          bidDraft={bidDraft}
-          setBidDraft={setBidDraft}
           supplierBids={supplierBids}
           setSupplierBids={setSupplierBids}
           activeUser={activeUser}
+          setActivePage={setCurrentPage}
         />
       );
     }
     if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
-    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} user={activeUser} />;
+    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} supplierBids={supplierBids} user={activeUser} />;
     if (currentPage === "profile") return <SupplierProfile currentUser={activeUser} />;
     return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
-  }, [activeUser, bidDraft, currentPage, selectedProject, showBidModal, supplierBids, supplierProjectFilter, supplierProjects, supplierResults]);
+  }, [activeUser, currentPage, supplierBids, supplierProjects, supplierResults]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -89,6 +110,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
           user={activeUser}
           setSidebarOpen={setSidebarOpen}
           onLogout={onLogout}
+          onNotificationNavigate={handleNotificationNavigate}
           projects={supplierProjects}
           bids={supplierBids}
           onOpenProfile={() => setShowProfileModal(true)}

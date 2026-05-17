@@ -19,14 +19,23 @@ class Project(models.Model):
         SERVICES = "Services", "Services"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    procurement_request = models.OneToOneField(
+        "Procurement",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="project",
+    )
     title = models.CharField(max_length=255)
     budget = models.DecimalField(max_digits=15, decimal_places=2)
     deadline = models.DateField()
+    public_result_expiry_date = models.DateField(null=True, blank=True)
     requirements = models.TextField(blank=True, default="")
     procurement_type = models.CharField(max_length=50, choices=ProcurementType.choices, default=ProcurementType.SERVICES)
     delivery_period = models.PositiveIntegerField(default=0)
     technical_specifications = models.TextField(blank=True, default="")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    awarded_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -41,6 +50,12 @@ class Project(models.Model):
 
 
 class Procurement(models.Model):
+    class Status(models.TextChoices):
+        PENDING_REVIEW = "Pending Review", "Pending Review"
+        APPROVED = "Approved", "Approved"
+        REJECTED = "Rejected", "Rejected"
+        REVISION_REQUIRED = "Revision Required", "Revision Required"
+
     class Type(models.TextChoices):
         GOODS = "Goods", "Goods"
         SERVICES = "Services", "Services"
@@ -49,10 +64,24 @@ class Procurement(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project_title = models.CharField(max_length=255)
     budget = models.DecimalField(max_digits=15, decimal_places=2)
+    deadline = models.DateField(null=True, blank=True)
+    public_result_expiry_date = models.DateField(null=True, blank=True)
     procurement_type = models.CharField(max_length=50, choices=Type.choices)
     technical_specifications = models.TextField(blank=True, default="")
     procurement_schedule = models.CharField(max_length=255, blank=True, default="")
     delivery_period = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING_REVIEW)
+    rejection_reason = models.TextField(blank=True, default="")
+    revision_notes = models.TextField(blank=True, default="")
+    review_remarks = models.TextField(blank=True, null=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_procurements",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="procurements")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

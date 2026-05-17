@@ -4,6 +4,18 @@ import App from "./App";
 import { ProcurementProvider } from "./lib/ProcurementContext";
 import "./index.css";
 
+function clearAuthSessionOnFreshLoad() {
+  try {
+    sessionStorage.removeItem("access_token");
+    sessionStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("current_supplier");
+  } catch {
+    // Ignore storage access failures.
+  }
+}
+
+clearAuthSessionOnFreshLoad();
+
 class RootErrorBoundary extends React.Component {
   constructor(props) {
     super(props);

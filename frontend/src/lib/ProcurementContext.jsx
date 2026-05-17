@@ -17,6 +17,7 @@ function hydrateState(rawState) {
   const source = rawState && typeof rawState === "object" ? rawState : {};
   return {
     projects: Array.isArray(source.projects) ? source.projects.map(normalizeProject) : [],
+    requests: Array.isArray(source.requests) ? source.requests.map(normalizeProject) : [],
     suppliers: Array.isArray(source.suppliers) ? source.suppliers.map(normalizeSupplier) : [],
     bids: Array.isArray(source.bids) ? source.bids.map(normalizeBid) : [],
     auditLogs: Array.isArray(source.auditLogs) ? source.auditLogs : [],
@@ -25,6 +26,20 @@ function hydrateState(rawState) {
 }
 
 const demoState = hydrateState({
+  requests: [
+    {
+      id: "REQ-DEMO-001",
+      project_title: "Procurement of 20 Desktop Computers",
+      category: "Goods",
+      quantity: 20,
+      budget: 500000,
+      delivery: "30 Days",
+      procurement_method: "Public Bidding",
+      status: STATUS.PENDING_REVIEW,
+      created_at: "2026-05-10T08:00:00.000Z",
+      submission_deadline: "2026-05-20T17:00:00.000Z",
+    },
+  ],
   projects: [
     {
       id: "PRJ-DEMO-001",
@@ -120,6 +135,27 @@ function ensureProjectStatus(project, fallback = STATUS.DRAFT) {
   return normalizeStatusCode(project?.status ?? fallback);
 }
 
+function normalizeRequest(request = {}) {
+  const deadline = request.submission_deadline || request.deadline || request.bid_opening_date || request.deadline_date || null;
+  return {
+    ...request,
+    id: request.id || `REQ-${Date.now()}`,
+    title: request.title || request.project_title || "Untitled Project",
+    project_title: request.project_title || request.title || "Untitled Project",
+    category: request.category || request.procurement_type || "General",
+    quantity: Number(request.quantity || 1),
+    budget: Number(request.budget || 0),
+    delivery: request.delivery || request.delivery_period || "",
+    procurement_method: request.procurement_method || request.procurementType || "",
+    technical_specifications: request.technical_specifications || request.requirements || "",
+    requirements: request.requirements || request.technical_specifications || "",
+    deadline,
+    submission_deadline: deadline,
+    status: typeof request.status === "number" ? getStatusLabel(request.status) : (request.status || "Pending Review"),
+    created_at: request.created_at || new Date().toISOString(),
+  };
+}
+
 export const ProcurementContext = createContext(null);
 
 export function ProcurementProvider({ children }) {
@@ -145,9 +181,9 @@ export function ProcurementProvider({ children }) {
   }, []);
 
   const createRequest = useCallback((payload, createdBy) => {
-    const deadline = payload.submission_deadline || payload.deadline || payload.procurement_schedule || null;
-    const project = normalizeProject({
-      id: `PRJ-${Date.now()}`,
+    const deadline = payload.deadline || payload.submission_deadline || payload.procurement_schedule || null;
+    const request = normalizeRequest({
+      id: `REQ-${Date.now()}`,
       project_title: payload.project_title || payload.title || "Untitled Project",
       category: payload.category || payload.procurement_type || "General",
       quantity: payload.quantity || 1,
@@ -155,14 +191,40 @@ export function ProcurementProvider({ children }) {
       delivery: payload.delivery || payload.delivery_period || "",
       procurement_method: payload.procurement_method || payload.procurementType || "",
       technical_specifications: payload.technical_specifications || payload.requirements || "",
-      status: STATUS.PENDING_REVIEW,
+      status: "Pending Review",
       created_at: new Date().toISOString(),
       submission_deadline: deadline,
       bid_opening_date: payload.bid_opening_date || null,
     });
-    setState((current) => ({ ...current, projects: [project, ...current.projects] }));
-    pushAudit(createdBy, `Created procurement request ${project.id}`);
-    return project;
+    setState((current) => ({ ...current, requests: [request, ...current.requests] }));
+    pushAudit(createdBy, `Created procurement request ${request.id}`);
+    return request;
+  }, [pushAudit]);
+
+  const updateRequest = useCallback((requestId, patch = {}, actor = "Admin") => {
+    let updatedRequest = null;
+    setState((current) => {
+      const requests = current.requests.map((request) => {
+        if (request.id !== requestId) return request;
+        updatedRequest = normalizeRequest({
+          ...request,
+          ...patch,
+          status: patch.status || request.status,
+          project_title: patch.project_title || patch.title || request.project_title,
+          technical_specifications: patch.technical_specifications || patch.requirements || request.technical_specifications,
+          submission_deadline: patch.submission_deadline || patch.deadline || request.submission_deadline,
+        });
+        return updatedRequest;
+      });
+      return { ...current, requests };
+    });
+    if (updatedRequest) pushAudit(actor, `Updated procurement request ${requestId}`);
+    return updatedRequest;
+  }, [pushAudit]);
+
+  const deleteRequest = useCallback((requestId, actor = "Admin") => {
+    setState((current) => ({ ...current, requests: current.requests.filter((request) => request.id !== requestId) }));
+    pushAudit(actor, `Deleted procurement request ${requestId}`);
   }, [pushAudit]);
 
   const updateProject = useCallback((projectId, patch = {}, actor = "Admin") => {
@@ -191,16 +253,95 @@ export function ProcurementProvider({ children }) {
     pushAudit(actor, `Deleted procurement project ${projectId}`);
   }, [pushAudit]);
 
-  const approveRequest = useCallback((projectId, approver, approved = true) => {
-    setState((current) => ({
-      ...current,
-      projects: current.projects.map((project) => (
-        project.id === projectId
-          ? { ...project, status: approved ? STATUS.APPROVED : STATUS.REJECTED, approved_at: new Date().toISOString(), approved_by: approver }
-          : project
-      )),
-    }));
-    pushAudit(approver, `${approved ? "Approved" : "Rejected"} procurement request ${projectId}`);
+  const approveRequest = useCallback((requestId, approver) => {
+    let approvedRequest = null;
+    let createdProject = null;
+    setState((current) => {
+      const requests = current.requests.map((request) => {
+        if (request.id !== requestId) return request;
+        approvedRequest = normalizeRequest({
+          ...request,
+          status: "Approved",
+          approved_at: new Date().toISOString(),
+          approved_by: approver,
+          revision_notes: "",
+          rejection_reason: "",
+        });
+        return approvedRequest;
+      });
+
+      if (approvedRequest) {
+        createdProject = normalizeProject({
+          id: `PRJ-${Date.now()}`,
+          project_title: approvedRequest.project_title,
+          category: approvedRequest.category,
+          quantity: approvedRequest.quantity || 1,
+          budget: Number(approvedRequest.budget) || 0,
+          delivery: approvedRequest.delivery || approvedRequest.delivery_period || "",
+          procurement_method: approvedRequest.procurement_method || approvedRequest.procurementType || "",
+          technical_specifications: approvedRequest.technical_specifications || approvedRequest.requirements || "",
+          requirements: approvedRequest.requirements || approvedRequest.technical_specifications || "",
+          status: "Active",
+          created_at: new Date().toISOString(),
+          submission_deadline: approvedRequest.submission_deadline || approvedRequest.deadline || null,
+          bid_opening_date: approvedRequest.bid_opening_date || null,
+        });
+      }
+
+      const nextProjects = createdProject
+        ? [createdProject, ...current.projects.filter((project) => project.request_id !== requestId)]
+        : current.projects;
+
+      return {
+        ...current,
+        requests,
+        projects: createdProject ? nextProjects : current.projects,
+      };
+    });
+    pushAudit(approver, `Approved procurement request ${requestId}`);
+    return { request: approvedRequest, project: createdProject };
+  }, [pushAudit]);
+
+  const rejectRequest = useCallback((requestId, reason, approver) => {
+    let updatedRequest = null;
+    setState((current) => {
+      const requests = current.requests.map((request) => {
+        if (request.id !== requestId) return request;
+        updatedRequest = normalizeRequest({
+          ...request,
+          status: "Rejected",
+          rejection_reason: reason,
+          revision_notes: "",
+          rejected_at: new Date().toISOString(),
+          rejected_by: approver,
+        });
+        return updatedRequest;
+      });
+      return { ...current, requests };
+    });
+    pushAudit(approver, `Rejected procurement request ${requestId}`);
+    return updatedRequest;
+  }, [pushAudit]);
+
+  const returnForRevision = useCallback((requestId, notes, approver) => {
+    let updatedRequest = null;
+    setState((current) => {
+      const requests = current.requests.map((request) => {
+        if (request.id !== requestId) return request;
+        updatedRequest = normalizeRequest({
+          ...request,
+          status: "Revision Required",
+          revision_notes: notes,
+          rejection_reason: "",
+          revised_at: new Date().toISOString(),
+          revised_by: approver,
+        });
+        return updatedRequest;
+      });
+      return { ...current, requests };
+    });
+    pushAudit(approver, `Returned procurement request ${requestId} for revision`);
+    return updatedRequest;
   }, [pushAudit]);
 
   const publishProject = useCallback((projectId, actor, deadline) => {
@@ -405,9 +546,13 @@ export function ProcurementProvider({ children }) {
   const value = useMemo(() => ({
     ...state,
     createRequest,
+    updateRequest,
+    deleteRequest,
     updateProject,
     deleteProject,
     approveRequest,
+    rejectRequest,
+    returnForRevision,
     publishProject,
     registerSupplier,
     updateSupplierStatus,
@@ -427,7 +572,7 @@ export function ProcurementProvider({ children }) {
       awardedContracts: state.projects.filter((project) => ensureProjectStatus(project) === STATUS.AWARDED).length,
       totalAwardedAmount: state.blockchainRecords.reduce((sum, record) => sum + Number(record.winning_bid_amount || 0), 0),
     },
-  }), [approveRequest, closeBidding, createRequest, deleteProject, evaluateAndRank, getProjectSupplierData, getPublicRecords, publishProject, pushAudit, registerSupplier, selectWinner, state.blockchainRecords, state.bids.length, state.projects, submitBid, updateBid, updateProject, updateSupplierStatus, verifyHash]);
+  }), [approveRequest, closeBidding, createRequest, deleteProject, deleteRequest, evaluateAndRank, getProjectSupplierData, getPublicRecords, publishProject, pushAudit, registerSupplier, rejectRequest, returnForRevision, selectWinner, state.blockchainRecords, state.bids.length, state.projects, state.requests, submitBid, updateBid, updateProject, updateRequest, updateSupplierStatus, verifyHash]);
 
   return <ProcurementContext.Provider value={value}>{children}</ProcurementContext.Provider>;
 }

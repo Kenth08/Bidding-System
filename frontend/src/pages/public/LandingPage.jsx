@@ -1,6 +1,7 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\public\LandingPage.jsx
 import {
   Activity,
+  Award,
   Building2,
   CheckCircle,
   ChevronDown,
@@ -13,11 +14,83 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import { useContext } from 'react'
-import { ProcurementContext } from '../../lib/ProcurementContext'
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export default function LandingPage({ onAdminLogin, onViewResults, onRegister }) {
-  const procurementCtx = useContext(ProcurementContext)
+  const [latestRecord, setLatestRecord] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [liveStats, setLiveStats] = useState({
+    totalProjects: 0,
+    totalBids: 0,
+    activeBidding: 0,
+  });
+
+  useEffect(() => {
+    async function fetchPublicData() {
+      try {
+        const res = await axios.get(`${BASE_URL}/public/results/`);
+        const records = Array.isArray(res.data) ? res.data : [];
+        if (records.length > 0) {
+          const latest = records[0];
+          setLatestRecord({
+            id: latest.project_id,
+            project_title: latest.project_title,
+            project_ref_id: latest.project_id ? `PRJ-${String(latest.project_id).substring(0, 6).toUpperCase()}` : null,
+            winner_name: latest.winner?.supplier_name,
+            winner_company: latest.winner?.supplier_name,
+            bid_amount: latest.winner?.bid_amount,
+            recorded_at: latest.awarded_at,
+          });
+        } else {
+          setLatestRecord(null);
+        }
+      } catch (err) {
+        console.error("Could not load blockchain data:", err);
+        setLatestRecord(null);
+      }
+
+      try {
+        const [projStatsRes, bidsRes] = await Promise.all([
+          axios.get(`${BASE_URL}/projects/public/stats/`),
+          axios.get(`${BASE_URL}/bids/public/`).catch(() => ({ data: { count: 0 } })),
+        ]);
+
+        const projectStats = projStatsRes.data || {};
+        const bidsPayload = bidsRes.data || {};
+        const totalBids = typeof bidsPayload.count === "number"
+          ? bidsPayload.count
+          : Array.isArray(bidsPayload.results)
+            ? bidsPayload.results.length
+            : Array.isArray(bidsPayload)
+              ? bidsPayload.length
+              : 0;
+
+        setLiveStats({
+          totalProjects: Number(projectStats.total_projects || 0),
+          totalBids,
+          activeBidding: Number(projectStats.active_bidding || 0),
+        });
+      } catch (err) {
+        console.error("Could not load stats:", err);
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    fetchPublicData();
+  }, []);
+
+  function formatDate(dateStr) {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }
 
   return (
     <div className="bg-white">
@@ -101,27 +174,6 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
               transparency for government and corporate procurement.
             </p>
 
-            {/* Small stats from procurement state */}
-            {(() => {
-              const stats = procurementCtx?.stats || { totalProjects: 0, totalBids: 0, activeBidding: 0 }
-              return (
-                <div className="mb-6 mt-2 flex items-center gap-3">
-                  <div className="rounded-xl bg-slate-800 p-3 text-xs">
-                    <p className="text-xs text-slate-400">Total Projects</p>
-                    <p className="text-sm font-semibold text-white">{stats.totalProjects}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-800 p-3 text-xs">
-                    <p className="text-xs text-slate-400">Total Bids</p>
-                    <p className="text-sm font-semibold text-white">{stats.totalBids}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-800 p-3 text-xs">
-                    <p className="text-xs text-slate-400">Active Bidding</p>
-                    <p className="text-sm font-semibold text-white">{stats.activeBidding}</p>
-                  </div>
-                </div>
-              )
-            })()}
-
             <div className="flex flex-wrap items-center gap-4">
               <button
                 type="button"
@@ -146,61 +198,60 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
               </button>
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-6 border-t border-slate-800 pt-8">
+            <div className="flex items-center gap-6 mt-8 pt-8 border-t border-slate-800">
               {[
-                { icon: Shield, label: "Blockchain Secured" },
-                { icon: Lock, label: "Role-based Access" },
-                { icon: CheckCircle, label: "Tamper-proof Records" },
-              ].map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-emerald-400" />
-                  <span className="text-xs text-slate-400">{label}</span>
+                { label: "Total Projects", value: statsLoading ? "..." : liveStats.totalProjects },
+                { label: "Total Bids", value: statsLoading ? "..." : liveStats.totalBids },
+                { label: "Active Bidding", value: statsLoading ? "..." : liveStats.activeBidding },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-2xl font-bold text-white">{value}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{label}</p>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="relative">
-            <div className="rounded-2xl border border-slate-700 bg-slate-800 p-5 shadow-2xl">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Blockchain Record</p>
-                <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  <span className="text-xs font-medium text-emerald-400">Verified</span>
+            {latestRecord ? (
+              <div
+                className="rounded-2xl p-5 shadow-2xl"
+                style={{ backgroundColor: "#1e293b", border: "1px solid #334155" }}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Latest Award</p>
+                  <div className="flex items-center gap-1.5 rounded-lg px-2 py-1" style={{ backgroundColor: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#34d399" }} />
+                    <span className="text-xs font-medium" style={{ color: "#34d399" }}>Verified</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {[
+                    { label: "Winner", value: latestRecord.winner_name || "-" },
+                    { label: "Company", value: latestRecord.winner_company || "-" },
+                    { label: "Bid Amount", value: latestRecord.bid_amount ? `₱${Number(latestRecord.bid_amount).toLocaleString()}` : "-" },
+                    { label: "Award Date", value: formatDate(latestRecord.recorded_at) },
+                    { label: "Project Ref", value: latestRecord.project_ref_id || `PRJ-${String(latestRecord.id || "").substring(0, 4).toUpperCase()}` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-xl p-3" style={{ backgroundColor: "#0f172a" }}>
+                      <p className="text-xs mb-1" style={{ color: "#94a3b8" }}>{label}</p>
+                      <p className="text-sm font-semibold text-white truncate">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: "#0f172a" }}>
+                  <p className="text-xs mb-1" style={{ color: "#94a3b8" }}>Project</p>
+                  <p className="text-sm font-semibold text-white truncate">{latestRecord.project_title || "-"}</p>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <CheckCircle className="w-3.5 h-3.5" style={{ color: "#34d399" }} />
+                  <span className="text-xs" style={{ color: "#64748b" }}>Permanently stored · Cannot be altered</span>
                 </div>
               </div>
-
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {[
-                  { label: "Winner", value: "Apex InfraTech" },
-                  { label: "Project ID", value: "PRJ-2048" },
-                  { label: "Bid Amount", value: "₱125,000" },
-                  { label: "Award Date", value: "2026-04-13" },
-                ].map(({ label, value }) => (
-                  <div key={label} className="rounded-xl bg-slate-900 p-3">
-                    <p className="mb-1 text-xs text-slate-500">{label}</p>
-                    <p className="text-sm font-semibold text-white">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-slate-900 rounded-xl p-3 mt-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                    <span className="text-xs text-emerald-400 font-medium">Blockchain Verified</span>
-                  </div>
-                  <span className="text-xs text-slate-500">Immutable Record</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  This award is permanently recorded and cannot be altered.
-                </p>
-              </div>
-            </div>
-
-            <div className="absolute -right-3 -top-3 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-lg">
-              100% Transparent
-            </div>
+            ) : null}
           </div>
         </div>
 

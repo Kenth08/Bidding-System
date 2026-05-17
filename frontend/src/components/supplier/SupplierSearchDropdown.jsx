@@ -7,17 +7,21 @@ const ICON_MAP = {
   bid: FileText,
 };
 
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
 export default function SupplierSearchDropdown({ query, onQueryChange, projects, bids, onSelectResult }) {
   const results = useMemo(() => {
     if (!query.trim()) {
       return { project: [], bid: [] };
     }
 
-    const q = query.toLowerCase();
+    const q = safeStr(query);
 
     return {
-      project: projects.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)),
-      bid: bids.filter((b) => b.projectName.toLowerCase().includes(q) || b.companyName.toLowerCase().includes(q)),
+      project: projects.filter((p) => safeStr(p.name || p.title).includes(q) || safeStr(p.id).includes(q)),
+      bid: bids.filter((b) => safeStr(b.projectName || b.projectTitle).includes(q) || safeStr(b.companyName || b.company).includes(q)),
     };
   }, [query, projects, bids]);
 

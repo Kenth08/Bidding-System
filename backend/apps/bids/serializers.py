@@ -9,15 +9,27 @@ User = get_user_model()
 class BidSerializer(serializers.ModelSerializer):
     projectTitle = serializers.CharField(source="project.title", read_only=True)
     projectName = serializers.CharField(source="project.title", read_only=True)
+    projectDeadline = serializers.DateField(source="project.deadline", read_only=True)
+    projectStatus = serializers.CharField(source="project.status", read_only=True)
+    projectBudget = serializers.DecimalField(source="project.budget", max_digits=15, decimal_places=2, read_only=True)
+    projectProcurementType = serializers.CharField(source="project.procurement_type", read_only=True)
+    projectTechnicalSpecifications = serializers.CharField(source="project.technical_specifications", read_only=True)
+    projectDeliveryPeriod = serializers.IntegerField(source="project.delivery_period", read_only=True)
+    projectBidCount = serializers.SerializerMethodField()
     supplierName = serializers.CharField(source="supplier.full_name", read_only=True)
     supplierCompany = serializers.CharField(source="supplier.company_name", read_only=True)
     companyName = serializers.CharField(source="company_name", read_only=True)
     bidAmount = serializers.DecimalField(source="bid_amount", max_digits=15, decimal_places=2, read_only=True)
-    submittedAt = serializers.DateTimeField(source="submitted_at", format="%Y-%m-%d", read_only=True)
+    submittedAt = serializers.DateTimeField(source="submitted_at", format="%Y-%m-%d %H:%M:%S", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", format="%Y-%m-%d", read_only=True)
     technicalCompliance = serializers.SerializerMethodField()
     quotationDocument = serializers.SerializerMethodField()
     technicalDocument = serializers.SerializerMethodField()
+    quotationFile = serializers.SerializerMethodField()
+    technicalProposal = serializers.SerializerMethodField()
+    supportingDocuments = serializers.SerializerMethodField()
+    awardedWinnerName = serializers.SerializerMethodField()
+    awardedWinnerCompany = serializers.SerializerMethodField()
 
     class Meta:
         model = Bid
@@ -26,6 +38,13 @@ class BidSerializer(serializers.ModelSerializer):
             "project",
             "projectTitle",
             "projectName",
+            "projectDeadline",
+            "projectStatus",
+            "projectBudget",
+            "projectProcurementType",
+            "projectTechnicalSpecifications",
+            "projectDeliveryPeriod",
+            "projectBidCount",
             "supplier",
             "supplierName",
             "supplierCompany",
@@ -39,6 +58,14 @@ class BidSerializer(serializers.ModelSerializer):
             "technicalCompliance",
             "evaluation_remarks",
             "rank",
+            "quotation_file",
+            "quotationFile",
+            "technical_proposal",
+            "technicalProposal",
+            "supporting_documents",
+            "supportingDocuments",
+            "awardedWinnerName",
+            "awardedWinnerCompany",
             "quotation_document",
             "quotationDocument",
             "technical_document",
@@ -60,6 +87,18 @@ class BidSerializer(serializers.ModelSerializer):
             "updatedAt",
         ]
 
+    def validate_bid_amount(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Bid amount must be greater than 0.")
+        return value
+
+    def validate(self, attrs):
+        if self.instance is None:
+            quotation_file = attrs.get("quotation_file") or self.initial_data.get("quotation_file") or self.initial_data.get("quotationDocument")
+            if not quotation_file:
+                raise serializers.ValidationError({"quotation_file": "Quotation file is required."})
+        return attrs
+
     def get_technicalCompliance(self, obj):
         if obj.technical_compliance is True:
             return "Compliant"
@@ -68,13 +107,43 @@ class BidSerializer(serializers.ModelSerializer):
         return "Pending"
 
     def get_quotationDocument(self, obj):
-        if not obj.quotation_document:
-            return ""
-        request = self.context.get("request")
-        return request.build_absolute_uri(obj.quotation_document.url) if request else obj.quotation_document.url
+        return self._build_file_url(obj.quotation_document)
 
     def get_technicalDocument(self, obj):
-        if not obj.technical_document:
+        return self._build_file_url(obj.technical_document)
+
+    def get_quotationFile(self, obj):
+        return self._build_file_url(obj.quotation_file or obj.quotation_document)
+
+    def get_technicalProposal(self, obj):
+        return self._build_file_url(obj.technical_proposal or obj.technical_document)
+
+    def get_supportingDocuments(self, obj):
+        return self._build_file_url(obj.supporting_documents)
+
+    def get_projectBidCount(self, obj):
+        return obj.project.bids.count() if obj.project_id else 0
+
+    def get_awardedWinnerName(self, obj):
+        if not obj.project_id:
+            return ""
+        winner_bid = obj.project.bids.filter(status=Bid.Status.WON).select_related("supplier").first()
+        if not winner_bid:
+            return ""
+        return winner_bid.supplier.full_name if winner_bid.supplier else winner_bid.company_name
+
+    def get_awardedWinnerCompany(self, obj):
+        if not obj.project_id:
+            return ""
+        winner_bid = obj.project.bids.filter(status=Bid.Status.WON).select_related("supplier").first()
+        if not winner_bid:
+            return ""
+        if winner_bid.supplier and winner_bid.supplier.company_name:
+            return winner_bid.supplier.company_name
+        return winner_bid.company_name or ""
+
+    def _build_file_url(self, field_file):
+        if not field_file:
             return ""
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.technical_document.url) if request else obj.technical_document.url
+        return request.build_absolute_uri(field_file.url) if request else field_file.url

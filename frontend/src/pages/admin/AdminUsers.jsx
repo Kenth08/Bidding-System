@@ -10,6 +10,10 @@ import Toast from "../../components/shared/Toast";
 
 const INITIAL_FORM = { fullName: "", email: "", password: "", role: "supplier", status: "Active" };
 
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
 export default function AdminUsers({ users, setUsers, currentUser }) {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -23,10 +27,12 @@ export default function AdminUsers({ users, setUsers, currentUser }) {
   const [errors, setErrors] = useState({});
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
     return users.filter((user) => {
-      const roleMatch = filter === "All" || user.role.toLowerCase() === filter.toLowerCase();
-      const searchMatch = !query || user.fullName.toLowerCase().includes(query) || user.email.toLowerCase().includes(query);
+      const roleMatch = filter === "All" || safeStr(user.role) === safeStr(filter);
+      const searchMatch =
+        safeStr(user.fullName || user.full_name).includes(safeStr(search)) ||
+        safeStr(user.email).includes(safeStr(search)) ||
+        safeStr(user.role).includes(safeStr(search));
       return roleMatch && searchMatch;
     });
   }, [filter, search, users]);

@@ -37,7 +37,6 @@ export async function loginWithEmail(email, password) {
         }
       } catch (supabaseError) {
         // Supabase error - continue to backend API
-        console.log('Supabase not configured or error:', supabaseError?.message);
       }
     }
 
@@ -63,8 +62,8 @@ export async function loginWithEmail(email, password) {
         return { user: null, error: 'Your account is deactivated. Contact the administrator.' };
       }
 
-      localStorage.setItem('access_token', access);
-      localStorage.setItem('refresh_token', refresh);
+      sessionStorage.setItem('access_token', access);
+      sessionStorage.setItem('refresh_token', refresh);
 
       if (user?.role === 'supplier' && localSupplierApproved) {
         const trustedUser = {
@@ -75,7 +74,7 @@ export async function loginWithEmail(email, password) {
           company_name: localSupplier.company_name || user.company_name,
           status: localSupplier.status || 'Verified',
         };
-        localStorage.setItem('current_supplier', JSON.stringify(trustedUser));
+        sessionStorage.setItem('current_supplier', JSON.stringify(trustedUser));
         return { user: trustedUser, error: null };
       }
 
@@ -90,7 +89,7 @@ export async function loginWithEmail(email, password) {
           role: 'supplier',
           status: localSupplier.status || 'Verified',
         };
-        localStorage.setItem('current_supplier', JSON.stringify(trustedUser));
+        sessionStorage.setItem('current_supplier', JSON.stringify(trustedUser));
         return { user: trustedUser, error: null };
       }
       // If backend fails and no supplier found in context, return original backend error
@@ -140,6 +139,10 @@ export async function logout() {
   localStorage.removeItem('supabase_token');
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
+  localStorage.removeItem('current_supplier');
+  sessionStorage.removeItem('access_token');
+  sessionStorage.removeItem('refresh_token');
+  sessionStorage.removeItem('current_supplier');
 }
 
 export async function getCurrentSession() {
@@ -150,7 +153,7 @@ export async function getCurrentSession() {
 
 export async function getCurrentUser() {
   try {
-    const backendToken = localStorage.getItem('access_token');
+    const backendToken = sessionStorage.getItem('access_token');
     if (backendToken) {
       const res = await api.get('/auth/me/');
       return res.data;

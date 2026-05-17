@@ -11,7 +11,11 @@ import { suppliersAPI, documentAPI } from "../../services/api";
 import { useContext } from "react";
 import { ProcurementContext } from "../../lib/ProcurementContext";
 
-export default function AdminSuppliers() {
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
+export default function AdminSuppliers({ notificationTargetSupplierId = null, notificationTargetVersion = 0 }) {
   const procurement = useContext(ProcurementContext);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,12 +75,22 @@ export default function AdminSuppliers() {
     loadDocs();
   }, [viewingSupplier]);
 
+  useEffect(() => {
+    if (!notificationTargetSupplierId || !suppliers.length) return;
+    const target = suppliers.find((supplier) => String(supplier.id) === String(notificationTargetSupplierId));
+    if (target) {
+      setViewingSupplier(target);
+    }
+  }, [notificationTargetSupplierId, notificationTargetVersion, suppliers]);
+
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
     return suppliers.filter((supplier) => {
-      const statusMatch = filter === "All" || supplier.status === filter || supplier.status_display === filter;
-      const text = `${supplier.full_name} ${supplier.company_name}`.toLowerCase();
-      return statusMatch && (!query || text.includes(query));
+      const statusMatch = filter === "All" || safeStr(supplier.status) === safeStr(filter) || safeStr(supplier.status_display) === safeStr(filter);
+      const searchMatch =
+        safeStr(supplier.full_name).includes(safeStr(search)) ||
+        safeStr(supplier.company_name).includes(safeStr(search)) ||
+        safeStr(supplier.email).includes(safeStr(search));
+      return statusMatch && searchMatch;
     });
   }, [filter, search, suppliers]);
 

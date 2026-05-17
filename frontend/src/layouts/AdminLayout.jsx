@@ -2,7 +2,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import AdminHeader from "../components/admin/AdminHeader";
 import AdminSidebar from "../components/admin/AdminSidebar";
-import AdminBids from "../pages/admin/AdminBids";
 import AdminBlockchain from "../pages/admin/AdminBlockchain";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminProjects from "../pages/admin/AdminProjects";
@@ -11,8 +10,9 @@ import AdminUsers from "../pages/admin/AdminUsers";
 import AdminProcurementPlanning from "../pages/admin/AdminProcurementPlanning";
 import AdminReports from "../pages/admin/AdminReports";
 import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
+import AdminBidEvaluation from "../pages/admin/AdminBidEvaluation";
 import AdminAwarding from "../pages/admin/AdminAwarding";
-import { usersAPI } from "../services/api";
+import { bidsAPI, projectsAPI, usersAPI } from "../services/api";
 import { ProcurementContext } from "../lib/ProcurementContext";
 import { getStatusLabel, normalizeBid, normalizeBlockchainRecord, normalizeProject, normalizeSupplier } from "../lib/procurementStatus";
 
@@ -24,30 +24,73 @@ export default function AdminLayout({ currentUser, onLogout }) {
   const [users, setUsers] = useState([]);
   const [bids, setBids] = useState([]);
   const [blockchainRecords, setBlockchainRecords] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [notificationTargetSupplierId, setNotificationTargetSupplierId] = useState(null);
+  const [notificationTargetVersion, setNotificationTargetVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setProjects(procurement.projects.map((project) => ({
-      ...normalizeProject(project),
-      status: getStatusLabel(project.status),
-      deadline: project.submission_deadline || project.deadline || project.bid_opening_date || "",
-      requirements: project.requirements || project.technical_specifications || "",
-    })));
-    setBids(procurement.bids.map((bid, index) => ({
-      ...normalizeBid(bid),
-      status: bid.status || "Submitted",
-      submittedAt: bid.submittedAt || bid.submitted_at || "",
-      bidAmount: bid.amount,
-      rank: bid.rank || index + 1,
-    })));
+    async function loadWorkspaceData() {
+      setIsLoading(true);
+      try {
+        const [projectResponse, bidResponse] = await Promise.all([projectsAPI.getAll(), bidsAPI.getAll()]);
+        const projectItems = projectResponse.data.results || projectResponse.data || [];
+        const bidItems = bidResponse.data.results || bidResponse.data || [];
+
+        setProjects(projectItems.map((project) => ({
+          ...normalizeProject(project),
+          status: getStatusLabel(project.status),
+          deadline: project.deadline || project.submission_deadline || project.bid_opening_date || "",
+          requirements: project.requirements || project.technical_specifications || "",
+        })));
+        setBids(bidItems.map((bid, index) => ({
+          ...normalizeBid(bid),
+          status: bid.status || "submitted",
+          submittedAt: bid.submittedAt || bid.submitted_at || "",
+          bidAmount: bid.bidAmount || bid.bid_amount || bid.amount || 0,
+          rank: bid.rank || index + 1,
+        })));
+      } catch (error) {
+        console.error("Failed to load admin workspace data", error);
+        setProjects([]);
+        setBids([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadWorkspaceData();
+  }, []);
+
+  useEffect(() => {
     setBlockchainRecords(procurement.blockchainRecords.map((record) => ({
       ...normalizeBlockchainRecord(record),
       recordedAt: record.recordedAt || record.recorded_at || record.timestamp,
       winner: record.winner_name || record.winner || record.winning_supplier,
       projectTitle: record.projectTitle || record.project_title,
     })));
-    setIsLoading(false);
-  }, [procurement.projects, procurement.bids, procurement.blockchainRecords]);
+  }, [procurement.blockchainRecords]);
+
+  function handleNotificationNavigate(link, notification) {
+    const path = String(link || "");
+    if (path.startsWith("/admin/suppliers")) {
+      setNotificationTargetSupplierId(notification?.related_id ? String(notification.related_id) : null);
+      setNotificationTargetVersion((current) => current + 1);
+      setCurrentPage("suppliers");
+      return;
+    }
+
+    if (path.startsWith("/admin/bid-evaluation")) {
+      const projectId = notification?.projectId || new URLSearchParams(path.split("?")[1] || "").get("project");
+      setSelectedProjectId(projectId ? String(projectId) : null);
+      setCurrentPage("bids");
+      return;
+    }
+
+    if (path.startsWith("/admin/projects")) {
+      setCurrentPage("projects");
+    }
+  }
 
   useEffect(() => {
     async function loadUsers() {
@@ -72,8 +115,20 @@ export default function AdminLayout({ currentUser, onLogout }) {
     if (currentPage === "projects") return { title: "Project Management", subtitle: "Create, update, and monitor procurement projects" };
     if (currentPage === "procurement") return { title: "Procurement Planning", subtitle: "Create and manage procurement requests" };
     if (currentPage === "suppliers") return { title: "Supplier Management", subtitle: "Review registrations and supplier status" };
-    if (currentPage === "bids") return { title: "Bid Evaluation", subtitle: "Review proposals and rank suppliers by bid amount" };
-    if (currentPage === "awarding") return { title: "Awarding", subtitle: "Generate award documents and manage winning bids" };
+    if (currentPage === "bids") {
+      const selectedProject = projects.find((project) => project.id === selectedProjectId);
+      return {
+        title: "Bid Evaluation",
+        subtitle: selectedProject ? `Review bids for ${selectedProject.title}` : "Review proposals and rank suppliers by bid amount",
+      };
+    }
+    if (currentPage === "awarding") {
+      const selectedProject = projects.find((project) => project.id === selectedProjectId);
+      return {
+        title: "Awarding",
+        subtitle: selectedProject ? `Generate award documents for ${selectedProject.title}` : "Generate award documents and manage winning bids",
+      };
+    }
     if (currentPage === "users") return { title: "User Accounts", subtitle: "Manage access, roles, and account status" };
     if (currentPage === "records") return { title: "Blockchain Records", subtitle: "Inspect immutable procurement ledger entries" };
     if (currentPage === "reports") return { title: "Reports & Analytics", subtitle: "View procurement and supplier performance reports" };
@@ -82,17 +137,17 @@ export default function AdminLayout({ currentUser, onLogout }) {
   }, [currentPage]);
 
   const page = useMemo(() => {
-    if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} />;
-    if (currentPage === "procurement") return <AdminProcurementPlanning />;
-    if (currentPage === "suppliers") return <AdminSuppliers />;
-    if (currentPage === "bids") return <AdminBids bids={bids} setBids={setBids} projects={projects} setProjects={setProjects} onRecordToBlockchain={(fn) => setBlockchainRecords((prev) => fn(prev))} />;
-    if (currentPage === "awarding") return <AdminAwarding bids={bids} projects={projects} />;
+    if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} onViewBids={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} />;
+    if (currentPage === "procurement") return <AdminProcurementPlanning onOpenProjects={() => setCurrentPage("projects")} />;
+    if (currentPage === "suppliers") return <AdminSuppliers notificationTargetSupplierId={notificationTargetSupplierId} notificationTargetVersion={notificationTargetVersion} />;
+    if (currentPage === "bids") return <AdminBidEvaluation bids={bids} setBids={setBids} projects={projects} selectedProjectId={selectedProjectId} onBackToProjects={() => setCurrentPage("projects")} onClearSelection={() => setSelectedProjectId(null)} onOpenProject={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} onOpenAwarding={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("awarding"); }} onAwardProject={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("awarding"); }} setProjects={setProjects} onRecordToBlockchain={(fn) => setBlockchainRecords((prev) => fn(prev))} />;
+    if (currentPage === "awarding") return <AdminAwarding bids={bids} projects={projects} selectedProjectId={selectedProjectId} />;
     if (currentPage === "users") return <AdminUsers users={users} setUsers={setUsers} currentUser={currentUser} />;
     if (currentPage === "records") return <AdminBlockchain blockchainRecords={blockchainRecords} />;
     if (currentPage === "reports") return <AdminReports projects={projects} suppliers={suppliers} bids={bids} />;
     if (currentPage === "audit") return <AdminAuditLogs />;
     return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
-  }, [bids, blockchainRecords, currentPage, currentUser, dashboardStats, projects, suppliers, users]);
+  }, [bids, blockchainRecords, currentPage, currentUser, dashboardStats, projects, selectedProjectId, suppliers, users]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -105,6 +160,7 @@ export default function AdminLayout({ currentUser, onLogout }) {
           currentUser={currentUser}
           setSidebarOpen={setSidebarOpen}
           onLogout={onLogout}
+          onNotificationNavigate={handleNotificationNavigate}
           projects={projects}
           suppliers={suppliers}
           bids={bids}

@@ -12,7 +12,11 @@ function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-export default function AdminAwarding({ bids = [], projects = [] }) {
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
+export default function AdminAwarding({ bids = [], projects = [], selectedProjectId = null }) {
   const procurement = useContext(ProcurementContext);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
@@ -21,12 +25,13 @@ export default function AdminAwarding({ bids = [], projects = [] }) {
 
   const awardedBids = useMemo(() => {
     return bids
-      .filter((bid) => bid.status === "Selected")
+      .filter((bid) => ["won", "selected"].includes(safeStr(bid.status)))
+      .filter((bid) => !selectedProjectId || String(bid.projectId || bid.project || bid.project_id) === String(selectedProjectId))
       .filter((bid) => {
-        const query = search.toLowerCase();
+        const query = safeStr(search);
         return (
-          (bid.supplierName || "").toLowerCase().includes(query) ||
-          (bid.projectTitle || bid.projectName || "").toLowerCase().includes(query)
+          safeStr(bid.supplierName).includes(query) ||
+          safeStr(bid.projectTitle || bid.projectName).includes(query)
         );
       })
       .map((bid) => {

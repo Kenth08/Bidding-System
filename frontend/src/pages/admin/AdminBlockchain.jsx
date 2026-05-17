@@ -12,6 +12,10 @@ function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
+function safeStr(val) {
+  return (val ?? "").toString().toLowerCase();
+}
+
 export default function AdminBlockchain({ blockchainRecords }) {
   const procurement = useContext(ProcurementContext);
   const [search, setSearch] = useState("");
@@ -20,10 +24,13 @@ export default function AdminBlockchain({ blockchainRecords }) {
   const [toast, setToast] = useState(null);
 
   const records = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = safeStr(search);
     return (blockchainRecords || procurement?.blockchainRecords || []).map(normalizeBlockchainRecord).filter((record) => {
-      const text = `${record.projectTitle} ${record.winner_name || record.winner}`.toLowerCase();
-      return !query || text.includes(query);
+      return (
+        safeStr(record.project_title || record.projectTitle).includes(query) ||
+        safeStr(record.winner_name || record.winner).includes(query) ||
+        safeStr(record.winner_company || record.winnerCompany).includes(query)
+      );
     });
   }, [blockchainRecords, procurement?.blockchainRecords, search]);
 
