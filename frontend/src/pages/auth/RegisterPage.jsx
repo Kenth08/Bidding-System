@@ -7,6 +7,7 @@ import {
   EyeOff,
   Shield,
 } from "lucide-react";
+import LoadingButton from "../../components/ui/LoadingButton";
 import { useState } from "react";
 import { registerWithEmail } from "../../services/authService";
 
@@ -353,13 +354,14 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
                   </div>
                 ) : null}
 
-                <button
+                <LoadingButton
                   type="submit"
-                  disabled={isLoading}
+                  isLoading={isLoading}
+                  loadingText="Registering..."
                   className="md:col-span-2 mt-2 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600"
                 >
                   Submit Registration
-                </button>
+                </LoadingButton>
               </form>
 
               <p className="mt-5 text-center text-sm text-slate-400">

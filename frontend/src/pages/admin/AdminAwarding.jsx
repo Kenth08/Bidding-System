@@ -16,6 +16,17 @@ function safeStr(val) {
   return (val ?? "").toString().toLowerCase();
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return "—";
+  const value = new Date(dateStr);
+  if (Number.isNaN(value.getTime())) return "—";
+  return value.toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export default function AdminAwarding({ bids = [], projects = [], selectedProjectId = null }) {
   const procurement = useContext(ProcurementContext);
   const [search, setSearch] = useState("");
@@ -43,6 +54,15 @@ export default function AdminAwarding({ bids = [], projects = [], selectedProjec
         };
       });
   }, [bids, projects, search]);
+
+  const latestAwardDate = useMemo(() => {
+    const latest = [...awardedBids].sort((left, right) => {
+      const leftDate = new Date(left.updated_at || left.updatedAt || 0).getTime();
+      const rightDate = new Date(right.updated_at || right.updatedAt || 0).getTime();
+      return rightDate - leftDate;
+    })[0];
+    return latest?.updated_at || latest?.updatedAt || null;
+  }, [awardedBids]);
 
   async function handleGenerateDocument(bidId, type) {
     setDocLoading(`${bidId}-${type}`);
@@ -83,7 +103,7 @@ export default function AdminAwarding({ bids = [], projects = [], selectedProjec
       </div>
 
       {awardedBids.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase text-emerald-600">Total Awards</p>
             <p className="mt-1 text-2xl font-bold text-emerald-700">{awardedBids.length}</p>
@@ -95,6 +115,10 @@ export default function AdminAwarding({ bids = [], projects = [], selectedProjec
           <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
             <p className="text-xs font-semibold uppercase text-purple-600">Documents Generated</p>
             <p className="mt-1 text-2xl font-bold text-purple-700">{awardedBids.length * 3}</p>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-semibold uppercase text-amber-600">Latest Award Date</p>
+            <p className="mt-1 text-lg font-bold text-amber-700">{formatDate(latestAwardDate)}</p>
           </div>
         </div>
       )}
@@ -110,6 +134,8 @@ export default function AdminAwarding({ bids = [], projects = [], selectedProjec
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Supplier</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Award Amount</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Bid Submitted</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Award Date</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Documents</th>
             </tr>
@@ -117,7 +143,7 @@ export default function AdminAwarding({ bids = [], projects = [], selectedProjec
           <tbody className="divide-y divide-slate-50">
             {awardedBids.length === 0 ? (
               <tr>
-                <td colSpan={5}>
+                <td colSpan={7}>
                   <EmptyState
                     icon={FileText}
                     title="No awarded bids yet"
@@ -131,6 +157,8 @@ export default function AdminAwarding({ bids = [], projects = [], selectedProjec
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">{bid.supplierName}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{bid.projectTitle || bid.projectName}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-emerald-600">{formatPeso(bid.bidAmount)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatDate(bid.submitted_at || bid.submittedAt)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatDate(bid.updated_at || bid.updatedAt)}</td>
                   <td className="px-6 py-4 text-sm"><StatusBadge status={bid.status} /></td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">

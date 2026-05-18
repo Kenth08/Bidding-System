@@ -1,8 +1,13 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\supplier\SupplierDashboard.jsx
 import StatCard from "../../components/shared/StatCard";
 import StatusBadge from "../../components/shared/StatusBadge";
+import { SkeletonStatCard } from "../../components/ui/Skeleton";
 
-export default function SupplierDashboard({ supplierProjects, supplierBids, user, setActivePage }) {
+export default function SupplierDashboard({ supplierProjects, supplierBids, user, setActivePage, isLoading }) {
+  const hasSubmittedBid = (projectId) => supplierBids.some((bid) => String(bid.projectId || bid.project_id || bid.project) === String(projectId));
+
+  const isProjectOpen = (project) => String(project.status || "").toLowerCase() === "open for bidding";
+
   const stats = {
     available: supplierProjects.length,
     myBids: supplierBids.length,
@@ -18,10 +23,21 @@ export default function SupplierDashboard({ supplierProjects, supplierBids, user
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Available Projects" value={stats.available} />
-        <StatCard title="My Bids" value={stats.myBids} />
-        <StatCard title="Under Review" value={stats.review} />
-        <StatCard title="Results Released" value={stats.results} />
+        {isLoading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard title="Available Projects" value={stats.available} />
+            <StatCard title="My Bids" value={stats.myBids} />
+            <StatCard title="Under Review" value={stats.review} />
+            <StatCard title="Results Released" value={stats.results} />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -29,7 +45,19 @@ export default function SupplierDashboard({ supplierProjects, supplierBids, user
           <div className="px-5 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Active Projects</h3></div>
           <div className="divide-y divide-slate-50">
             {supplierProjects.slice(0, 3).map((project) => (
-              <div key={project.id} className="px-5 py-3 flex items-center justify-between"><div><p className="text-sm font-medium text-slate-800">{project.title}</p><p className="text-xs text-slate-500">Deadline: {project.deadline}</p></div><button onClick={() => setActivePage?.("available-projects")} className="text-xs font-semibold text-emerald-600">Bid Now</button></div>
+              <div key={project.id} className="px-5 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{project.title}</p>
+                  <p className="text-xs text-slate-500">Deadline: {project.deadline}</p>
+                </div>
+                {hasSubmittedBid(project.id) ? (
+                  <span className="inline-flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bid Submitted ✓</span>
+                ) : isProjectOpen(project) ? (
+                  <button onClick={() => setActivePage?.("available-projects")} className="text-xs font-semibold text-emerald-600">Bid Now</button>
+                ) : (
+                  <span className="inline-flex items-center rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">Closed</span>
+                )}
+              </div>
             ))}
           </div>
         </div>

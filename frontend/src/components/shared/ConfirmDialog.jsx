@@ -1,5 +1,6 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\shared\ConfirmDialog.jsx
 import Modal from "./Modal";
+import LoadingButton from "../ui/LoadingButton";
 
 /**
  * @param {{
@@ -24,6 +25,8 @@ export default function ConfirmDialog({
   confirmVariant = "primary",
   icon,
   infoCard,
+  isConfirmLoading = false,
+  confirmLoadingText = undefined,
 }) {
   const confirmClass =
     confirmVariant === "danger"
@@ -44,13 +47,15 @@ export default function ConfirmDialog({
           >
             Cancel
           </button>
-          <button
+          <LoadingButton
             type="button"
             onClick={onConfirm}
+            isLoading={isConfirmLoading}
+            loadingText={confirmLoadingText || confirmLabel}
             className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${confirmClass}`}
           >
             {confirmLabel}
-          </button>
+          </LoadingButton>
         </div>
       </div>
     </Modal>

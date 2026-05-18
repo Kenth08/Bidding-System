@@ -1,6 +1,8 @@
 import { Fragment, useMemo, useState } from "react";
 import { ArrowLeft, FileText, Trophy } from "lucide-react";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import LoadingButton from "../../components/ui/LoadingButton";
+import { SkeletonTable } from "../../components/ui/Skeleton";
 import EmptyState from "../../components/shared/EmptyState";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
@@ -90,6 +92,7 @@ export default function AdminBidEvaluation({
   onOpenAwarding,
   onAwardProject,
   setProjects,
+  isLoading,
 }) {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
@@ -212,6 +215,21 @@ export default function AdminBidEvaluation({
   }
 
   if (!selectedProjectId) {
+    if (isLoading) {
+      return (
+        <div>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">Bid Evaluation</h1>
+              <p className="mt-0.5 text-sm text-slate-500">Review projects that have received bids</p>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-6">
+            <SkeletonTable rows={5} cols={4} />
+          </div>
+        </div>
+      );
+    }
     return (
       <div>
         <div className="mb-6 flex items-center justify-between">
@@ -384,12 +402,10 @@ export default function AdminBidEvaluation({
                 const draft = reviewDrafts[bid.id] || {};
                 const complianceValue = draft.technical_compliance ?? bid.technical_compliance;
                 const remarksValue = draft.evaluation_remarks ?? bid.evaluation_remarks ?? "";
-                const lowest = isLowestCompliantBid(bid);
                 const projectStatus = String(selectedProject?.status || "").toLowerCase();
                 const isAwarded = projectStatus === "awarded";
                 const bidStatus = String(bid.status || "").toLowerCase();
-                const canSelectWinner = lowest && !isAwarded && bidStatus !== "won";
-                const hideWinnerButton = isAwarded;
+                const canSelectWinner = complianceValue === true && !isAwarded && bidStatus !== "won";
 
                 return (
                   <Fragment key={bid.id}>
@@ -431,26 +447,29 @@ export default function AdminBidEvaluation({
                       <td className="px-6 py-4"><StatusBadge status={bid.status} /></td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-2">
-                          <button
+                          <LoadingButton
                             type="button"
                             onClick={() => saveEvaluation(bid)}
+                            isLoading={actionLoading}
+                            loadingText="Saving..."
                             className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
-                            disabled={actionLoading || isAwarded}
+                            disabled={isAwarded}
                           >
                             Save Evaluation
-                          </button>
-                          {hideWinnerButton ? null : canSelectWinner ? (
-                            <button
+                          </LoadingButton>
+                          {canSelectWinner ? (
+                            <LoadingButton
                               type="button"
                               onClick={() => {
                                 setSelectingBid(bid);
                                 setShowWinnerConfirm(true);
                               }}
+                              isLoading={actionLoading}
+                              loadingText="Awarding..."
                               className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
-                              disabled={actionLoading}
                             >
                               Select Winner
-                            </button>
+                            </LoadingButton>
                           ) : null}
                         </div>
                       </td>
@@ -473,6 +492,8 @@ export default function AdminBidEvaluation({
         confirmVariant="danger"
         icon={<Trophy className="h-4 w-4" />}
         infoCard={selectingBid ? <div className="text-sm text-slate-600"><p>Supplier: {selectingBid.supplierName}</p><p>Project: {selectingBid.projectTitle || selectingBid.projectName}</p><p>Amount: {formatPeso(selectingBid.bidAmount || selectingBid.bid_amount)}</p></div> : null}
+        isConfirmLoading={actionLoading}
+        confirmLoadingText="Awarding..."
       />
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />

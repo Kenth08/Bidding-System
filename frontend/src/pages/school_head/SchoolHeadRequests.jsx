@@ -2,7 +2,8 @@
 import { CheckCircle, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
-import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
+import { SkeletonTable } from "../../components/ui/Skeleton";
+import LoadingButton from "../../components/ui/LoadingButton";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
@@ -31,6 +32,7 @@ export default function SchoolHeadRequests({ refreshToken = 0, onRefresh }) {
   const [showRemarks, setShowRemarks] = useState(false);
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const filters = ["All", "Pending Review", "Approved", "Rejected", "Revision Required"];
 
   async function loadRequests() {
@@ -79,6 +81,7 @@ export default function SchoolHeadRequests({ refreshToken = 0, onRefresh }) {
       showToast("Remarks are required for rejection or revision.", "error");
       return;
     }
+    setActionLoading(true);
     try {
       await procurementAPI.review(selectedRequest.id, action, remarks);
       setSelectedRequest(null);
@@ -96,6 +99,8 @@ export default function SchoolHeadRequests({ refreshToken = 0, onRefresh }) {
     } catch (error) {
       console.error("Failed to review request", error);
       showToast(error.response?.data?.error || "Failed to review request.", "error");
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -136,7 +141,7 @@ export default function SchoolHeadRequests({ refreshToken = 0, onRefresh }) {
               <tr>
                 <td colSpan={6}>
                   <div className="p-6">
-                    <LoadingSkeleton rows={5} />
+                    <SkeletonTable rows={5} cols={4} />
                   </div>
                 </td>
               </tr>
@@ -244,31 +249,39 @@ export default function SchoolHeadRequests({ refreshToken = 0, onRefresh }) {
               >
                 Close
               </button>
-              <button
+              <LoadingButton
                 onClick={async () => { setReviewAction("approved"); setShowRemarks(false); await submitReview("approved"); }}
+                isLoading={actionLoading && reviewAction === "approved"}
+                loadingText="Approving..."
                 className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
               >
                 Approve
-              </button>
-              <button
+              </LoadingButton>
+              <LoadingButton
                 onClick={() => { setReviewAction("revision_required"); setShowRemarks(true); }}
+                isLoading={actionLoading && reviewAction === "revision_required"}
+                loadingText="Saving..."
                 className="rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-600"
               >
                 Needs Revision
-              </button>
-              <button
+              </LoadingButton>
+              <LoadingButton
                 onClick={() => { setReviewAction("rejected"); setShowRemarks(true); }}
+                isLoading={actionLoading && reviewAction === "rejected"}
+                loadingText="Rejecting..."
                 className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-600"
               >
                 Reject
-              </button>
+              </LoadingButton>
               {showRemarks ? (
-                <button
+                <LoadingButton
                   onClick={async () => await submitReview(reviewAction)}
+                  isLoading={actionLoading}
+                  loadingText={reviewAction === "rejected" ? "Rejecting..." : "Submitting..."}
                   className={`rounded-xl px-4 py-2.5 text-sm font-medium text-white ${reviewAction === "rejected" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}
                 >
                   Submit {reviewAction === "rejected" ? "Rejection" : "Revision"}
-                </button>
+                </LoadingButton>
               ) : null}
             </div>
           </div>

@@ -1,13 +1,14 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\admin\AdminDashboard.jsx
 import StatCard from "../../components/shared/StatCard";
 import StatusBadge from "../../components/shared/StatusBadge";
+import { SkeletonStatCard } from "../../components/ui/Skeleton";
 import { normalizeProject } from "../../lib/procurementStatus";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
 }
 
-export default function AdminDashboard({ stats, projects, bids, blockchainRecords, setActivePage }) {
+export default function AdminDashboard({ stats, projects, bids, blockchainRecords, setActivePage, isLoading }) {
   const normalizedProjects = (projects || []).map(normalizeProject);
   const counts = stats || {
     projects: normalizedProjects.length,
@@ -22,10 +23,21 @@ export default function AdminDashboard({ stats, projects, bids, blockchainRecord
       <div className="flex items-center justify-between mb-6"><div><h1 className="text-lg font-bold text-slate-900">Dashboard</h1><p className="text-sm text-slate-500 mt-0.5">Procurement activity overview</p></div></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Projects" value={counts.total_projects ?? counts.projects} />
-        <StatCard title="Total Bids" value={counts.total_bids ?? counts.bids} />
-        <StatCard title="Active Bidding" value={counts.active_bidding ?? counts.activeBidding} />
-        <StatCard title="Awarded Contracts" value={counts.awarded_contracts ?? counts.awarded ?? counts.awardedContracts} />
+        {isLoading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard title="Total Projects" value={counts.total_projects ?? counts.projects} />
+            <StatCard title="Total Bids" value={counts.total_bids ?? counts.bids} />
+            <StatCard title="Active Bidding" value={counts.active_bidding ?? counts.activeBidding} />
+            <StatCard title="Awarded Contracts" value={counts.awarded_contracts ?? counts.awarded ?? counts.awardedContracts} />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">

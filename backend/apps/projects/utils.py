@@ -10,6 +10,6 @@ def close_expired_projects():
     to ensure projects with past deadlines are moved to `closed` state.
     """
     today = timezone.localdate()
-    expired = Project.objects.filter(status=Project.Status.ACTIVE, deadline__lt=today)
+    expired = Project.objects.filter(status=Project.Status.ACTIVE, deadline__lt=today, is_archived=False)
     if expired.exists():
         expired.update(status=Project.Status.CLOSED, updated_at=timezone.now())

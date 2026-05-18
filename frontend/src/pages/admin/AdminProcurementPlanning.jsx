@@ -9,6 +9,8 @@ import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 import { getStatusLabel } from "../../lib/procurementStatus";
 import { procurementAPI } from "../../services/api";
+import { SkeletonTable } from "../../components/ui/Skeleton";
+import LoadingButton from "../../components/ui/LoadingButton";
 
 const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
 
@@ -34,7 +36,7 @@ function formatDate(value) {
   return dateValue.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export default function AdminProcurementPlanning({ onOpenProjects }) {
+export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -64,6 +66,32 @@ export default function AdminProcurementPlanning({ onOpenProjects }) {
   useEffect(() => {
     loadRequests();
   }, []);
+
+  const filtered = useMemo(() => {
+    return requests.filter((request) => {
+      return (
+        safeStr(request.project_title || request.title).includes(safeStr(search)) ||
+        safeStr(request.procurement_type || request.category).includes(safeStr(search)) ||
+        safeStr(request.created_by_name).includes(safeStr(search))
+      );
+    });
+  }, [requests, search]);
+
+  if (isLoading || loading) {
+    return (
+      <div>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">Procurement Planning</h1>
+            <p className="mt-0.5 text-sm text-slate-500">Create and manage procurement requests</p>
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-6">
+          <SkeletonTable rows={5} cols={4} />
+        </div>
+      </div>
+    );
+  }
 
   function openCreate() {
     setEditingRequest(null);
@@ -167,16 +195,6 @@ export default function AdminProcurementPlanning({ onOpenProjects }) {
       setShowConfirm(false);
     }
   }
-
-  const filtered = useMemo(() => {
-    return requests.filter((request) => {
-      return (
-        safeStr(request.project_title || request.title).includes(safeStr(search)) ||
-        safeStr(request.procurement_type || request.category).includes(safeStr(search)) ||
-        safeStr(request.created_by_name).includes(safeStr(search))
-      );
-    });
-  }, [requests, search]);
 
   return (
     <div>
@@ -386,13 +404,14 @@ export default function AdminProcurementPlanning({ onOpenProjects }) {
             >
               Cancel
             </button>
-            <button
+            <LoadingButton
               type="submit"
-              disabled={isSaving}
+              isLoading={isSaving}
+              loadingText="Saving..."
               className="flex-1 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600"
             >
-              {isSaving ? "Saving..." : editingRequest ? "Update Request" : "Create Request"}
-            </button>
+              {editingRequest ? "Update Request" : "Create Request"}
+            </LoadingButton>
           </div>
         </form>
       </Modal>

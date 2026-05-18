@@ -43,7 +43,7 @@ class ProjectListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         today = timezone.localdate()
-        queryset = Project.objects.select_related("created_by", "procurement_request").prefetch_related("bids").order_by("-created_at")
+        queryset = Project.objects.select_related("created_by", "procurement_request").prefetch_related("bids").filter(is_archived=False).order_by("-created_at")
 
         # Auto-close expired projects before returning lists
         close_expired_projects()
@@ -414,7 +414,7 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
         if getattr(user, "role", None) == "supplier" and getattr(user, "status", None) not in {"approved", "active"}:
             return queryset.none()
         if getattr(user, "role", None) == "supplier":
-            return queryset.filter(status=Project.Status.ACTIVE, deadline__gte=timezone.localdate())
+            return queryset.filter(status=Project.Status.ACTIVE, deadline__gte=timezone.localdate(), is_archived=False)
         return queryset
 
     def perform_update(self, serializer):
@@ -427,6 +427,62 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         log_audit("DELETE", self.request.user, f"Deleted project {instance.title}", "project", instance.id)
         instance.delete()
+
+
+class ProjectHistoryView(generics.ListAPIView):
+    serializer_class = ProjectSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        return Project.objects.select_related("created_by", "procurement_request").prefetch_related("bids").filter(is_archived=True).order_by("-archived_at", "-created_at")
+
+
+class ArchiveProjectView(APIView):
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        try:
+            project = Project.objects.get(pk=pk)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found."}, status=404)
+
+        if project.is_archived:
+            return Response({"error": "Project is already archived."}, status=400)
+
+        reason = str(request.data.get("reason", "Archived by admin")).strip() or "Archived by admin"
+        project.is_archived = True
+        project.archived_at = timezone.now()
+        project.archived_reason = reason
+        project.save(update_fields=["is_archived", "archived_at", "archived_reason", "updated_at"])
+        log_audit("UPDATE", request.user, f"Archived project {project.title}. Reason: {reason}", "project", project.id)
+
+        return Response({
+            "message": f'Project "{project.title}" has been archived.',
+            "project": ProjectSerializer(project, context={"request": request}).data,
+        })
+
+
+class UnarchiveProjectView(APIView):
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        try:
+            project = Project.objects.get(pk=pk)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found."}, status=404)
+
+        if not project.is_archived:
+            return Response({"error": "Project is not archived."}, status=400)
+
+        project.is_archived = False
+        project.archived_at = None
+        project.archived_reason = None
+        project.save(update_fields=["is_archived", "archived_at", "archived_reason", "updated_at"])
+
+        return Response({
+            "message": f'Project "{project.title}" has been restored.',
+            "project": ProjectSerializer(project, context={"request": request}).data,
+        })
 
 
 class ProcurementListCreateView(generics.ListCreateAPIView):

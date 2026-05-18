@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { ArrowLeft, Award, CheckCircle, Loader2, Search, Shield, XCircle } from "lucide-react";
 import Modal from "../../components/shared/Modal";
+import { SkeletonTable } from "../../components/ui/Skeleton";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -198,7 +199,9 @@ export default function PublicResultsPage({ onBack }) {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-slate-100 bg-white p-10 text-center text-slate-500">Loading public results...</div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-6">
+            <SkeletonTable rows={5} cols={4} />
+          </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50">
@@ -274,7 +277,7 @@ export default function PublicResultsPage({ onBack }) {
         )}
 
         <div className="mt-10 pt-6 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-400">© 2026 Blockchain E-Procurement System · BSIT Capstone · Davao del Norte State College</p>
+          <p className="text-xs text-slate-400">© 2026 Blockchain E-Procurement System. All rights reserved.</p>
         </div>
       </div>
 

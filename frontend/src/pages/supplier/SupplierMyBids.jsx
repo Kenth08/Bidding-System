@@ -3,6 +3,7 @@ import { Fragment, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
 import StatusBadge from "../../components/shared/StatusBadge";
+import { SkeletonTable } from "../../components/ui/Skeleton";
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
@@ -29,7 +30,7 @@ function safeStr(val) {
   return (val ?? "").toString().toLowerCase();
 }
 
-export default function SupplierMyBids({ supplierBids = [], onNavigate }) {
+export default function SupplierMyBids({ supplierBids = [], onNavigate, isLoading }) {
   const [expandedId, setExpandedId] = useState(null);
   const [filter, setFilter] = useState("All");
 
@@ -85,7 +86,13 @@ export default function SupplierMyBids({ supplierBids = [], onNavigate }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8">
+                  <SkeletonTable rows={5} cols={4} />
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={5}>
                   <EmptyState

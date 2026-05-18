@@ -1,5 +1,6 @@
 // Unified login page
-import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, Shield } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, Lock, Shield } from "lucide-react";
+import LoadingButton from "../../components/ui/LoadingButton";
 import { useState } from "react";
 import { loginWithEmail } from "../../services/authService";
 
@@ -128,14 +129,14 @@ export default function LoginPage({ onLogin, onBack, onGoToRegister }) {
               </div>
             </label>
 
-            <button
+            <LoadingButton
               type="submit"
-              disabled={isLoading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-80"
+              isLoading={isLoading}
+              loadingText="Signing In..."
+              className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600 active:scale-[0.98]"
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {isLoading ? "Signing In..." : "Sign In"}
-            </button>
+              Sign In
+            </LoadingButton>
 
             {error ? <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div> : null}
 

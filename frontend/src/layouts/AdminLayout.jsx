@@ -12,6 +12,7 @@ import AdminReports from "../pages/admin/AdminReports";
 import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
 import AdminBidEvaluation from "../pages/admin/AdminBidEvaluation";
 import AdminAwarding from "../pages/admin/AdminAwarding";
+import AdminProjectHistory from "../pages/admin/AdminProjectHistory";
 import { bidsAPI, projectsAPI, usersAPI } from "../services/api";
 import { ProcurementContext } from "../lib/ProcurementContext";
 import { getStatusLabel, normalizeBid, normalizeBlockchainRecord, normalizeProject, normalizeSupplier } from "../lib/procurementStatus";
@@ -133,20 +134,22 @@ export default function AdminLayout({ currentUser, onLogout }) {
     if (currentPage === "records") return { title: "Blockchain Records", subtitle: "Inspect immutable procurement ledger entries" };
     if (currentPage === "reports") return { title: "Reports & Analytics", subtitle: "View procurement and supplier performance reports" };
     if (currentPage === "audit") return { title: "Audit Logs", subtitle: "Track all system activities and changes" };
+    if (currentPage === "project-history") return { title: "Project History", subtitle: "Archived procurement projects and restore actions" };
     return { title: "Admin Dashboard", subtitle: "Overview of projects, bids, and blockchain activity" };
   }, [currentPage]);
 
   const page = useMemo(() => {
-    if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} onViewBids={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} />;
-    if (currentPage === "procurement") return <AdminProcurementPlanning onOpenProjects={() => setCurrentPage("projects")} />;
-    if (currentPage === "suppliers") return <AdminSuppliers notificationTargetSupplierId={notificationTargetSupplierId} notificationTargetVersion={notificationTargetVersion} />;
-    if (currentPage === "bids") return <AdminBidEvaluation bids={bids} setBids={setBids} projects={projects} selectedProjectId={selectedProjectId} onBackToProjects={() => setCurrentPage("projects")} onClearSelection={() => setSelectedProjectId(null)} onOpenProject={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} onOpenAwarding={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("awarding"); }} onAwardProject={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("awarding"); }} setProjects={setProjects} onRecordToBlockchain={(fn) => setBlockchainRecords((prev) => fn(prev))} />;
+    if (currentPage === "projects") return <AdminProjects projects={projects} setProjects={setProjects} onViewBids={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} isLoading={isLoading} />;
+    if (currentPage === "procurement") return <AdminProcurementPlanning onOpenProjects={() => setCurrentPage("projects")} isLoading={isLoading} />;
+    if (currentPage === "suppliers") return <AdminSuppliers notificationTargetSupplierId={notificationTargetSupplierId} notificationTargetVersion={notificationTargetVersion} isLoading={isLoading} />;
+    if (currentPage === "bids") return <AdminBidEvaluation bids={bids} setBids={setBids} projects={projects} selectedProjectId={selectedProjectId} onBackToProjects={() => setCurrentPage("projects")} onClearSelection={() => setSelectedProjectId(null)} onOpenProject={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} onOpenAwarding={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("awarding"); }} onAwardProject={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("awarding"); }} setProjects={setProjects} onRecordToBlockchain={(fn) => setBlockchainRecords((prev) => fn(prev))} isLoading={isLoading} />;
     if (currentPage === "awarding") return <AdminAwarding bids={bids} projects={projects} selectedProjectId={selectedProjectId} />;
     if (currentPage === "users") return <AdminUsers users={users} setUsers={setUsers} currentUser={currentUser} />;
     if (currentPage === "records") return <AdminBlockchain blockchainRecords={blockchainRecords} />;
     if (currentPage === "reports") return <AdminReports projects={projects} suppliers={suppliers} bids={bids} />;
     if (currentPage === "audit") return <AdminAuditLogs />;
-    return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
+    if (currentPage === "project-history") return <AdminProjectHistory />;
+    return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} isLoading={isLoading} />;
   }, [bids, blockchainRecords, currentPage, currentUser, dashboardStats, projects, selectedProjectId, suppliers, users]);
 
   return (

@@ -141,7 +141,11 @@ export default function NotificationPanel({ onNavigate }) {
         aria-label="Notifications"
       >
         <Bell className="h-4 w-4" />
-        {unreadCount > 0 ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-red-400" /> : null}
+        {unreadCount > 0 ? (
+          <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        ) : null}
       </button>
 
       {open ? (

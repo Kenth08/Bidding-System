@@ -1,9 +1,10 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\admin\AdminSidebar.jsx
-import { ChevronRight, FolderKanban, Gavel, LayoutDashboard, Link, Shield, Users, X, Briefcase, Award, FileText, History } from "lucide-react";
+import { Archive, Award, Briefcase, ChevronRight, FileText, FolderKanban, Gavel, History, LayoutDashboard, Link, Shield, Users, X } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "projects", label: "Projects", icon: FolderKanban },
+  { key: "project-history", label: "Project History", icon: Archive },
   { key: "procurement", label: "Procurement Planning", icon: Briefcase },
   { key: "suppliers", label: "Suppliers", icon: Users },
   { key: "bids", label: "Bid Evaluation", icon: Gavel },

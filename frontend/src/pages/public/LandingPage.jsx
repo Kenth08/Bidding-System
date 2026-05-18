@@ -1,7 +1,6 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\pages\public\LandingPage.jsx
 import {
   Activity,
-  Award,
   Building2,
   CheckCircle,
   ChevronDown,
@@ -20,7 +19,6 @@ import axios from "axios";
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export default function LandingPage({ onAdminLogin, onViewResults, onRegister }) {
-  const [latestRecord, setLatestRecord] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [liveStats, setLiveStats] = useState({
     totalProjects: 0,
@@ -30,28 +28,6 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
 
   useEffect(() => {
     async function fetchPublicData() {
-      try {
-        const res = await axios.get(`${BASE_URL}/public/results/`);
-        const records = Array.isArray(res.data) ? res.data : [];
-        if (records.length > 0) {
-          const latest = records[0];
-          setLatestRecord({
-            id: latest.project_id,
-            project_title: latest.project_title,
-            project_ref_id: latest.project_id ? `PRJ-${String(latest.project_id).substring(0, 6).toUpperCase()}` : null,
-            winner_name: latest.winner?.supplier_name,
-            winner_company: latest.winner?.supplier_name,
-            bid_amount: latest.winner?.bid_amount,
-            recorded_at: latest.awarded_at,
-          });
-        } else {
-          setLatestRecord(null);
-        }
-      } catch (err) {
-        console.error("Could not load blockchain data:", err);
-        setLatestRecord(null);
-      }
-
       try {
         const [projStatsRes, bidsRes] = await Promise.all([
           axios.get(`${BASE_URL}/projects/public/stats/`),
@@ -145,7 +121,7 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
         </div>
       </nav>
 
-      <section className="relative flex min-h-screen items-center overflow-hidden bg-slate-900 pb-10 pt-16">
+      <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-900 py-28 px-6 text-center">
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
@@ -157,9 +133,9 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
 
         <div className="pointer-events-none absolute right-1/4 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-emerald-500 opacity-[0.05] blur-3xl" />
 
-        <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-20 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <h1 className="mb-4 text-4xl font-bold leading-tight text-white sm:text-5xl">
+        <div className="relative flex min-h-screen w-full max-w-6xl flex-col items-center justify-center text-center px-6">
+          <div className="flex flex-col items-center justify-center min-h-screen text-center px-6 w-full">
+            <h1 className="text-6xl font-bold text-center max-w-3xl text-white leading-tight sm:text-7xl">
               Transparent
               <br />
               Procurement,
@@ -169,12 +145,12 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
               Blockchain
             </h1>
 
-            <p className="mb-8 max-w-md text-base leading-relaxed text-slate-400">
+            <p className="mt-4 max-w-xl text-lg text-center text-slate-400 leading-relaxed mx-auto">
               A blockchain-based e-procurement platform that ensures fair bidding, tamper-proof records, and full
               transparency for government and corporate procurement.
             </p>
 
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex items-center justify-center gap-4">
               <button
                 type="button"
                 onClick={onAdminLogin}
@@ -191,67 +167,25 @@ export default function LandingPage({ onAdminLogin, onViewResults, onRegister })
               </button>
             </div>
 
-            <p className="mt-4 text-xs text-slate-400">
+            <p className="text-center mt-3 text-xs text-slate-400">
               New supplier?{" "}
               <button type="button" onClick={onRegister} className="font-semibold text-emerald-400 hover:text-emerald-300">
                 Register as Supplier
               </button>
             </p>
 
-            <div className="flex items-center gap-6 mt-8 pt-8 border-t border-slate-800">
+            <div className="mt-10 flex items-center justify-center gap-12 border-t border-slate-800 pt-8">
               {[
                 { label: "Total Projects", value: statsLoading ? "..." : liveStats.totalProjects },
                 { label: "Total Bids", value: statsLoading ? "..." : liveStats.totalBids },
                 { label: "Active Bidding", value: statsLoading ? "..." : liveStats.activeBidding },
               ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-2xl font-bold text-white">{value}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{label}</p>
+                <div key={label} className="text-center">
+                  <p className="text-4xl font-bold text-white">{value}</p>
+                  <p className="text-xs text-slate-400 mt-1">{label}</p>
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="relative">
-            {latestRecord ? (
-              <div
-                className="rounded-2xl p-5 shadow-2xl"
-                style={{ backgroundColor: "#1e293b", border: "1px solid #334155" }}
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Latest Award</p>
-                  <div className="flex items-center gap-1.5 rounded-lg px-2 py-1" style={{ backgroundColor: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#34d399" }} />
-                    <span className="text-xs font-medium" style={{ color: "#34d399" }}>Verified</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  {[
-                    { label: "Winner", value: latestRecord.winner_name || "-" },
-                    { label: "Company", value: latestRecord.winner_company || "-" },
-                    { label: "Bid Amount", value: latestRecord.bid_amount ? `₱${Number(latestRecord.bid_amount).toLocaleString()}` : "-" },
-                    { label: "Award Date", value: formatDate(latestRecord.recorded_at) },
-                    { label: "Project Ref", value: latestRecord.project_ref_id || `PRJ-${String(latestRecord.id || "").substring(0, 4).toUpperCase()}` },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="rounded-xl p-3" style={{ backgroundColor: "#0f172a" }}>
-                      <p className="text-xs mb-1" style={{ color: "#94a3b8" }}>{label}</p>
-                      <p className="text-sm font-semibold text-white truncate">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: "#0f172a" }}>
-                  <p className="text-xs mb-1" style={{ color: "#94a3b8" }}>Project</p>
-                  <p className="text-sm font-semibold text-white truncate">{latestRecord.project_title || "-"}</p>
-                </div>
-
-                <div className="flex items-center gap-2 mt-2">
-                  <CheckCircle className="w-3.5 h-3.5" style={{ color: "#34d399" }} />
-                  <span className="text-xs" style={{ color: "#64748b" }}>Permanently stored · Cannot be altered</span>
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
 

@@ -1,10 +1,12 @@
-import { CheckCircle, Eye, Megaphone, Pencil, Trash2, CircleAlert, FolderOpen } from "lucide-react";
+import { Archive, CheckCircle, Eye, Megaphone, Pencil, Trash2, CircleAlert, FolderOpen } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import { projectsAPI } from "../../services/api";
+import { SkeletonTable } from "../../components/ui/Skeleton";
+import LoadingButton from "../../components/ui/LoadingButton";
 import Toast from "../../components/shared/Toast";
 
 const INITIAL_FORM = { title: "", budget: "", deadline: "", requirements: "", status: "draft" };
@@ -68,7 +70,7 @@ function safeStr(val) {
   return (val ?? "").toString().toLowerCase();
 }
 
-export default function AdminProjects({ onViewBids }) {
+export default function AdminProjects({ onViewBids, isLoading }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("All");
@@ -77,6 +79,9 @@ export default function AdminProjects({ onViewBids }) {
   const [editingProject, setEditingProject] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [archiveModal, setArchiveModal] = useState({ open: false, project: null });
+  const [archiveReason, setArchiveReason] = useState("");
+  const [archiving, setArchiving] = useState(null);
   const [toast, setToast] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
@@ -120,6 +125,24 @@ export default function AdminProjects({ onViewBids }) {
       return matchesFilter && matchesSearch;
     });
   }, [filter, projects, search, now]);
+
+  if (isLoading || loading) {
+    return (
+      <div>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">Project Management</h1>
+            <p className="mt-0.5 text-sm text-slate-500">Approved procurement projects published for bidding</p>
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-6">
+          <SkeletonTable rows={5} cols={5} />
+        </div>
+      </div>
+    );
+  }
+
+  
 
   function openEdit(project) {
     setEditingProject(project);
@@ -180,6 +203,24 @@ export default function AdminProjects({ onViewBids }) {
     } finally {
       setDeletingId(null);
       setShowConfirm(false);
+    }
+  }
+
+  async function handleArchive() {
+    if (!archiveModal.project) return;
+
+    setArchiving(archiveModal.project.id);
+    try {
+      await projectsAPI.archive(archiveModal.project.id, archiveReason || "Archived by admin");
+      await loadProjects();
+      setArchiveModal({ open: false, project: null });
+      setArchiveReason("");
+      setToast({ message: `"${archiveModal.project.title}" moved to history.`, type: "success" });
+    } catch (error) {
+      console.error(error);
+      setToast({ message: "Failed to archive project.", type: "error" });
+    } finally {
+      setArchiving(null);
     }
   }
 
@@ -271,6 +312,9 @@ export default function AdminProjects({ onViewBids }) {
                         <button onClick={() => onViewBids?.(project.id)} className="rounded-lg p-2 text-emerald-600 hover:bg-slate-100" title="View bids">
                           <Megaphone className="h-4 w-4" />
                         </button>
+                        <button onClick={() => setArchiveModal({ open: true, project })} className="rounded-lg p-2 text-amber-500 hover:bg-slate-100" title="Archive project" disabled={archiving === project.id}>
+                          <Archive className="h-4 w-4" />
+                        </button>
                         {effectiveStatus === "awarded" ? (
                           <div title="This project has been awarded and is locked" className="rounded-lg p-2 text-slate-500">
                             <span className="text-sm">🔒</span>
@@ -329,9 +373,14 @@ export default function AdminProjects({ onViewBids }) {
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button>
-            <button onClick={saveProject} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white" disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save"}
-            </button>
+            <LoadingButton
+              onClick={saveProject}
+              isLoading={isSaving}
+              loadingText="Saving..."
+              className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Save
+            </LoadingButton>
           </div>
         </div>
       </Modal>
@@ -440,6 +489,48 @@ export default function AdminProjects({ onViewBids }) {
         ) : null}
       </Modal>
 
+      <Modal
+        isOpen={archiveModal.open}
+        onClose={() => { setArchiveModal({ open: false, project: null }); setArchiveReason(""); }}
+        title="Archive Project"
+        subtitle="Move this project to history"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+            <Archive className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p className="text-sm text-amber-700">
+              This will hide <strong>"{archiveModal.project?.title}"</strong> from active projects and supplier browsing. You can restore it later from Project History.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Archive Reason (optional)</label>
+            <input
+              type="text"
+              value={archiveReason}
+              onChange={(event) => setArchiveReason(event.target.value)}
+              placeholder="e.g. Project completed, outdated, replaced by a newer request"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-400/20"
+            />
+          </div>
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+            <button
+              onClick={() => { setArchiveModal({ open: false, project: null }); setArchiveReason(""); }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleArchive}
+              disabled={Boolean(archiving)}
+              className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:bg-amber-300"
+            >
+              <Archive className="h-4 w-4" />
+              Move to History
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <ConfirmDialog
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
@@ -448,6 +539,8 @@ export default function AdminProjects({ onViewBids }) {
         message="This action cannot be undone. All associated bids will also be removed."
         confirmLabel="Delete"
         confirmVariant="danger"
+        isConfirmLoading={Boolean(deletingId)}
+        confirmLoadingText="Deleting..."
       />
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />

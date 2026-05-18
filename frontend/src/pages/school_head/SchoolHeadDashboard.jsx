@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getStatusLabel } from "../../lib/procurementStatus";
 import { procurementAPI } from "../../services/api";
 import StatusBadge from "../../components/shared/StatusBadge";
+import { SkeletonStatCard } from "../../components/ui/Skeleton";
 
 function StatCard({ label, value, icon: Icon }) {
   return (
@@ -58,10 +59,21 @@ export default function SchoolHeadDashboard({ user, requests, setActivePage, ref
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Pending Review" value={counts.pending} icon={Clock} />
-        <StatCard label="Approved" value={counts.approved} icon={CheckCircle} />
-        <StatCard label="Rejected" value={counts.rejected} icon={XCircle} />
-        <StatCard label="Needs Revision" value={counts.revision} icon={FileText} />
+        {loading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard label="Pending Review" value={counts.pending} icon={Clock} />
+            <StatCard label="Approved" value={counts.approved} icon={CheckCircle} />
+            <StatCard label="Rejected" value={counts.rejected} icon={XCircle} />
+            <StatCard label="Needs Revision" value={counts.revision} icon={FileText} />
+          </>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-100 bg-white overflow-hidden">

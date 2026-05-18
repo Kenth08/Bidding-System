@@ -2,7 +2,8 @@
 import { Eye, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
-import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
+import { SkeletonTable } from "../../components/ui/Skeleton";
+import LoadingButton from "../../components/ui/LoadingButton";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
@@ -15,7 +16,7 @@ function safeStr(val) {
   return (val ?? "").toString().toLowerCase();
 }
 
-export default function AdminSuppliers({ notificationTargetSupplierId = null, notificationTargetVersion = 0 }) {
+export default function AdminSuppliers({ notificationTargetSupplierId = null, notificationTargetVersion = 0, isLoading }) {
   const procurement = useContext(ProcurementContext);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +25,7 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
   const [viewingSupplier, setViewingSupplier] = useState(null);
   const [supplierDocs, setSupplierDocs] = useState([]);
   const [toast, setToast] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     async function loadSuppliers() {
@@ -95,6 +97,7 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
   }, [filter, search, suppliers]);
 
   async function changeStatus(id, status) {
+    setActionLoading(`${id}:${status}`);
     try {
       const isApproved = status === 'approved';
       const backendStatus = isApproved ? 'approved' : 'rejected';
@@ -113,6 +116,8 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
     } catch (error) {
       console.error("Failed to update supplier status", error);
       setToast({ message: "Failed to update supplier status.", type: "error" });
+    } finally {
+      setActionLoading(null);
     }
   }
 
@@ -152,8 +157,12 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {loading ? (
-              <LoadingSkeleton rows={5} />
+            {(isLoading || loading) ? (
+              <tr>
+                <td colSpan={9} className="px-6 py-8">
+                  <SkeletonTable rows={5} cols={4} />
+                </td>
+              </tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={8}>
@@ -174,10 +183,14 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
                   <div className="flex gap-2">
                     <button onClick={() => setViewingSupplier(supplier)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Eye className="h-4 w-4" /></button>
                     {supplier.status !== "Verified" && supplier.status !== "approved" && (
-                      <button onClick={() => changeStatus(supplier.id, "approved")} className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600">Approve</button>
+                      <LoadingButton onClick={() => changeStatus(supplier.id, "approved")} isLoading={actionLoading === `${supplier.id}:approved`} loadingText="Approving..." className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600">
+                        Approve
+                      </LoadingButton>
                     )}
                     {supplier.status !== "Rejected" && (
-                      <button onClick={() => changeStatus(supplier.id, "rejected")} className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">Reject</button>
+                      <LoadingButton onClick={() => changeStatus(supplier.id, "rejected")} isLoading={actionLoading === `${supplier.id}:rejected`} loadingText="Rejecting..." className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
+                        Reject
+                      </LoadingButton>
                     )}
                   </div>
                 </td>

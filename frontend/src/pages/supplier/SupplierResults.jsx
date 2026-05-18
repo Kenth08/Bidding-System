@@ -26,14 +26,21 @@ export default function SupplierResults({ supplierResults = [], supplierBids = [
       id: bid.id,
       projectTitle: bid.projectTitle || bid.projectName,
       projectId: bid.projectId || bid.project,
+      projectStatus: String(bid.projectStatus || bid.project_status || "").toLowerCase(),
       winnerName: bid.awardedWinnerName || bid.winner_name || bid.winner || "Not selected yet",
       winnerCompany: bid.awardedWinnerCompany || bid.winner_company || "Not selected yet",
       bidAmount: bid.bidAmount || bid.bid_amount,
       submittedAt: bid.submittedAt || bid.submitted_at,
       status: String(bid.status || "").toLowerCase(),
-      isWinner: String(bid.status || "").toLowerCase() === "won",
     }));
   }, [supplierBids, supplierResults]);
+
+  const toDisplayState = (result) => {
+    const projectAwarded = result.projectStatus === "awarded";
+    if (result.status === "won") return "won";
+    if (result.status === "lost" && projectAwarded) return "lost";
+    return "under_evaluation";
+  };
 
   if (!results.length) {
     return (
@@ -61,29 +68,31 @@ export default function SupplierResults({ supplierResults = [], supplierBids = [
         {results.map((result) => (
           <div
             key={result.id}
-            className={`rounded-2xl border p-4 ${result.isWinner ? "border-emerald-200 bg-emerald-50/60" : "border-slate-100 bg-white"}`}
+            className={`rounded-2xl border p-4 ${toDisplayState(result) === "won" ? "border-emerald-200 bg-emerald-50/60" : "border-slate-100 bg-white"}`}
           >
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-800">{result.projectTitle || result.projectName}</h3>
               <span
-                className={`rounded-md px-2 py-1 text-xs font-semibold ${result.isWinner ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
+                className={`rounded-md px-2 py-1 text-xs font-semibold ${toDisplayState(result) === "won" ? "bg-emerald-100 text-emerald-700" : toDisplayState(result) === "lost" ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"}`}
               >
-                {result.isWinner ? "Won" : "Lost"}
+                {toDisplayState(result) === "won" ? "Won" : toDisplayState(result) === "lost" ? "Lost" : "Under Evaluation"}
               </span>
             </div>
 
             <div className="mt-3 space-y-1 text-sm text-slate-600">
-              <p>Winner: {result.winnerName}</p>
-              <p>Company: {result.winnerCompany || "—"}</p>
+              <p>Winner: {toDisplayState(result) === "won" || toDisplayState(result) === "lost" ? result.winnerName : "—"}</p>
+              <p>Company: {toDisplayState(result) === "won" || toDisplayState(result) === "lost" ? (result.winnerCompany || "—") : "—"}</p>
               <p>Your Bid Amount: {formatPeso(result.bidAmount)}</p>
               <p>Submitted At: {formatDateTime(result.submittedAt)}</p>
             </div>
 
-            <div className={`mt-3 rounded-xl border p-3 ${result.isWinner ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
-              <p className={`text-sm font-semibold ${result.isWinner ? "text-emerald-700" : "text-red-600"}`}>
-                {result.isWinner
+            <div className={`mt-3 rounded-xl border p-3 ${toDisplayState(result) === "won" ? "border-emerald-100 bg-emerald-50" : toDisplayState(result) === "lost" ? "border-red-100 bg-red-50" : "border-blue-100 bg-blue-50"}`}>
+              <p className={`text-sm font-semibold ${toDisplayState(result) === "won" ? "text-emerald-700" : toDisplayState(result) === "lost" ? "text-red-600" : "text-blue-600"}`}>
+                {toDisplayState(result) === "won"
                   ? "Congratulations! Your bid was selected as the winning bid."
-                  : "Thank you for participating. Another supplier was selected for this project."}
+                  : toDisplayState(result) === "lost"
+                    ? "Thank you for participating. Another supplier was selected for this project."
+                    : "Your bid is currently under evaluation. Results will be announced soon."}
               </p>
             </div>
 

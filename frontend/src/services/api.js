@@ -68,6 +68,9 @@ export const projectsAPI = {
   update: (id, data) => api.patch(`/projects/${id}/`, data),
   delete: (id) => api.delete(`/projects/${id}/`),
   publish: (id) => api.patch(`/projects/${id}/publish/`),
+  archive: (id, reason) => api.patch(`/projects/${id}/archive/`, { reason }),
+  unarchive: (id) => api.patch(`/projects/${id}/unarchive/`),
+  getHistory: () => api.get('/projects/history/'),
 }
 
 export const dashboardAPI = {

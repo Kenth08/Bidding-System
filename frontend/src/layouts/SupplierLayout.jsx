@@ -93,10 +93,10 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
         />
       );
     }
-    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
-    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} supplierBids={supplierBids} user={activeUser} />;
+    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} isLoading={isLoading} />;
+    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} supplierBids={supplierBids} user={activeUser} isLoading={isLoading} />;
     if (currentPage === "profile") return <SupplierProfile currentUser={activeUser} />;
-    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
+    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} isLoading={isLoading} />;
   }, [activeUser, currentPage, supplierBids, supplierProjects, supplierResults]);
 
   return (

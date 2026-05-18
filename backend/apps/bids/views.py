@@ -153,7 +153,9 @@ class BidDetailView(generics.RetrieveUpdateDestroyAPIView):
         if bid_instance.project.status == Project.Status.AWARDED:
             raise PermissionDenied(detail={"error": "Bids for awarded projects cannot be modified."})
         bid = serializer.save()
-        log_audit("UPDATE", self.request.user, f"Updated evaluation for bid {bid.id}", "bid", bid.id)
+        proj_title = bid.project.title if getattr(bid, 'project', None) else 'Unknown Project'
+        supplier_name = bid.supplier.full_name if getattr(bid, 'supplier', None) else 'Unknown Supplier'
+        log_audit("UPDATE", self.request.user, f"Updated evaluation for bid for {proj_title} by {supplier_name}", "bid", bid.id)
 
 
 class BidPublicCountView(APIView):
@@ -173,7 +175,9 @@ class MarkUnderReviewView(APIView):
             bid = Bid.objects.get(pk=pk)
             bid.status = Bid.Status.UNDER_EVALUATION
             bid.save(update_fields=['status', 'updated_at'])
-            log_audit("UPDATE", request.user, f"Marked bid {bid.id} under review", "bid", bid.id)
+            proj_title = bid.project.title if getattr(bid, 'project', None) else 'Unknown Project'
+            supplier_name = bid.supplier.full_name if getattr(bid, 'supplier', None) else 'Unknown Supplier'
+            log_audit("UPDATE", request.user, f"Marked bid from {supplier_name} for {proj_title} under review", "bid", bid.id)
             recalculate_project_ranks(bid.project)
             return Response(BidSerializer(bid).data)
         except Bid.DoesNotExist:
