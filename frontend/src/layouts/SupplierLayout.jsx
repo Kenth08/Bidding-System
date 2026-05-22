@@ -9,21 +9,18 @@ import SupplierMyBids from "../pages/supplier/SupplierMyBids";
 import SupplierProjects from "../pages/supplier/SupplierProjects";
 import SupplierResults from "../pages/supplier/SupplierResults";
 import SupplierProfile from "../pages/supplier/SupplierProfile";
+import { DataProvider, useData } from "../context/DataContext";
 import { ProcurementContext } from "../lib/ProcurementContext";
-import { getStatusLabel, normalizeBid, normalizeBlockchainRecord, normalizeProject, normalizeSupplier } from "../lib/procurementStatus";
-import { bidsAPI, projectsAPI } from "../services/api";
+import { getStatusLabel } from "../lib/procurementStatus";
 
-export default function SupplierLayout({ user, currentUser, onLogout }) {
+function SupplierLayoutContent({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
+  const { cache, isInitialLoading } = useData();
   const procurement = useContext(ProcurementContext);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [projects, setProjects] = useState([]);
-  const [supplierBids, setSupplierBids] = useState([]);
-  const [supplierResults, setSupplierResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   function handleNotificationNavigate(link) {
     const path = String(link || "");
@@ -32,44 +29,9 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
     if (path.startsWith("/supplier/bids")) setCurrentPage("my-bids");
   }
 
-  useEffect(() => {
-    async function loadSupplierData() {
-      setIsLoading(true);
-      try {
-        const [projectResponse, bidResponse] = await Promise.all([
-          projectsAPI.getAll(),
-          bidsAPI.getAll({ supplier: "me" }),
-        ]);
-        const projectItems = projectResponse.data.results || projectResponse.data || [];
-        const bidItems = bidResponse.data.results || bidResponse.data || [];
-
-        setProjects(projectItems.map((project) => ({
-          ...normalizeProject(project),
-          status: getStatusLabel(project.status),
-          deadline: project.deadline || project.submission_deadline || project.bid_opening_date || "",
-          requirements: project.requirements || project.technical_specifications || "",
-          bid_count: project.bid_count || 0,
-        })));
-        setSupplierBids(bidItems.map((bid) => ({
-          ...normalizeBid(bid),
-          submittedAt: bid.submittedAt || bid.submitted_at || "",
-          bidAmount: bid.bidAmount || bid.bid_amount || bid.amount || 0,
-        })));
-      } catch (error) {
-        console.error("Failed to load supplier data", error);
-        setProjects([]);
-        setSupplierBids([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadSupplierData();
-  }, [activeUser?.id]);
-
-  useEffect(() => {
-    setSupplierResults(procurement.blockchainRecords.map((record) => normalizeBlockchainRecord(record)));
-  }, [procurement.blockchainRecords]);
+  const projects = cache.projects || [];
+  const supplierBids = cache.bids || [];
+  const supplierResults = cache.blockchainRecords || [];
 
   const supplierProjects = useMemo(() => projects.filter((project) => getStatusLabel(project.status) === "Open for Bidding"), [projects]);
 
@@ -78,7 +40,7 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
     if (currentPage === "my-bids") return { title: "My Bids", subtitle: "Track submitted bids and evaluation status" };
     if (currentPage === "results") return { title: "Results", subtitle: "View blockchain-verified procurement outcomes" };
     if (currentPage === "profile") return { title: "My Profile", subtitle: "Manage your profile and uploaded documents" };
-    return { title: "Supplier Dashboard", subtitle: "Overview of projects, bids, and latest updates" };
+    return { title: "Supplier Dashboard", subtitle: "" };
   }, [currentPage]);
 
   const page = useMemo(() => {
@@ -87,16 +49,15 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
         <SupplierProjects
           supplierProjects={supplierProjects}
           supplierBids={supplierBids}
-          setSupplierBids={setSupplierBids}
           activeUser={activeUser}
           setActivePage={setCurrentPage}
         />
       );
     }
-    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} isLoading={isLoading} />;
-    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} supplierBids={supplierBids} user={activeUser} isLoading={isLoading} />;
+    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
+    if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} supplierBids={supplierBids} user={activeUser} />;
     if (currentPage === "profile") return <SupplierProfile currentUser={activeUser} />;
-    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} isLoading={isLoading} />;
+    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
   }, [activeUser, currentPage, supplierBids, supplierProjects, supplierResults]);
 
   return (
@@ -121,5 +82,13 @@ export default function SupplierLayout({ user, currentUser, onLogout }) {
       <SupplierProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} currentUser={activeUser} />
       <SupplierSettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
     </div>
+  );
+}
+
+export default function SupplierLayout({ user, currentUser, onLogout }) {
+  return (
+    <DataProvider>
+      <SupplierLayoutContent user={user} currentUser={currentUser} onLogout={onLogout} />
+    </DataProvider>
   );
 }

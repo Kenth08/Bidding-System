@@ -6,6 +6,7 @@ const SIZE_CLASS = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
+  xl: "max-w-3xl",
 };
 
 /**
@@ -35,8 +36,8 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, size
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className={`relative w-full ${SIZE_CLASS[size] || SIZE_CLASS.lg} overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl`}>
-        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+      <div className={`relative flex max-h-[calc(100vh-2rem)] w-full flex-col ${SIZE_CLASS[size] || SIZE_CLASS.lg} overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl`}>
+        <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
           <div>
             {title ? <h3 className="text-base font-semibold text-slate-900">{title}</h3> : null}
             {subtitle ? <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p> : null}
@@ -50,7 +51,7 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, size
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
       </div>
     </div>
   );

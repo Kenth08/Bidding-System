@@ -136,10 +136,6 @@ export async function logout() {
   if (supabase) {
     await supabase.auth.signOut();
   }
-  localStorage.removeItem('supabase_token');
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('current_supplier');
   sessionStorage.removeItem('access_token');
   sessionStorage.removeItem('refresh_token');
   sessionStorage.removeItem('current_supplier');

@@ -1,64 +1,42 @@
 // c:\Users\Mico\Bidding-System\frontend\src\pages\admin\AdminSuppliers.jsx
-import { Eye, Users } from "lucide-react";
+import { CheckCircle, Eye, Pencil, Users, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
-import { SkeletonTable } from "../../components/ui/Skeleton";
 import LoadingButton from "../../components/ui/LoadingButton";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
-import { suppliersAPI, documentAPI } from "../../services/api";
-import { useContext } from "react";
-import { ProcurementContext } from "../../lib/ProcurementContext";
+import { suppliersAPI, documentAPI, usersAPI } from "../../services/api";
+import { useData } from "../../context/DataContext";
 
 function safeStr(val) {
   return (val ?? "").toString().toLowerCase();
 }
 
-export default function AdminSuppliers({ notificationTargetSupplierId = null, notificationTargetVersion = 0, isLoading }) {
-  const procurement = useContext(ProcurementContext);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function AdminSuppliers({ notificationTargetSupplierId = null, notificationTargetVersion = 0 }) {
+  const { cache, loadSuppliers, updateItem } = useData();
+  const [suppliers, setSuppliers] = useState(() => cache.suppliers || []);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [viewingSupplier, setViewingSupplier] = useState(null);
   const [supplierDocs, setSupplierDocs] = useState([]);
   const [toast, setToast] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [editingSupplier, setEditingSupplier] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   useEffect(() => {
-    async function loadSuppliers() {
-      if (procurement?.suppliers?.length) {
-        setSuppliers(procurement.suppliers.map((item) => ({
-          id: item.id,
-          full_name: item.full_name || item.company_name,
-          company_name: item.company_name,
-          email: item.email || '',
-          phone: item.phone || '',
-          business_type: item.business_type || '',
-          business_permit_number: item.business_permit_number || '',
-          created_at: item.created_at,
-          status: item.status,
-          status_display: item.status,
-        })));
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const res = await suppliersAPI.getAll();
-        setSuppliers(res.data.data || res.data || []);
-      } catch (error) {
-        console.error("Failed to fetch suppliers", error);
-      } finally {
-        setLoading(false);
-      }
+    if (!Array.isArray(cache.suppliers)) {
+      loadSuppliers();
     }
+  }, [cache.suppliers, loadSuppliers]);
 
-    loadSuppliers();
-  }, []);
+  useEffect(() => {
+    if (Array.isArray(cache.suppliers)) {
+      setSuppliers(cache.suppliers);
+    }
+  }, [cache.suppliers]);
 
   // Load documents for the supplier when viewingSupplier changes
   useEffect(() => {
@@ -85,6 +63,22 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
     }
   }, [notificationTargetSupplierId, notificationTargetVersion, suppliers]);
 
+  useEffect(() => {
+    if (!editingSupplier) {
+      setEditForm({});
+      return;
+    }
+
+    setEditForm({
+      full_name: editingSupplier.full_name || "",
+      company_name: editingSupplier.company_name || "",
+      company_address: editingSupplier.company_address || "",
+      phone: editingSupplier.phone || "",
+      business_type: editingSupplier.business_type || "",
+      email: editingSupplier.email || "",
+    });
+  }, [editingSupplier]);
+
   const filtered = useMemo(() => {
     return suppliers.filter((supplier) => {
       const statusMatch = filter === "All" || safeStr(supplier.status) === safeStr(filter) || safeStr(supplier.status_display) === safeStr(filter);
@@ -104,12 +98,8 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
       const localStatus = isApproved ? 'Verified' : 'Rejected';
 
       await suppliersAPI.updateStatus(id, backendStatus);
-
-      if (procurement?.updateSupplierStatus) {
-        procurement.updateSupplierStatus(id, localStatus, 'Admin');
-      }
-
       setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status: localStatus } : supplier)));
+      updateItem('suppliers', id, { status: localStatus, status_display: localStatus });
       const message = isApproved ? "Supplier approved successfully" : "Supplier rejected successfully";
       const type = isApproved ? "success" : "warning";
       setToast({ message, type });
@@ -118,6 +108,21 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
       setToast({ message: "Failed to update supplier status.", type: "error" });
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleEditSave() {
+    if (!editingSupplier) return;
+
+    try {
+      await usersAPI.update(editingSupplier.id, editForm);
+      setSuppliers((previous) => previous.map((supplier) => (supplier.id === editingSupplier.id ? { ...supplier, ...editForm } : supplier)));
+      updateItem('suppliers', editingSupplier.id, editForm);
+      setEditingSupplier(null);
+      setToast({ message: "Supplier details updated successfully.", type: "success" });
+    } catch (error) {
+      console.error("Failed to update supplier", error);
+      setToast({ message: "Failed to update supplier.", type: "error" });
     }
   }
 
@@ -150,20 +155,14 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Email</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Phone</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Business Type</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Permit No.</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Permit Document</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Registered</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {(isLoading || loading) ? (
-              <tr>
-                <td colSpan={9} className="px-6 py-8">
-                  <SkeletonTable rows={5} cols={4} />
-                </td>
-              </tr>
-            ) : filtered.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td colSpan={8}>
                   <EmptyState icon={Users} title="No suppliers registered yet" subtitle="New supplier registrations will appear here." />
@@ -176,7 +175,7 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.email}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.phone || "-"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_type || "-"}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_permit_number || "-"}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_permit_document_name || "-"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{supplier.created_at?.slice(0, 10)}</td>
                 <td className="px-6 py-4"><StatusBadge status={supplier.status || supplier.status_display} /></td>
                 <td className="px-6 py-4">
@@ -191,6 +190,11 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
                       <LoadingButton onClick={() => changeStatus(supplier.id, "rejected")} isLoading={actionLoading === `${supplier.id}:rejected`} loadingText="Rejecting..." className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
                         Reject
                       </LoadingButton>
+                    )}
+                    {String(supplier.status).toLowerCase() === "rejected" && (
+                      <button onClick={() => setEditingSupplier(supplier)} className="flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50" title="Edit rejected supplier details">
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
                     )}
                   </div>
                 </td>
@@ -210,7 +214,18 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
             <p><span className="font-semibold">Address:</span> {viewingSupplier.company_address || "-"}</p>
             <p><span className="font-semibold">Phone:</span> {viewingSupplier.phone || "-"}</p>
             <p><span className="font-semibold">Business Type:</span> {viewingSupplier.business_type || "-"}</p>
-            <p><span className="font-semibold">Business Permit No.:</span> {viewingSupplier.business_permit_number || "-"}</p>
+            <p><span className="font-semibold">Business Permit Document:</span> {viewingSupplier.business_permit_document_name || "-"}</p>
+            {viewingSupplier.business_permit_document_url ? (
+              <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-800">{viewingSupplier.business_permit_document_name || "Business Permit Document"}</p>
+                  <p className="text-xs text-slate-400">Uploaded business permit</p>
+                </div>
+                <a href={viewingSupplier.business_permit_document_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50">
+                  View Document
+                </a>
+              </div>
+            ) : null}
             <p><span className="font-semibold">Registered Date:</span> {viewingSupplier.created_at?.slice(0, 10)}</p>
             <StatusBadge status={viewingSupplier.status || viewingSupplier.status_display} />
             <div className="pt-4">
@@ -237,6 +252,59 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(editingSupplier)}
+        onClose={() => setEditingSupplier(null)}
+        title="Edit Rejected Supplier"
+        subtitle="Update supplier details before reconsidering"
+        size="md"
+      >
+        {editingSupplier ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+              <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <p className="text-sm text-blue-700">You are editing <strong>{editingSupplier.full_name}</strong>'s details. After editing, you can approve this supplier.</p>
+            </div>
+
+            {[
+              { key: "full_name", label: "Full Name", type: "text" },
+              { key: "email", label: "Email", type: "email" },
+              { key: "company_name", label: "Company Name", type: "text" },
+              { key: "company_address", label: "Company Address", type: "text" },
+              { key: "phone", label: "Phone Number", type: "tel" },
+            ].map(({ key, label, type }) => (
+              <div key={key}>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
+                <input
+                  type={type}
+                  value={editForm[key] || ""}
+                  onChange={(event) => setEditForm((previous) => ({ ...previous, [key]: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                />
+              </div>
+            ))}
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Business Type</label>
+              <select
+                value={editForm.business_type || ""}
+                onChange={(event) => setEditForm((previous) => ({ ...previous, business_type: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-emerald-400 focus:bg-white"
+              >
+                {["Construction", "IT Services", "Healthcare", "Logistics", "Consulting", "Other"].map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+              <button onClick={() => setEditingSupplier(null)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">Cancel</button>
+              <button onClick={handleEditSave} className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600">Save Changes</button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />

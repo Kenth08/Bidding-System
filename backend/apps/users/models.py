@@ -61,7 +61,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     company_address = models.CharField(max_length=255, blank=True, default="")
     phone = models.CharField(max_length=50, blank=True, default="")
     business_type = models.CharField(max_length=100, blank=True, default="")
-    business_permit_number = models.CharField(max_length=100, blank=True, default="")
+    business_permit_document = models.FileField(upload_to="uploads/permits/", blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

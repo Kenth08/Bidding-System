@@ -28,7 +28,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             "title",
             "budget",
             "deadline",
+            "procurement_schedule",
             "public_result_expiry_date",
+            "published_at",
             "awarded_at",
             "requirements",
             "procurement_type",
@@ -45,7 +47,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_by", "created_at", "updated_at", "awarded_at", "is_archived", "archived_at", "archived_reason"]
+        read_only_fields = ["created_by", "created_at", "updated_at", "published_at", "awarded_at", "is_archived", "archived_at", "archived_reason"]
 
     def get_procurement_request_details(self, obj):
         if not obj.procurement_request:

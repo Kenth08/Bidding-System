@@ -40,10 +40,6 @@ export default function App() {
 
   useEffect(() => {
     async function restoreSession() {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("current_supplier");
-
       const accessToken = sessionStorage.getItem("access_token");
       if (!accessToken) {
         setIsInitializing(false);

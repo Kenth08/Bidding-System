@@ -1,19 +1,17 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\layouts\SchoolHeadLayout.jsx
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import SchoolHeadHeader from "../components/school_head/SchoolHeadHeader";
 import SchoolHeadSidebar from "../components/school_head/SchoolHeadSidebar";
 import SchoolHeadDashboard from "../pages/school_head/SchoolHeadDashboard";
+import SchoolHeadApprovedProjects from "../pages/school_head/SchoolHeadApprovedProjects";
 import SchoolHeadRequests from "../pages/school_head/SchoolHeadRequests";
+import { DataProvider, useData } from "../context/DataContext";
 
-export default function SchoolHeadLayout({ user, currentUser, onLogout }) {
+function SchoolHeadLayoutContent({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
+  const { cache, isInitialLoading } = useData();
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [refreshToken, setRefreshToken] = useState(0);
-
-  function triggerRefresh() {
-    setRefreshToken((current) => current + 1);
-  }
 
   function handleNotificationNavigate(link) {
     const path = String(link || "");
@@ -22,13 +20,15 @@ export default function SchoolHeadLayout({ user, currentUser, onLogout }) {
 
   const pageMeta = useMemo(() => {
     if (currentPage === "requests") return { title: "Procurement Requests", subtitle: "Review and decide on planning requests" };
-    return { title: "School Head Dashboard", subtitle: "Review pending procurement requests" };
+    if (currentPage === "history") return { title: "Approved Records", subtitle: "View projects created from approved requests" };
+    return { title: "School Head Dashboard", subtitle: "" };
   }, [currentPage]);
 
   const page = useMemo(() => {
-    if (currentPage === "requests") return <SchoolHeadRequests user={activeUser} refreshToken={refreshToken} onRefresh={triggerRefresh} />;
-    return <SchoolHeadDashboard user={activeUser} setActivePage={setCurrentPage} refreshToken={refreshToken} />;
-  }, [activeUser, currentPage, refreshToken]);
+    if (currentPage === "requests") return <SchoolHeadRequests user={activeUser} requests={cache.procurementRequests || []} />;
+    if (currentPage === "history") return <SchoolHeadApprovedProjects projects={cache.projects || []} />;
+    return <SchoolHeadDashboard user={activeUser} requests={cache.procurementRequests || []} setActivePage={setCurrentPage} />;
+  }, [activeUser, cache.procurementRequests, currentPage]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -46,4 +46,12 @@ export default function SchoolHeadLayout({ user, currentUser, onLogout }) {
       </div>
     </div>
   );
+}
+
+export default function SchoolHeadLayout({ user, currentUser, onLogout }) {
+  return (
+    <DataProvider>
+      <SchoolHeadLayoutContent user={user} currentUser={currentUser} onLogout={onLogout} />
+    </DataProvider>
+  )
 }

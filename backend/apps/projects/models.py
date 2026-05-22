@@ -29,6 +29,7 @@ class Project(models.Model):
     title = models.CharField(max_length=255)
     budget = models.DecimalField(max_digits=15, decimal_places=2)
     deadline = models.DateField()
+    procurement_schedule = models.DateField(null=True, blank=True)
     public_result_expiry_date = models.DateField(null=True, blank=True)
     requirements = models.TextField(blank=True, default="")
     procurement_type = models.CharField(max_length=50, choices=ProcurementType.choices, default=ProcurementType.SERVICES)
@@ -38,6 +39,7 @@ class Project(models.Model):
     is_archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
     archived_reason = models.CharField(max_length=255, blank=True, null=True, help_text="Reason for archiving this project")
+    published_at = models.DateTimeField(null=True, blank=True)
     awarded_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -131,6 +133,8 @@ class DocumentUpload(models.Model):
         LEGAL_DOCUMENTS = "Legal Documents", "Legal Documents"
         BUSINESS_PERMIT = "Business Permit", "Business Permit"
         PHILGEPS_REGISTRATION = "PhilGEPS Registration", "PhilGEPS Registration"
+        TAX_CLEARANCE = "Tax Clearance", "Tax Clearance"
+        VALID_ID = "Valid ID", "Valid ID"
         QUOTATION = "Quotation", "Quotation"
         SUPPORTING_DOCUMENTS = "Supporting Documents", "Supporting Documents"
 

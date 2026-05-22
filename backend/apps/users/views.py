@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
-from config.throttling import LoginRateThrottle
+from config.throttling import LoginRateThrottle, SignupRateThrottle
 
 from .permissions import IsAdmin
 from .serializers import UserSerializer, RegisterSerializer
@@ -18,6 +18,7 @@ User = get_user_model()
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").lower().strip()
@@ -63,15 +64,23 @@ class LoginView(APIView):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
+    throttle_classes = [SignupRateThrottle]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            business_permit_document = request.FILES.get("business_permit_document") or request.FILES.get("business_permit")
+            if business_permit_document:
+                user.business_permit_document = business_permit_document
+                user.save(update_fields=["business_permit_document", "updated_at"])
+
             file_map = {
-                DocumentUpload.DocumentType.LEGAL_DOCUMENTS: request.FILES.get("legal_documents"),
-                DocumentUpload.DocumentType.BUSINESS_PERMIT: request.FILES.get("business_permit"),
+                DocumentUpload.DocumentType.BUSINESS_PERMIT: business_permit_document,
                 DocumentUpload.DocumentType.PHILGEPS_REGISTRATION: request.FILES.get("philgeps_registration"),
+                DocumentUpload.DocumentType.TAX_CLEARANCE: request.FILES.get("tax_clearance"),
+                DocumentUpload.DocumentType.VALID_ID: request.FILES.get("valid_id"),
+                DocumentUpload.DocumentType.LEGAL_DOCUMENTS: request.FILES.get("legal_documents"),
             }
             for document_type, uploaded_file in file_map.items():
                 if uploaded_file:

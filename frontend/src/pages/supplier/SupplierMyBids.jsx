@@ -1,4 +1,4 @@
-import { FileText, Link2 } from "lucide-react";
+import { FileText, Link2, Lock } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
@@ -52,6 +52,11 @@ export default function SupplierMyBids({ supplierBids = [], onNavigate, isLoadin
           <h1 className="text-lg font-bold text-slate-900">My Bids</h1>
           <p className="mt-0.5 text-sm text-slate-500">Track your submitted bids and outcomes</p>
         </div>
+      </div>
+
+      <div className="mb-5 flex items-center gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-3.5">
+        <Lock className="h-4 w-4 shrink-0 text-amber-500" />
+        <p className="text-sm text-amber-700">Submitted bids cannot be edited or withdrawn. Please review carefully before submitting.</p>
       </div>
 
       <div className="mb-4 flex gap-3">

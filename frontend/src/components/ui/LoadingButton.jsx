@@ -10,9 +10,9 @@ export default function LoadingButton({
       type={type}
       onClick={onClick}
       disabled={isLoading || disabled}
-      className={`${className} flex items-center gap-2 justify-center ${isLoading ? 'opacity-75 cursor-not-allowed' : ''}`}
+      className={`${className} inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-400/30 ${isLoading ? 'cursor-not-allowed opacity-75' : 'hover:translate-y-[-1px]'}`}
     >
-      {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       {isLoading ? (loadingText || children) : children}
     </button>
   )

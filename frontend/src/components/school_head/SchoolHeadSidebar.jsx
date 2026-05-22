@@ -1,9 +1,10 @@
 // c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\components\school_head\SchoolHeadSidebar.jsx
-import { ChevronRight, ClipboardList, LayoutDashboard, Shield, X } from "lucide-react";
+import { ChevronRight, ClipboardList, FolderClock, LayoutDashboard, Shield, X } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "requests", label: "Procurement Requests", icon: ClipboardList },
+  { key: "requests", label: "Requests", icon: ClipboardList },
+  { key: "history", label: "Records", icon: FolderClock },
 ];
 
 export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, currentUser }) {
@@ -20,15 +21,15 @@ export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebar
                 setCurrentPage(item.key);
                 setSidebarOpen(false);
               }}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-150 ${
+              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition-all duration-150 ${
                 isActive
-                  ? "bg-emerald-500/10 font-semibold text-emerald-400"
+                  ? "bg-emerald-500/15 font-semibold text-white shadow-sm ring-1 ring-emerald-400/25"
                   : "text-slate-400 hover:bg-white/5 hover:text-white"
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span>{item.label}</span>
-              {isActive ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" /> : null}
+              {isActive ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-300" /> : null}
             </button>
           </li>
         );
@@ -47,7 +48,7 @@ export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebar
         }}
       >
         <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 shadow-lg shadow-emerald-500/20">
             <Shield className="h-4 w-4 text-white" />
           </div>
           <div>
@@ -56,12 +57,12 @@ export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebar
           </div>
         </div>
 
-        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-widest text-slate-600">Menu</p>
+        <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600">Menu</p>
         <nav className="flex-1">{NavBlock}</nav>
 
         <div className="mt-auto border-t border-slate-800 pt-4">
-          <button type="button" className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white">
+          <button type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-white/5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">
               {currentUser?.full_name?.charAt(0) || "H"}
             </div>
             <div className="min-w-0 flex-1">
@@ -104,7 +105,7 @@ export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebar
               </button>
             </div>
 
-            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-widest text-slate-600">Menu</p>
+            <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600">Menu</p>
             <nav className="flex-1">{NavBlock}</nav>
 
             <div className="mt-auto border-t border-slate-800 pt-4">

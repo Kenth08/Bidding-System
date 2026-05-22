@@ -23,7 +23,7 @@ class Bid(models.Model):
     quotation_document = models.FileField(upload_to="bids/quotations/", blank=True, null=True)
     technical_document = models.FileField(upload_to="bids/technical/", blank=True, null=True)
     status = models.CharField(max_length=50, choices=Status.choices, default=Status.SUBMITTED)
-    technical_compliance = models.BooleanField(null=True, blank=True)
+    technical_compliance = models.BooleanField(default=False, null=True, blank=True)
     evaluation_remarks = models.TextField(blank=True, default="")
     rank = models.PositiveIntegerField(null=True, blank=True)
     recorded = models.BooleanField(default=False)

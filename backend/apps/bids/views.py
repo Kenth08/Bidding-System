@@ -19,7 +19,7 @@ from apps.blockchain.serializers import BlockchainRecordSerializer
 from apps.users.permissions import IsAdmin, IsSupplier
 from apps.projects.models import Project
 from apps.projects.audit import log_audit
-from apps.projects.utils import close_expired_projects
+from apps.projects.utils import auto_publish_scheduled_projects, close_expired_projects
 from apps.notifications.utils import create_notification, notify_admins, notify_user
 
 
@@ -106,6 +106,7 @@ class BidListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         # Ensure expired projects are closed before allowing submissions
+        auto_publish_scheduled_projects()
         close_expired_projects()
 
         project = self._get_project_from_request()
@@ -148,14 +149,19 @@ class BidDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BidSerializer
     queryset = Bid.objects.all()
 
-    def perform_update(self, serializer):
-        bid_instance = self.get_object()
-        if bid_instance.project.status == Project.Status.AWARDED:
-            raise PermissionDenied(detail={"error": "Bids for awarded projects cannot be modified."})
-        bid = serializer.save()
-        proj_title = bid.project.title if getattr(bid, 'project', None) else 'Unknown Project'
-        supplier_name = bid.supplier.full_name if getattr(bid, 'supplier', None) else 'Unknown Supplier'
-        log_audit("UPDATE", self.request.user, f"Updated evaluation for bid for {proj_title} by {supplier_name}", "bid", bid.id)
+    def update(self, request, *args, **kwargs):
+        self.get_object()
+        return Response(
+            {'error': 'Submitted bids cannot be edited.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        self.get_object()
+        return Response(
+            {'error': 'Submitted bids cannot be deleted.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
 
 class BidPublicCountView(APIView):
@@ -190,6 +196,12 @@ class SelectWinnerView(APIView):
     def patch(self, request, pk):
         try:
             bid = Bid.objects.select_related('project', 'supplier').get(pk=pk)
+
+            if not bid.technical_compliance:
+                return Response(
+                    {'error': 'Cannot select winner. This bid is not technically compliant. Please evaluate and mark as compliant first.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             with transaction.atomic():
                 if bid.project.status == Project.Status.AWARDED:
@@ -249,6 +261,38 @@ class SelectWinnerView(APIView):
             return Response(BidSerializer(bid).data)
         except Bid.DoesNotExist:
             return Response({'error': 'Bid not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AddEvaluationRemarksView(APIView):
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        try:
+            bid = Bid.objects.select_related('project', 'supplier').get(pk=pk)
+        except Bid.DoesNotExist:
+            return Response({'error': 'Bid not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        technical_compliance = request.data.get('technical_compliance')
+        if technical_compliance is None:
+            technical_compliance = request.data.get('is_technically_compliant')
+
+        if technical_compliance is not None:
+            if isinstance(technical_compliance, str):
+                technical_compliance = technical_compliance.strip().lower() in {'true', '1', 'yes', 'compliant'}
+            else:
+                technical_compliance = bool(technical_compliance)
+            bid.technical_compliance = technical_compliance
+
+        bid.evaluation_remarks = request.data.get('evaluation_remarks', bid.evaluation_remarks or '')
+        if bid.status == Bid.Status.SUBMITTED:
+            bid.status = Bid.Status.UNDER_EVALUATION
+        bid.save(update_fields=['technical_compliance', 'evaluation_remarks', 'status', 'updated_at'])
+        recalculate_project_ranks(bid.project)
+
+        proj_title = bid.project.title if getattr(bid, 'project', None) else 'Unknown Project'
+        supplier_name = bid.supplier.full_name if getattr(bid, 'supplier', None) else 'Unknown Supplier'
+        log_audit("UPDATE", request.user, f"Updated evaluation remarks for bid for {proj_title} by {supplier_name}", "bid", bid.id)
+        return Response(BidSerializer(bid, context={'request': request}).data)
 
 
 class RecordToBlockchainView(APIView):

@@ -5,6 +5,7 @@ from .views import (
     ProjectDetailView,
     PublishProjectView,
     ProjectHistoryView,
+    ApprovedProjectRecordsView,
     ArchiveProjectView,
     UnarchiveProjectView,
     ProcurementRequestListCreateView,
@@ -22,6 +23,7 @@ from .views import (
 urlpatterns = [
     path("", ProjectListCreateView.as_view(), name="project-list-create"),
     path("history/", ProjectHistoryView.as_view(), name="project-history"),
+    path("approved-records/", ApprovedProjectRecordsView.as_view(), name="approved-project-records"),
     path("<uuid:pk>/archive/", ArchiveProjectView.as_view(), name="project-archive"),
     path("<uuid:pk>/unarchive/", UnarchiveProjectView.as_view(), name="project-unarchive"),
     path("<uuid:pk>/", ProjectDetailView.as_view(), name="project-detail"),

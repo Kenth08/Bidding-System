@@ -39,9 +39,6 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${res.data.access}`
         return api(original)
       } catch {
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('current_supplier')
         sessionStorage.removeItem('access_token')
         sessionStorage.removeItem('refresh_token')
         sessionStorage.removeItem('current_supplier')
@@ -63,6 +60,7 @@ export const projectsAPI = {
   getAll: (statusFilter) => api.get('/projects/', {
     params: statusFilter && statusFilter !== 'All' ? { status: statusFilter } : {},
   }),
+  getApprovedRecords: () => api.get('/projects/approved-records/'),
   getOne: (id) => api.get(`/projects/${id}/`),
   create: (data) => api.post('/projects/', data),
   update: (id, data) => api.patch(`/projects/${id}/`, data),
@@ -82,6 +80,7 @@ export const bidsAPI = {
   create: (data) => api.post('/bids/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
   update: (id, data) => api.patch(`/bids/${id}/`, data),
   markReview: (id) => api.patch(`/bids/${id}/review/`),
+  saveRemarks: (id, data) => api.patch(`/bids/${id}/remarks/`, data),
   selectWinner: (id) => api.patch(`/bids/${id}/select/`),
   recordBlockchain: (id) => api.post(`/bids/${id}/record/`),
 }

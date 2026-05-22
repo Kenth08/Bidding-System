@@ -1,16 +1,17 @@
-import { Archive, CheckCircle, Eye, Megaphone, Pencil, Trash2, CircleAlert, FolderOpen } from "lucide-react";
+import { Archive, CheckCircle, Clock, Eye, History, Lock, Megaphone, Pencil, Trash2, CircleAlert, FolderOpen, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import EmptyState from "../../components/shared/EmptyState";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
-import { projectsAPI } from "../../services/api";
-import { SkeletonTable } from "../../components/ui/Skeleton";
+import { auditLogAPI, bidsAPI, blockchainAPI, projectsAPI } from "../../services/api";
 import LoadingButton from "../../components/ui/LoadingButton";
 import Toast from "../../components/shared/Toast";
+import { useData } from "../../context/DataContext";
 
-const INITIAL_FORM = { title: "", budget: "", deadline: "", requirements: "", status: "draft" };
+const INITIAL_FORM = { title: "", budget: "", deadline: "", requirements: "" };
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const PUBLISHED_STATUSES = new Set(["active", "closed", "awarded"]);
 
 function formatPeso(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value || 0);
@@ -21,6 +22,43 @@ function formatDate(value) {
   const dateValue = new Date(value);
   if (Number.isNaN(dateValue.getTime())) return value;
   return dateValue.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const dateValue = new Date(value);
+  if (Number.isNaN(dateValue.getTime())) return value;
+  return dateValue.toLocaleString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatScheduleLabel(project) {
+  const statusKey = getProjectStatusKey(project);
+  const scheduleDate = project?.procurement_schedule ? new Date(project.procurement_schedule) : null;
+  if (statusKey === "active") {
+    return `Published on: ${formatDate(project.published_at || project.updated_at)}`;
+  }
+  if (scheduleDate && !Number.isNaN(scheduleDate.getTime())) {
+    const today = startOfToday();
+    if (scheduleDate.toDateString() === today.toDateString()) {
+      return "Going live today";
+    }
+    return `Goes live: ${formatDate(project.procurement_schedule)}`;
+  }
+  return "Goes live: —";
+}
+
+function getProjectStatusKey(project) {
+  return String(project?.status || "draft").toLowerCase();
+}
+
+function isPosted(project) {
+  return ["active", "awarded"].includes(getProjectStatusKey(project));
 }
 
 function startOfToday() {
@@ -61,7 +99,7 @@ function ProjectStatusPill({ status }) {
     <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${config.className}`}>
       <Icon className="h-3.5 w-3.5" />
       {config.label}
-      {statusKey === "awarded" ? <span className="ml-1" title="This project has been awarded and is locked">🔒</span> : null}
+      {PUBLISHED_STATUSES.has(statusKey) ? <span className="ml-1" title="Published project">🔒</span> : null}
     </span>
   );
 }
@@ -71,7 +109,8 @@ function safeStr(val) {
 }
 
 export default function AdminProjects({ onViewBids, isLoading }) {
-  const [projects, setProjects] = useState([]);
+  const { cache, loadProjects, updateItem, removeItem, refresh } = useData();
+  const [projects, setProjects] = useState(() => cache.projects || []);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -87,6 +126,15 @@ export default function AdminProjects({ onViewBids, isLoading }) {
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [publishingProject, setPublishingProject] = useState(null);
+  const [historyDrawer, setHistoryDrawer] = useState({ open: false, project: null });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyViewProjects, setHistoryViewProjects] = useState([]);
+  const [historyViewLoading, setHistoryViewLoading] = useState(false);
+  const [historyViewSearch, setHistoryViewSearch] = useState("");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -94,23 +142,114 @@ export default function AdminProjects({ onViewBids, isLoading }) {
     return () => clearInterval(timer);
   }, []);
 
-  async function loadProjects() {
-    setLoading(true);
+  useEffect(() => {
+    if (!Array.isArray(cache.projects)) {
+      loadProjects();
+    }
+  }, [cache.projects, loadProjects]);
+
+  useEffect(() => {
+    if (Array.isArray(cache.projects)) {
+      setProjects(cache.projects);
+    }
+  }, [cache.projects]);
+
+  async function fetchHistory() {
+    setHistoryViewLoading(true);
     try {
-      const response = await projectsAPI.getAll();
-      const items = response.data.results || response.data || [];
-      setProjects(items);
+      const response = await projectsAPI.getHistory();
+      setHistoryViewProjects(response.data.results || response.data || []);
     } catch (error) {
-      console.error("Failed to load projects", error);
-      setProjects([]);
+      console.error("Failed to load history", error);
+      setHistoryViewProjects([]);
+      setToast({ message: "Failed to load project history.", type: "error" });
     } finally {
-      setLoading(false);
+      setHistoryViewLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  function handleToggleHistory() {
+    if (!showHistory) fetchHistory();
+    setShowHistory((previous) => !previous);
+  }
+
+  async function openGlobalHistory() {
+    setShowGlobalHistory(true);
+    setGlobalHistoryLoading(true);
+    setGlobalHistoryItems([]);
+
+    try {
+      const [auditResponse, bidsResponse, blockchainResponse, projectsResponse] = await Promise.all([
+        auditLogAPI.getAll(),
+        bidsAPI.getAll(),
+        blockchainAPI.getAll(),
+        projectsAPI.getAll(),
+      ]);
+
+      const auditLogs = auditResponse.data.results || auditResponse.data || [];
+      const allBids = bidsResponse.data.results || bidsResponse.data || [];
+      const allBlockchain = blockchainResponse.data.results || blockchainResponse.data || [];
+      const allProjects = projectsResponse.data.results || projectsResponse.data || [];
+
+      const projectsById = {};
+      allProjects.forEach((p) => {
+        projectsById[String(p.id)] = p;
+      });
+
+      const items = [];
+
+      // Audit logs
+      auditLogs.forEach((entry) => {
+        const projectId = String(entry.resource_type) === "project" ? String(entry.resource_id) : null;
+        const projectName = projectId ? projectsById[projectId]?.title || "Unknown Project" : (entry.resource_meta?.project_name || "Unknown Project");
+        items.push({
+          action: entry.action || "Action",
+          projectName,
+          performedBy: entry.user_name || entry.user_email || "System",
+          timestamp: entry.created_at,
+          detail: entry.description || "",
+          type: entry.action || "AUDIT",
+        });
+      });
+
+      // Bids
+      allBids.forEach((bid) => {
+        const projectId = String(bid.project || bid.projectId || bid.project_id || "");
+        const projectName = projectsById[projectId]?.title || bid.projectTitle || bid.project_name || "Unknown Project";
+        items.push({
+          action: "Bid received",
+          projectName,
+          performedBy: bid.supplierName || bid.supplier_name || bid.company_name || "Supplier",
+          timestamp: bid.submitted_at || bid.submittedAt || bid.created_at,
+          detail: `${formatPeso(bid.bidAmount || bid.bid_amount || bid.amount || 0)} submitted`,
+          type: "BID",
+        });
+      });
+
+      // Blockchain records
+      allBlockchain.forEach((rec) => {
+        const projectId = String(rec.project || rec.projectId || rec.project_id || "");
+        const projectName = projectsById[projectId]?.title || rec.project_title || "Unknown Project";
+        items.push({
+          action: "Blockchain recorded",
+          projectName,
+          performedBy: rec.winner_name || rec.winner || "System",
+          timestamp: rec.recordedAt || rec.recorded_at || rec.created_at,
+          detail: `Recorded blockchain entry`,
+          type: "BLOCKCHAIN",
+        });
+      });
+
+      items.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      setGlobalHistoryItems(items);
+    } catch (error) {
+      console.error("Failed to load global history", error);
+      setGlobalHistoryItems([]);
+      setToast({ message: "Failed to load project history.", type: "error" });
+    } finally {
+      setGlobalHistoryLoading(false);
+    }
+  }
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
@@ -126,20 +265,8 @@ export default function AdminProjects({ onViewBids, isLoading }) {
     });
   }, [filter, projects, search, now]);
 
-  if (isLoading || loading) {
-    return (
-      <div>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Project Management</h1>
-            <p className="mt-0.5 text-sm text-slate-500">Approved procurement projects published for bidding</p>
-          </div>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-6">
-          <SkeletonTable rows={5} cols={5} />
-        </div>
-      </div>
-    );
+  if (false) {
+    return <div className="text-sm text-slate-500">Loading projects...</div>;
   }
 
   
@@ -151,7 +278,6 @@ export default function AdminProjects({ onViewBids, isLoading }) {
       budget: String(project.budget || ""),
       deadline: project.deadline || "",
       requirements: project.requirements || "",
-      status: String(project.status || "draft").toLowerCase(),
     });
     setErrors({});
     setShowModal(true);
@@ -175,15 +301,16 @@ export default function AdminProjects({ onViewBids, isLoading }) {
 
     setIsSaving(true);
     try {
-      await projectsAPI.update(editingProject.id, {
+      const response = await projectsAPI.update(editingProject.id, {
         title: form.title.trim(),
         budget: Number(form.budget),
         deadline: form.deadline,
         requirements: form.requirements.trim(),
-        status: form.status,
       });
+      const updatedProject = response.data;
+      setProjects((prev) => prev.map((project) => (project.id === editingProject.id ? { ...project, ...updatedProject } : project)));
+      updateItem("projects", editingProject.id, updatedProject);
       setShowModal(false);
-      await loadProjects();
     } catch (error) {
       console.error(error);
       setToast({ message: "Failed to save project. Please try again.", type: "error" });
@@ -196,6 +323,7 @@ export default function AdminProjects({ onViewBids, isLoading }) {
     if (!deletingId) return;
     try {
       await projectsAPI.delete(deletingId);
+      removeItem("projects", deletingId);
       await loadProjects();
     } catch (error) {
       console.error(error);
@@ -211,7 +339,9 @@ export default function AdminProjects({ onViewBids, isLoading }) {
 
     setArchiving(archiveModal.project.id);
     try {
-      await projectsAPI.archive(archiveModal.project.id, archiveReason || "Archived by admin");
+      const response = await projectsAPI.archive(archiveModal.project.id, archiveReason || "Archived by admin");
+      const archivedProject = response.data;
+      updateItem("projects", archiveModal.project.id, archivedProject || { status: "archived", archived_reason: archiveReason || "Archived by admin" });
       await loadProjects();
       setArchiveModal({ open: false, project: null });
       setArchiveReason("");
@@ -224,12 +354,159 @@ export default function AdminProjects({ onViewBids, isLoading }) {
     }
   }
 
+  async function handlePublish() {
+    if (!publishingProject) return;
+
+    try {
+      const response = await projectsAPI.publish(publishingProject.id);
+      updateItem("projects", publishingProject.id, response.data || { status: "active" });
+      await loadProjects();
+      setToast({ message: `"${publishingProject.title}" is now active.`, type: "success" });
+    } catch (error) {
+      console.error(error);
+      setToast({ message: "Failed to publish project.", type: "error" });
+    } finally {
+      setPublishingProject(null);
+      setShowPublishConfirm(false);
+    }
+  }
+
+  async function openHistory(project) {
+    setHistoryDrawer({ open: true, project });
+    setHistoryLoading(true);
+    setHistoryItems([]);
+
+    try {
+      const [auditResponse, bidsResponse, blockchainResponse] = await Promise.all([
+        auditLogAPI.getAll(),
+        bidsAPI.getAll(),
+        blockchainAPI.getAll(),
+      ]);
+
+      const auditLogs = auditResponse.data.results || auditResponse.data || [];
+      const allBids = bidsResponse.data.results || bidsResponse.data || [];
+      const allBlockchainRecords = blockchainResponse.data.results || blockchainResponse.data || [];
+      const projectId = String(project.id);
+      const procurementId = String(project.procurement_request || project.procurement_request_details?.id || "");
+      const bidsForProject = allBids.filter((bid) => String(bid.project || bid.projectId || bid.project_id || "") === projectId);
+      const blockchainForProject = allBlockchainRecords.filter((record) => String(record.project || record.projectId || record.project_id || "") === projectId);
+      const createdLog = auditLogs.find((entry) => entry.resource_type === "project" && String(entry.resource_id) === projectId && entry.action === "CREATE");
+      const procurementLog = procurementId
+        ? auditLogs.find((entry) => entry.resource_type === "procurement" && String(entry.resource_id) === procurementId && entry.action === "APPROVE")
+        : null;
+      const publishedLog = auditLogs.find((entry) => entry.resource_type === "project" && String(entry.resource_id) === projectId && entry.action === "UPDATE" && String(entry.description || "").toLowerCase().includes("published project"));
+      const winningBid = bidsForProject.find((bid) => String(bid.status || "").toLowerCase() === "won");
+      const winnerLog = winningBid
+        ? auditLogs.find((entry) => entry.resource_type === "bid" && String(entry.resource_id) === String(winningBid.id) && entry.action === "SELECT_WINNER")
+        : null;
+      const blockchainRecord = blockchainForProject[0] || null;
+      const blockchainLog = blockchainRecord
+        ? auditLogs.find((entry) => entry.resource_type === "blockchain" && String(entry.resource_id) === String(blockchainRecord.id) && entry.action === "RECORD_BLOCKCHAIN")
+        : null;
+
+      const items = [];
+
+      if (createdLog) {
+        items.push({
+          action: "Project created",
+          performedBy: createdLog.user_name || createdLog.user_email || "System",
+          timestamp: createdLog.created_at,
+          detail: `Draft project created for ${project.title}`,
+        });
+      }
+
+      if (procurementLog) {
+        items.push({
+          action: "Procurement request approved",
+          performedBy: procurementLog.user_name || procurementLog.user_email || "System",
+          timestamp: procurementLog.created_at,
+          detail: procurementLog.description || "Approved by School Head",
+        });
+      }
+
+      if (publishedLog) {
+        items.push({
+          action: "Project published / went live",
+          performedBy: publishedLog.user_name || publishedLog.user_email || "System",
+          timestamp: publishedLog.created_at,
+          detail: publishedLog.description || "Published by admin",
+        });
+      }
+
+      bidsForProject
+        .slice()
+        .sort((left, right) => new Date(left.submitted_at || left.submittedAt || 0) - new Date(right.submitted_at || right.submittedAt || 0))
+        .forEach((bid) => {
+          items.push({
+            action: "Bid received",
+            performedBy: bid.supplierName || bid.supplier_name || bid.company_name || "Supplier",
+            timestamp: bid.submitted_at || bid.submittedAt,
+            detail: `${formatPeso(bid.bidAmount || bid.bid_amount || bid.amount || 0)} submitted`,
+          });
+        });
+
+      if (winnerLog && winningBid) {
+        items.push({
+          action: "Winner selected",
+          performedBy: winnerLog.user_name || winnerLog.user_email || "Admin",
+          timestamp: winnerLog.created_at,
+          detail: `${winningBid.supplierName || winningBid.supplier_name || winningBid.company_name || "Supplier"} won with ${formatPeso(winningBid.bidAmount || winningBid.bid_amount || winningBid.amount || 0)}`,
+        });
+      } else if (winningBid) {
+        items.push({
+          action: "Winner selected",
+          performedBy: winningBid.supplierName || winningBid.supplier_name || winningBid.company_name || "Supplier",
+          timestamp: winningBid.updated_at || winningBid.submitted_at || winningBid.submittedAt,
+          detail: `${formatPeso(winningBid.bidAmount || winningBid.bid_amount || winningBid.amount || 0)} selected as winner`,
+        });
+      }
+
+      if (blockchainLog && blockchainRecord) {
+        items.push({
+          action: "Blockchain recorded",
+          performedBy: blockchainLog.user_name || blockchainLog.user_email || "Admin",
+          timestamp: blockchainLog.created_at,
+          detail: `Recorded at ${formatDateTime(blockchainRecord.recordedAt || blockchainRecord.recorded_at)}`,
+        });
+      } else if (blockchainRecord) {
+        items.push({
+          action: "Blockchain recorded",
+          performedBy: blockchainRecord.winner_name || blockchainRecord.winner || "System",
+          timestamp: blockchainRecord.recordedAt || blockchainRecord.recorded_at,
+          detail: `Recorded blockchain entry for ${project.title}`,
+        });
+      }
+
+      items.sort((left, right) => new Date(right.timestamp || 0) - new Date(left.timestamp || 0));
+      setHistoryItems(items);
+    } catch (error) {
+      console.error("Failed to load project history", error);
+      setHistoryItems([]);
+      setToast({ message: "Failed to load project history.", type: "error" });
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-slate-900">Project Management</h1>
           <p className="mt-0.5 text-sm text-slate-500">Approved procurement projects published for bidding</p>
+        </div>
+        <div>
+          <button
+            onClick={handleToggleHistory}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+              showHistory
+                ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            {showHistory ? "Back to Active Projects" : "View History"}
+          </button>
         </div>
       </div>
 
@@ -238,10 +515,24 @@ export default function AdminProjects({ onViewBids, isLoading }) {
           <Megaphone className="h-4 w-4 text-emerald-500" />
         </div>
         <p className="text-sm text-slate-600">
-          Projects are automatically created when the School Head approves a procurement request. To create a new project, go to <span className="font-semibold text-emerald-600">Procurement Planning</span>.
+          Projects are created as drafts when the School Head approves a procurement request. Publish a draft project when it is ready for suppliers.
         </p>
       </div>
 
+      {showHistory ? (
+        <HistoryTable projects={historyViewProjects} loading={historyViewLoading} search={historyViewSearch} setSearch={setHistoryViewSearch} onRestore={async (project) => {
+          try {
+            await projectsAPI.unarchive(project.id);
+            setHistoryViewProjects((previous) => previous.filter((item) => item.id !== project.id));
+            await refresh("projects");
+            await loadProjects();
+            setToast({ message: `"${project.title}" restored to active projects.`, type: "success" });
+          } catch (error) {
+            console.error(error);
+            setToast({ message: "Failed to restore project.", type: "error" });
+          }
+        }} />
+      ) : (
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
         <div className="flex gap-4 border-b border-slate-50 px-6 pt-4">
           {["All", "Draft", "Open for Bidding", "Closed", "Awarded"].map((tab) => (
@@ -271,7 +562,7 @@ export default function AdminProjects({ onViewBids, isLoading }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {loading ? (
+            {false ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">Loading projects...</td>
               </tr>
@@ -286,13 +577,14 @@ export default function AdminProjects({ onViewBids, isLoading }) {
                 const timing = getTiming(project);
                 const projectStatus = String(project.status || "draft").toLowerCase();
                 const effectiveStatus = projectStatus === "active" && timing.isClosed ? "closed" : projectStatus;
-                const procurementRequest = project.procurement_request_details || {};
+                const posted = ["active", "awarded"].includes(effectiveStatus);
                 return (
-                  <tr key={project.id} className="group transition-colors hover:bg-slate-50/50">
+                  <tr key={project.id} className="group transition-colors hover:bg-slate-50/50" title={posted ? "Posted projects cannot be edited or deleted" : undefined}>
                     <td className="px-6 py-4 text-sm font-medium text-slate-800">{project.title}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(project.budget)}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       <div>
+                        <p>{formatScheduleLabel(project)}</p>
                         <p>{timing.closesLabel}</p>
                         <p className="mt-0.5 text-xs text-slate-400">{timing.label}</p>
                       </div>
@@ -315,10 +607,15 @@ export default function AdminProjects({ onViewBids, isLoading }) {
                         <button onClick={() => setArchiveModal({ open: true, project })} className="rounded-lg p-2 text-amber-500 hover:bg-slate-100" title="Archive project" disabled={archiving === project.id}>
                           <Archive className="h-4 w-4" />
                         </button>
-                        {effectiveStatus === "awarded" ? (
-                          <div title="This project has been awarded and is locked" className="rounded-lg p-2 text-slate-500">
-                            <span className="text-sm">🔒</span>
-                          </div>
+                        {posted ? (
+                          <>
+                            <div title="Cannot edit — project is posted" className="rounded-lg p-2 text-slate-300">
+                              <Lock className="h-4 w-4" />
+                            </div>
+                            <div title="Cannot delete — project is posted" className="rounded-lg p-2 text-slate-300">
+                              <Trash2 className="h-4 w-4" />
+                            </div>
+                          </>
                         ) : (
                           <>
                             <button onClick={() => openEdit(project)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Edit project">
@@ -338,9 +635,65 @@ export default function AdminProjects({ onViewBids, isLoading }) {
           </tbody>
         </table>
       </div>
+      )}
+
+      {historyDrawer.open ? (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setHistoryDrawer({ open: false, project: null })} aria-hidden="true" />
+          <aside className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col border-l border-slate-100 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Project History</h3>
+                <p className="mt-0.5 text-xs text-slate-400">{historyDrawer.project?.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryDrawer({ open: false, project: null })}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100"
+                aria-label="Close project history"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-medium text-slate-800">{historyDrawer.project?.title}</p>
+                <p className="mt-0.5 text-xs text-slate-500">Read-only project activity timeline</p>
+              </div>
+
+              {historyLoading ? (
+                <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">Loading history...</div>
+              ) : historyItems.length === 0 ? (
+                <EmptyState icon={Clock} title="No history available" subtitle="Activity will appear here after the project is approved, published, awarded, or recorded." />
+              ) : (
+                <div className="space-y-3">
+                  {historyItems.map((item, index) => (
+                    <div key={`${item.action}-${index}`} className="rounded-xl border border-slate-100 bg-white p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                          <Clock className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-slate-800">{item.action}</p>
+                            <p className="text-xs text-slate-400">{formatDateTime(item.timestamp)}</p>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">Performed by {item.performedBy || "System"}</p>
+                          {item.detail ? <p className="mt-2 text-sm text-slate-600">{item.detail}</p> : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Edit Project" subtitle="Manage project details" size="lg">
-        <div className="grid gap-4">
+          <div className="grid gap-4">
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Project Title <span className="text-red-400">*</span></label>
             <input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm" />
@@ -361,15 +714,6 @@ export default function AdminProjects({ onViewBids, isLoading }) {
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Requirements</label>
             <textarea rows={4} value={form.requirements} onChange={(event) => setForm((prev) => ({ ...prev, requirements: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
-            <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
-              <option value="draft">Draft</option>
-              <option value="active">Open for Bidding</option>
-              <option value="closed">Closed</option>
-              <option value="awarded">Awarded</option>
-            </select>
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600">Cancel</button>
@@ -544,6 +888,75 @@ export default function AdminProjects({ onViewBids, isLoading }) {
       />
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
+    </div>
+  );
+}
+
+function HistoryTable({ projects, loading, search, setSearch, onRestore }) {
+  const filtered = projects.filter((project) => {
+    const query = safeStr(search);
+    return [project.title, project.status, project.procurement_type, project.archived_reason].some((value) => safeStr(value).includes(query));
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-3.5">
+        <Archive className="h-4 w-4 shrink-0 text-amber-500" />
+        <p className="text-sm text-amber-700">Archived projects are hidden from suppliers. Restore a project to make it visible again.</p>
+        <span className="ml-auto shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-600">{projects.length} archived</span>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+        <div className="border-b border-slate-50 px-6 py-3">
+          <SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search archived projects..." />
+        </div>
+
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/50">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Project Name</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Budget</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Final Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Archived On</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Reason</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-6 text-sm text-slate-500">Loading archived projects...</td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6}>
+                  <EmptyState icon={Archive} title="No archived projects" subtitle="Projects you archive will appear here." />
+                </td>
+              </tr>
+            ) : (
+              filtered.map((project) => (
+                <tr key={project.id} className="transition-colors hover:bg-slate-50/50">
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-medium text-slate-800">{project.title}</p>
+                    <p className="mt-0.5 text-xs text-slate-400">{project.bid_count || 0} bids</p>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">{formatPeso(project.budget)}</td>
+                  <td className="px-6 py-4">
+                    <ProjectStatusPill status={project.status} />
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatDate(project.archived_at)}</td>
+                  <td className="px-6 py-4 text-xs text-slate-500 max-w-[140px] truncate">{project.archived_reason || "—"}</td>
+                  <td className="px-6 py-4">
+                    <button onClick={() => onRestore(project)} className="flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50">
+                      <RotateCcw className="h-3.5 w-3.5" /> Restore
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

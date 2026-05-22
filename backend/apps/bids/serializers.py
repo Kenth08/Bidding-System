@@ -30,6 +30,7 @@ class BidSerializer(serializers.ModelSerializer):
     supportingDocuments = serializers.SerializerMethodField()
     awardedWinnerName = serializers.SerializerMethodField()
     awardedWinnerCompany = serializers.SerializerMethodField()
+    is_technically_compliant = serializers.BooleanField(source="technical_compliance", read_only=True)
 
     class Meta:
         model = Bid
@@ -55,6 +56,7 @@ class BidSerializer(serializers.ModelSerializer):
             "proposal",
             "status",
             "technical_compliance",
+            "is_technically_compliant",
             "technicalCompliance",
             "evaluation_remarks",
             "rank",
@@ -102,9 +104,7 @@ class BidSerializer(serializers.ModelSerializer):
     def get_technicalCompliance(self, obj):
         if obj.technical_compliance is True:
             return "Compliant"
-        if obj.technical_compliance is False:
-            return "Non-Compliant"
-        return "Pending"
+        return "Non-Compliant"
 
     def get_quotationDocument(self, obj):
         return self._build_file_url(obj.quotation_document)

@@ -22,19 +22,19 @@ export default function EmptyState({
   const resolvedTitle = label || title;
 
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-16 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
         <Icon className="h-6 w-6 text-slate-400" />
       </div>
-      <p className="text-sm font-semibold text-slate-600">{resolvedTitle}</p>
-      <p className="mt-1 max-w-xs text-xs text-slate-400">{subtitle}</p>
+      <p className="text-sm font-semibold text-slate-700">{resolvedTitle}</p>
+      <p className="mt-1 max-w-xs text-xs leading-5 text-slate-400">{subtitle}</p>
       {actionLabel && onAction ? (
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 text-sm font-medium text-emerald-600 transition-colors hover:text-emerald-700"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-100"
         >
-          {actionLabel} →
+          {actionLabel} <span aria-hidden="true">→</span>
         </button>
       ) : null}
     </div>

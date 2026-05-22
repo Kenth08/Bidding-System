@@ -15,9 +15,9 @@ function SchoolHeadProfileDropdown({ currentUser, onLogout }) {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors hover:bg-slate-50"
+        className="flex items-center gap-2.5 rounded-2xl px-2 py-1.5 transition-colors hover:bg-slate-50"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">
           {currentUser?.full_name?.charAt(0) || "H"}
         </div>
         <div className="text-left">
@@ -62,7 +62,7 @@ function SchoolHeadProfileDropdown({ currentUser, onLogout }) {
 
 export default function SchoolHeadHeader({ title, subtitle, currentUser, setSidebarOpen, onLogout, onNotificationNavigate }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur sm:px-6 lg:px-8">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -73,6 +73,7 @@ export default function SchoolHeadHeader({ title, subtitle, currentUser, setSide
           <Menu className="h-5 w-5" />
         </button>
         <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">School Head Workspace</p>
           <h1 className="text-base font-semibold text-slate-800">{title}</h1>
           <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>
         </div>

@@ -9,8 +9,8 @@ import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 import { getStatusLabel } from "../../lib/procurementStatus";
 import { procurementAPI } from "../../services/api";
-import { SkeletonTable } from "../../components/ui/Skeleton";
 import LoadingButton from "../../components/ui/LoadingButton";
+import { useData } from "../../context/DataContext";
 
 const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
 
@@ -36,9 +36,9 @@ function formatDate(value) {
   return dateValue.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default function AdminProcurementPlanning({ onOpenProjects }) {
+  const { cache, loadProcurement, updateItem, addItem, removeItem } = useData();
+  const [requests, setRequests] = useState(() => cache.procurementRequests || []);
   const [showModal, setShowModal] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
   const [form, setForm] = useState(INITIAL_REQUEST);
@@ -50,22 +50,20 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
   const [isSaving, setIsSaving] = useState(false);
 
   async function loadRequests() {
-    setLoading(true);
-    try {
-      const response = await procurementAPI.getAll();
-      const items = response.data.results || response.data || [];
-      setRequests(items);
-    } catch (error) {
-      console.error("Failed to load procurement requests", error);
-      setRequests([]);
-    } finally {
-      setLoading(false);
-    }
+    await loadProcurement();
   }
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    if (!Array.isArray(cache.procurementRequests)) {
+      loadRequests();
+    }
+  }, [cache.procurementRequests]);
+
+  useEffect(() => {
+    if (Array.isArray(cache.procurementRequests)) {
+      setRequests(cache.procurementRequests);
+    }
+  }, [cache.procurementRequests]);
 
   const filtered = useMemo(() => {
     return requests.filter((request) => {
@@ -76,22 +74,6 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
       );
     });
   }, [requests, search]);
-
-  if (isLoading || loading) {
-    return (
-      <div>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Procurement Planning</h1>
-            <p className="mt-0.5 text-sm text-slate-500">Create and manage procurement requests</p>
-          </div>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-6">
-          <SkeletonTable rows={5} cols={4} />
-        </div>
-      </div>
-    );
-  }
 
   function openCreate() {
     setEditingRequest(null);
@@ -137,7 +119,17 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
     } catch (e) {}
     if (!form.procurementType) nextErrors.procurementType = "Procurement type is required.";
     if (!form.technicalSpecifications.trim()) nextErrors.technicalSpecifications = "Technical specifications are required.";
-    if (!form.deliveryPeriod.trim()) nextErrors.deliveryPeriod = "Delivery period is required.";
+    if (!form.procurementSchedule) nextErrors.procurementSchedule = "Procurement schedule is required.";
+    if (!form.deliveryPeriod) nextErrors.deliveryPeriod = "Expected delivery date is required.";
+    try {
+      const scheduleDate = new Date(form.procurementSchedule);
+      const deliveryDate = new Date(form.deliveryPeriod);
+      const deadlineDate = new Date(form.deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(scheduleDate.getTime()) && scheduleDate < today) nextErrors.procurementSchedule = "Procurement schedule must be today or a future date.";
+      if (!Number.isNaN(deliveryDate.getTime()) && !Number.isNaN(deadlineDate.getTime()) && deliveryDate <= deadlineDate) nextErrors.deliveryPeriod = "Expected delivery date must be after the bidding deadline.";
+    } catch (e) {}
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -153,20 +145,25 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
       public_result_expiry_date: form.publicResultExpiryDate || null,
       procurement_type: form.procurementType,
       technical_specifications: form.technicalSpecifications.trim(),
-      procurement_schedule: form.procurementSchedule.trim(),
-      delivery_period: form.deliveryPeriod.trim(),
+      procurement_schedule: form.procurementSchedule,
+      delivery_period: form.deliveryPeriod,
     };
 
     try {
       if (editingRequest) {
-        await procurementAPI.update(editingRequest.id, payload);
+        const response = await procurementAPI.update(editingRequest.id, payload);
+        const updatedRequest = response.data;
+        setRequests((previous) => previous.map((item) => (item.id === editingRequest.id ? updatedRequest : item)));
+        updateItem('procurement', editingRequest.id, updatedRequest);
         setToast({ message: "Procurement request updated successfully", type: "success" });
       } else {
-        await procurementAPI.create(payload);
+        const response = await procurementAPI.create(payload);
+        const createdRequest = response.data;
+        setRequests((previous) => [createdRequest, ...previous]);
+        addItem('procurement', createdRequest);
         setToast({ message: "Procurement request created successfully", type: "success" });
       }
       setShowModal(false);
-      await loadRequests();
     } catch (error) {
       console.error(error);
       setToast({ message: "Failed to save procurement request.", type: "error" });
@@ -186,6 +183,7 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
     try {
       await procurementAPI.delete(deletingId);
       setRequests((prev) => prev.filter((item) => item.id !== deletingId));
+      removeItem('procurement', deletingId);
       setToast({ message: "Procurement request deleted", type: "success" });
     } catch (error) {
       console.error(error);
@@ -216,7 +214,7 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
           <Info className="h-4 w-4 text-emerald-500" />
         </div>
-        <p className="text-sm text-slate-600">Approved requests are automatically published as projects.</p>
+        <p className="text-sm text-slate-600">Approved requests move into the Projects page where an admin can publish them for suppliers.</p>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
@@ -237,11 +235,7 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Loading procurement requests...</td>
-              </tr>
-            ) : filtered.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7}>
                   <EmptyState title="No procurement requests yet" subtitle="Create a new procurement request to get started." />
@@ -375,23 +369,26 @@ export default function AdminProcurementPlanning({ onOpenProjects, isLoading }) 
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Schedule</span>
               <input
-                type="text"
+                type="date"
                 value={form.procurementSchedule}
                 onChange={(event) => setForm((prev) => ({ ...prev, procurementSchedule: event.target.value }))}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                placeholder="e.g., Q1 2026, Immediate, etc."
+                min={new Date().toISOString().split("T")[0]}
               />
+              <p className="mt-1 text-xs text-slate-400">Project will automatically go live and become visible to suppliers on this date</p>
+              {errors.procurementSchedule && <p className="mt-1 text-xs text-red-600">{errors.procurementSchedule}</p>}
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period</span>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Expected Delivery Date</span>
               <input
-                type="text"
+                type="date"
                 value={form.deliveryPeriod}
                 onChange={(event) => setForm((prev) => ({ ...prev, deliveryPeriod: event.target.value }))}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                placeholder="e.g., 30 days, 6 months, etc."
+                min={form.deadline || new Date().toISOString().split("T")[0]}
               />
+              <p className="mt-1 text-xs text-slate-400">The expected date for delivery of goods or services</p>
               {errors.deliveryPeriod && <p className="mt-1 text-xs text-red-600">{errors.deliveryPeriod}</p>}
             </label>
           </div>

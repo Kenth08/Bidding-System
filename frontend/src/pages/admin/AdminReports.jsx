@@ -1,6 +1,5 @@
 import { Download, FolderOpen, Users, Award, FileText } from "lucide-react";
 import { useContext, useMemo, useState } from "react";
-import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
 import StatusBadge from "../../components/shared/StatusBadge";
 import { ProcurementContext } from "../../lib/ProcurementContext";
 import { normalizeBid, normalizeProject, normalizeSupplier } from "../../lib/procurementStatus";
@@ -67,9 +66,7 @@ export default function AdminReports({ projects = [], suppliers = [], bids = [],
             <p className="text-sm text-slate-500 mt-0.5">Procurement and supplier summary reports</p>
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-6">
-          <LoadingSkeleton rows={6} />
-        </div>
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 text-sm text-slate-500">Reports are loading...</div>
       </div>
     );
   }

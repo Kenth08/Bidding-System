@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Archive, Award, Calendar, DollarSign, Eye, RotateCcw, Search } from "lucide-react";
 import { projectsAPI } from "../../services/api";
 import EmptyState from "../../components/shared/EmptyState";
-import LoadingSkeleton from "../../components/shared/LoadingSkeleton";
 import Modal from "../../components/shared/Modal";
 import SearchBar from "../../components/shared/SearchBar";
 import Toast from "../../components/shared/Toast";
@@ -114,9 +113,7 @@ export default function AdminProjectHistory() {
           <tbody className="divide-y divide-slate-50">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-6 py-6">
-                  <LoadingSkeleton rows={4} />
-                </td>
+                <td colSpan={7} className="px-6 py-6 text-sm text-slate-500">Loading archived projects...</td>
               </tr>
             ) : filteredProjects.length === 0 ? (
               <tr>

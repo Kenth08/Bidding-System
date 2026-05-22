@@ -99,7 +99,7 @@ REST_FRAMEWORK = {
         "config.throttling.GeneralUserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "login": "5/15min",      # 5 attempts per 15 minutes for login
+        "login": "5/min",        # 5 attempts per minute for login
         "signup": "10/hour",      # 10 signup attempts per hour per IP
         "anon": "100/hour",       # 100 requests per hour for anonymous users
         "user": "1000/hour",      # 1000 requests per hour for authenticated users
@@ -158,8 +158,13 @@ SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 # Cookie Security (set to True in production with HTTPS)
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").strip().lower() == "true"
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False").strip().lower() == "true"
 CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "same-origin")
 
 # Logging Configuration
 LOGGING = {

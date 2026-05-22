@@ -7,7 +7,6 @@ import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 import { bidsAPI } from "../../services/api";
-import { SkeletonCard } from "../../components/ui/Skeleton";
 import LoadingButton from "../../components/ui/LoadingButton";
 import { getStatusLabel, normalizeBid } from "../../lib/procurementStatus";
 
@@ -63,7 +62,7 @@ function ProjectStatusPill({ isOpen }) {
   );
 }
 
-export default function SupplierProjects({ supplierProjects = [], supplierBids = [], setSupplierBids, activeUser, setActivePage, isLoading }) {
+export default function SupplierProjects({ supplierProjects = [], supplierBids = [], setSupplierBids, activeUser, setActivePage }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [now, setNow] = useState(() => new Date());
@@ -196,13 +195,7 @@ export default function SupplierProjects({ supplierProjects = [], supplierBids =
         ))}
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array(6).fill(0).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
-      ) : filteredProjects.length === 0 ? (
+      {filteredProjects.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 bg-white">
           <EmptyState title="No matching projects" subtitle="Try another filter or search term." />
         </div>

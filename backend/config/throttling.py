@@ -13,6 +13,12 @@ class LoginRateThrottle(SimpleRateThrottle):
         if request.user and request.user.is_authenticated:
             return str(request.user.id)
         return self.get_ident_ipaddress(request)
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        if not ident:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": ident}
     
     def get_ident_ipaddress(self, request):
         # Get client IP, accounting for proxies
@@ -38,6 +44,12 @@ class SignupRateThrottle(SimpleRateThrottle):
     
     def get_ident(self, request):
         return self.get_ident_ipaddress(request)
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        if not ident:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": ident}
     
     def get_ident_ipaddress(self, request):
         xff = request.META.get('HTTP_X_FORWARDED_FOR')

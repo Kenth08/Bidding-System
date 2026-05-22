@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   Shield,
+  Upload,
 } from "lucide-react";
 import LoadingButton from "../../components/ui/LoadingButton";
 import { useState } from "react";
@@ -29,11 +30,45 @@ const INITIAL_FORM = {
   companyAddress: "",
   phone: "",
   businessType: "",
-  businessPermitNumber: "",
-  legalDocuments: null,
-  businessPermit: null,
+  businessPermitDocument: null,
   philGepsRegistration: null,
+  taxClearance: null,
+  validId: null,
 };
+
+const REQUIRED_DOCUMENTS = [
+  { key: "businessPermitDocument", label: "Business Permit Document" },
+  { key: "philGepsRegistration", label: "PhilGEPS Registration" },
+  { key: "taxClearance", label: "Tax Clearance" },
+  { key: "validId", label: "Valid ID" },
+];
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const FILE_ACCEPT = ".pdf,.jpg,.jpeg,.png";
+
+function FileUploadField({ label, file, error, onChange }) {
+  const inputId = label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+
+  return (
+    <label htmlFor={inputId} className="block">
+      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-white">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <Upload className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-700">Click to upload or drag and drop</p>
+            <p className="text-xs text-slate-400">PDF, JPG, PNG · Max 5MB</p>
+            <p className="mt-1 truncate text-xs text-slate-600">{file?.name || "No file selected"}</p>
+          </div>
+        </div>
+        <input id={inputId} type="file" accept={FILE_ACCEPT} onChange={onChange} className="sr-only" />
+      </div>
+      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+    </label>
+  );
+}
 
 export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
   const [form, setForm] = useState(INITIAL_FORM);
@@ -42,9 +77,21 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [fileErrors, setFileErrors] = useState({});
 
   function updateForm(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateFile(key, file) {
+    if (file && file.size > MAX_FILE_SIZE) {
+      setFileErrors((prev) => ({ ...prev, [key]: "File must be 5MB or smaller." }));
+      updateForm(key, null);
+      return;
+    }
+
+    setFileErrors((prev) => ({ ...prev, [key]: "" }));
+    updateForm(key, file || null);
   }
 
   async function handleSubmit(event) {
@@ -53,6 +100,12 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
 
     if (!form.fullName || !form.email || !form.password || !form.companyName) {
       setError("Please fill in all required fields.");
+      return;
+    }
+
+    const missingDocument = REQUIRED_DOCUMENTS.find(({ key }) => !form[key]);
+    if (missingDocument) {
+      setError(`Please upload ${missingDocument.label}.`);
       return;
     }
 
@@ -77,10 +130,10 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
       payload.append("company_address", form.companyAddress);
       payload.append("phone", form.phone);
       payload.append("business_type", form.businessType);
-      payload.append("business_permit_number", form.businessPermitNumber);
-      if (form.legalDocuments) payload.append("legal_documents", form.legalDocuments);
-      if (form.businessPermit) payload.append("business_permit", form.businessPermit);
+      payload.append("business_permit_document", form.businessPermitDocument);
       if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration);
+      if (form.taxClearance) payload.append("tax_clearance", form.taxClearance);
+      if (form.validId) payload.append("valid_id", form.validId);
 
       const { error: registrationError } = await registerWithEmail(payload);
       if (registrationError) {
@@ -298,54 +351,35 @@ export default function RegisterPage({ onBack, onSuccess, onGoToLogin }) {
                   </select>
                 </label>
 
-                <label className="md:col-span-2">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Business Permit Number</span>
-                  <input
-                    type="text"
-                    value={form.businessPermitNumber}
-                    onChange={(event) => updateForm("businessPermitNumber", event.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                    placeholder="e.g., BP-2024-123456"
+                <div className="md:col-span-2 grid grid-cols-1 gap-4">
+                  <FileUploadField
+                    label="Business Permit Document"
+                    file={form.businessPermitDocument}
+                    error={fileErrors.businessPermitDocument}
+                    onChange={(event) => updateFile("businessPermitDocument", event.target.files?.[0])}
                   />
-                </label>
+                  <FileUploadField
+                    label="PhilGEPS Registration"
+                    file={form.philGepsRegistration}
+                    error={fileErrors.philGepsRegistration}
+                    onChange={(event) => updateFile("philGepsRegistration", event.target.files?.[0])}
+                  />
+                  <FileUploadField
+                    label="Tax Clearance"
+                    file={form.taxClearance}
+                    error={fileErrors.taxClearance}
+                    onChange={(event) => updateFile("taxClearance", event.target.files?.[0])}
+                  />
+                  <FileUploadField
+                    label="Valid ID"
+                    file={form.validId}
+                    error={fileErrors.validId}
+                    onChange={(event) => updateFile("validId", event.target.files?.[0])}
+                  />
+                </div>
 
-                <div className="md:col-span-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Document Upload</p>
-                  <p className="text-xs text-slate-500 mb-3">Upload required documents (PDF or Image files)</p>
-                  
-                  <div className="space-y-3">
-                    <label>
-                      <span className="text-xs font-medium text-slate-600">Legal Documents</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(event) => updateForm("legalDocuments", event.target.files?.[0])}
-                        className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-600 cursor-pointer"
-                      />
-                    </label>
-
-                    <label>
-                      <span className="text-xs font-medium text-slate-600">Business Permit File</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(event) => updateForm("businessPermit", event.target.files?.[0])}
-                        className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-600 cursor-pointer"
-                      />
-                    </label>
-
-                    <label>
-                      <span className="text-xs font-medium text-slate-600">PhilGEPS Registration Certificate</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(event) => updateForm("philGepsRegistration", event.target.files?.[0])}
-                        className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-600 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-
-                  <p className="text-xs text-slate-400 mt-3">Files must be less than 10MB each. After registration, your account will be pending admin approval.</p>
+                <div className="md:col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="text-xs text-slate-400">Files must be 5MB or smaller. After registration, your account will be pending admin approval.</p>
                 </div>
 
                 {error ? (
