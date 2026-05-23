@@ -20,7 +20,7 @@ export default function AdminSuppliers() {
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data) ? r.data : r.data.results || []); setLoading(false); }).catch(() => setLoading(false)); };
+  const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
   useEffect(() => { fetchData(); }, []);
 
   const filtered = useMemo(() => suppliers.filter((s) => {
@@ -104,10 +104,41 @@ export default function AdminSuppliers() {
                 <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
               ))}
             </div>
-            {viewing.business_permit_document && (
-              <div className="rounded-xl border border-slate-100 p-3">
-                <p className="text-xs font-semibold text-slate-500 mb-2">Uploaded Documents</p>
-                <p className="text-sm text-emerald-600">Business Permit: Uploaded</p>
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Verification Documents</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: "Business Permit", key: "business_permit_document" },
+                  { label: "PhilGEPS Registration", key: "philgeps_registration" },
+                  { label: "Tax Clearance", key: "tax_clearance" },
+                  { label: "Valid ID", key: "valid_id" },
+                ].map(({ label, key }) => {
+                  const url = viewing[key];
+                  return (
+                    <div key={key} className={`flex items-center justify-between rounded-lg border p-3 ${url ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-slate-50"}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${url ? "bg-emerald-100 text-emerald-600" : "bg-slate-200 text-slate-400"}`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
+                        <span className="text-xs font-medium text-slate-700 truncate">{label}</span>
+                      </div>
+                      {url ? (
+                        <div className="flex gap-1.5 shrink-0">
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200 transition-colors">View</a>
+                          <a href={url} download className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200 transition-colors">Download</a>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">Not uploaded</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {viewing.status === "pending" && (
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "approved" }); }} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors">Approve Supplier</button>
+                <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "rejected" }); }} className="flex-1 rounded-xl bg-red-50 border border-red-200 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors">Reject Supplier</button>
               </div>
             )}
           </div>

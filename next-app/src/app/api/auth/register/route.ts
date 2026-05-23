@@ -36,11 +36,12 @@ export async function POST(request: Request) {
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
 
-  // Save business permit document if provided
-  let permitPath: string | null = null;
-  const permitFile = formData.get("business_permit_document") as File | null;
-  if (permitFile && permitFile.size > 0) {
-    permitPath = await saveFile(permitFile, "permits");
+  // Save uploaded documents
+  const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id"] as const;
+  const docPaths: Record<string, string | null> = {};
+  for (const key of docFields) {
+    const file = formData.get(key) as File | null;
+    docPaths[key] = file && file.size > 0 ? await saveFile(file, "documents") : null;
   }
 
   const password_hash = await bcrypt.hash(password, 12);
@@ -56,7 +57,10 @@ export async function POST(request: Request) {
       company_address,
       phone,
       business_type,
-      business_permit_document: permitPath,
+      business_permit_document: docPaths.business_permit_document,
+      philgeps_registration: docPaths.philgeps_registration,
+      tax_clearance: docPaths.tax_clearance,
+      valid_id: docPaths.valid_id,
     },
   });
 
