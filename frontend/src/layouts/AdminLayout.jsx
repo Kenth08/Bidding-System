@@ -1,5 +1,5 @@
-// c:\Users\Mico\Bidding-System\frontend\src\layouts\AdminLayout.jsx
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import AdminHeader from "../components/admin/AdminHeader";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import AdminBlockchain from "../pages/admin/AdminBlockchain";
@@ -13,12 +13,49 @@ import AdminBidEvaluation from "../pages/admin/AdminBidEvaluation";
 import AdminAwarding from "../pages/admin/AdminAwarding";
 import { usersAPI } from "../services/api";
 import { DataProvider, useData } from "../context/DataContext";
-import { ProcurementContext } from "../lib/ProcurementContext";
+
+// Map URL segments to internal page keys
+const PATH_TO_PAGE = {
+  "": "dashboard",
+  "projects": "projects",
+  "procurement": "procurement",
+  "suppliers": "suppliers",
+  "bid-evaluation": "bids",
+  "awarding": "awarding",
+  "users": "users",
+  "blockchain": "records",
+  "reports": "reports",
+};
+
+const PAGE_TO_PATH = {
+  "dashboard": "",
+  "projects": "projects",
+  "procurement": "procurement",
+  "suppliers": "suppliers",
+  "bids": "bid-evaluation",
+  "awarding": "awarding",
+  "users": "users",
+  "records": "blockchain",
+  "reports": "reports",
+};
 
 function AdminLayoutContent({ currentUser, onLogout }) {
   const { cache, isInitialLoading } = useData();
-  const procurement = useContext(ProcurementContext);
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Derive currentPage from URL
+  const currentPage = useMemo(() => {
+    const segment = location.pathname.replace(/^\/admin\/?/, "").split("/")[0] || "";
+    return PATH_TO_PAGE[segment] || "dashboard";
+  }, [location.pathname]);
+
+  // Navigate by updating URL
+  const setCurrentPage = useCallback((page) => {
+    const path = PAGE_TO_PATH[page] || "";
+    navigate(`/admin${path ? `/${path}` : ""}`, { replace: false });
+  }, [navigate]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
@@ -64,8 +101,8 @@ function AdminLayoutContent({ currentUser, onLogout }) {
   const projects = cache.projects || [];
   const bids = cache.bids || [];
   const blockchainRecords = cache.blockchainRecords || [];
-  const suppliers = cache.suppliers || procurement.suppliers || [];
-  const dashboardStats = cache.stats || procurement.stats;
+  const suppliers = cache.suppliers || [];
+  const dashboardStats = cache.stats || null;
 
   const pageMeta = useMemo(() => {
     if (currentPage === "projects") return { title: "Project Management", subtitle: "Create, update, and monitor procurement projects" };
@@ -88,9 +125,8 @@ function AdminLayoutContent({ currentUser, onLogout }) {
     if (currentPage === "users") return { title: "User Accounts", subtitle: "Manage access, roles, and account status" };
     if (currentPage === "records") return { title: "Blockchain Records", subtitle: "Inspect immutable procurement ledger entries" };
     if (currentPage === "reports") return { title: "Reports & Analytics", subtitle: "View procurement and supplier performance reports" };
-    // Audit Logs intentionally removed from UI
     return { title: "Admin Dashboard", subtitle: "" };
-  }, [currentPage]);
+  }, [currentPage, projects, selectedProjectId]);
 
   const page = useMemo(() => {
     if (currentPage === "projects") return <AdminProjects projects={projects} onViewBids={(projectId) => { setSelectedProjectId(projectId); setCurrentPage("bids"); }} />;
@@ -102,7 +138,7 @@ function AdminLayoutContent({ currentUser, onLogout }) {
     if (currentPage === "records") return <AdminBlockchain blockchainRecords={blockchainRecords} />;
     if (currentPage === "reports") return <AdminReports projects={projects} suppliers={suppliers} bids={bids} />;
     return <AdminDashboard stats={dashboardStats} projects={projects} bids={bids} blockchainRecords={blockchainRecords} setActivePage={setCurrentPage} />;
-  }, [bids, blockchainRecords, currentPage, currentUser, dashboardStats, projects, selectedProjectId, suppliers, users]);
+  }, [bids, blockchainRecords, currentPage, currentUser, dashboardStats, notificationTargetSupplierId, notificationTargetVersion, projects, selectedProjectId, setCurrentPage, suppliers, users]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">

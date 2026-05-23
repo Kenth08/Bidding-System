@@ -1,13 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { AuthProvider } from "./context/AuthContext";
 import { ProcurementProvider } from "./lib/ProcurementContext";
 import "./index.css";
-
-function clearAuthSessionOnFreshLoad() {
-}
-
-clearAuthSessionOnFreshLoad();
 
 class RootErrorBoundary extends React.Component {
   constructor(props) {
@@ -16,33 +13,11 @@ class RootErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    return {
-      hasError: true,
-      message: error?.message || "Unknown runtime error",
-    };
+    return { hasError: true, message: error?.message || "Unknown runtime error" };
   }
 
   componentDidCatch(error, errorInfo) {
     console.error("App crashed:", error, errorInfo);
-  }
-
-  componentDidMount() {
-    this.removeErrorListener = (event) => {
-      const message = event?.error?.message || event?.message || "Unknown runtime error";
-      this.setState({ hasError: true, message });
-    };
-    this.removeRejectionListener = (event) => {
-      const message = event?.reason?.message || String(event?.reason || "Unhandled promise rejection");
-      this.setState({ hasError: true, message });
-    };
-
-    window.addEventListener("error", this.removeErrorListener);
-    window.addEventListener("unhandledrejection", this.removeRejectionListener);
-  }
-
-  componentWillUnmount() {
-    window.removeEventListener("error", this.removeErrorListener);
-    window.removeEventListener("unhandledrejection", this.removeRejectionListener);
   }
 
   render() {
@@ -53,7 +28,6 @@ class RootErrorBoundary extends React.Component {
         </div>
       );
     }
-
     return this.props.children;
   }
 }
@@ -61,9 +35,13 @@ class RootErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <RootErrorBoundary>
-      <ProcurementProvider>
-        <App />
-      </ProcurementProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <ProcurementProvider>
+            <App />
+          </ProcurementProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </RootErrorBoundary>
   </React.StrictMode>
 );

@@ -62,7 +62,7 @@ function ProjectStatusPill({ isOpen }) {
   );
 }
 
-export default function SupplierProjects({ supplierProjects = [], supplierBids = [], setSupplierBids, activeUser, setActivePage }) {
+export default function SupplierProjects({ supplierProjects = [], supplierBids = [], activeUser, setActivePage, onBidSubmitted }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [now, setNow] = useState(() => new Date());
@@ -152,10 +152,10 @@ export default function SupplierProjects({ supplierProjects = [], supplierBids =
 
       const response = await bidsAPI.create(formData);
       const createdBid = normalizeBid(response.data);
-      setSupplierBids?.((current) => [createdBid, ...current]);
+      onBidSubmitted?.();
       setShowBidModal(false);
       setBidDraft({ bidAmount: "", quotationFile: null, technicalProposal: null, supportingDocuments: null });
-      setToast({ message: `Bid submitted successfully. Timestamp: ${createdBid.submittedAt || response.data.submittedAt || new Date().toISOString()}`, type: "success" });
+      setToast({ message: `Bid submitted successfully. Timestamp: ${createdBid.submittedAt || new Date().toISOString()}`, type: "success" });
       setActivePage?.("my-bids");
     } catch (error) {
       console.error("Failed to submit bid", error);

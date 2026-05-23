@@ -1,178 +1,87 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\App.jsx
-import { useEffect, useState } from "react";
-import AdminLayout from "./layouts/AdminLayout";
-import SupplierLayout from "./layouts/SupplierLayout";
-import SchoolHeadLayout from "./layouts/SchoolHeadLayout";
-import LoginPage from "./pages/auth/LoginPage";
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./components/shared/ProtectedRoute";
 import LandingPage from "./pages/public/LandingPage";
-import PublicResultsPage from "./pages/public/PublicResultsPage";
+import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
-import { authAPI } from "./services/api";
+import PublicResultsPage from "./pages/public/PublicResultsPage";
 
-function getLocalSupplierState() {
-  try {
-    const rawState = localStorage.getItem("ep_procurement_state_v1");
-    if (!rawState) return null;
-    return JSON.parse(rawState);
-  } catch {
-    return null;
-  }
+const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
+const SupplierLayout = lazy(() => import("./layouts/SupplierLayout"));
+const SchoolHeadLayout = lazy(() => import("./layouts/SchoolHeadLayout"));
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-7 text-center text-slate-700 shadow-sm">
+        <p className="text-sm font-medium">Loading...</p>
+      </div>
+    </div>
+  );
 }
 
-function getApprovedLocalSupplier(email) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
-  if (!normalizedEmail) return null;
-
-  const state = getLocalSupplierState();
-  const supplier = state?.suppliers?.find((item) => String(item.email || "").trim().toLowerCase() === normalizedEmail);
-  if (!supplier) return null;
-
-  const status = String(supplier.status || "").trim().toLowerCase();
-  if (status !== "verified" && status !== "approved") return null;
-
-  return supplier;
+function getRolePath(role) {
+  if (role === "school_head") return "/school-head";
+  return `/${role}`;
 }
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState("landing");
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const { user, isLoading, login, logout } = useAuth();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    async function restoreSession() {
-      const accessToken = sessionStorage.getItem("access_token");
-      if (!accessToken) {
-        setIsInitializing(false);
-        return;
-      }
+  if (isLoading) return <LoadingFallback />;
 
-      try {
-        const response = await authAPI.me();
-        const backendUser = response.data;
-        if (backendUser?.role === "supplier") {
-          const localSupplier = getApprovedLocalSupplier(backendUser.email);
-          if (localSupplier) {
-            const trustedSupplier = {
-              ...backendUser,
-              id: localSupplier.id || backendUser.id,
-              email: localSupplier.email || backendUser.email,
-              full_name: localSupplier.full_name || localSupplier.company_name || backendUser.full_name || backendUser.company_name,
-              company_name: localSupplier.company_name || backendUser.company_name,
-              status: localSupplier.status || "Verified",
-            };
-            sessionStorage.setItem("current_supplier", JSON.stringify(trustedSupplier));
-            setCurrentUser(trustedSupplier);
-            setCurrentScreen("supplier");
-            return;
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <Routes>
+        {/* Public routes */}
+        <Route
+          path="/"
+          element={
+            user
+              ? <Navigate to={getRolePath(user.role)} replace />
+              : <LandingPage
+                  onAdminLogin={() => navigate("/login")}
+                  onViewResults={() => navigate("/results")}
+                  onRegister={() => navigate("/register")}
+                />
           }
-        }
-
-        setCurrentUser(backendUser);
-        setCurrentScreen(backendUser.role);
-      } catch {
-        const currentSupplierJson = sessionStorage.getItem("current_supplier");
-        if (currentSupplierJson) {
-          try {
-            const currentSupplier = JSON.parse(currentSupplierJson);
-            const localSupplier = getApprovedLocalSupplier(currentSupplier.email);
-            if (localSupplier) {
-              const trustedSupplier = {
-                ...currentSupplier,
-                ...localSupplier,
-                role: "supplier",
-                status: localSupplier.status || "Verified",
-              };
-              setCurrentUser(trustedSupplier);
-              setCurrentScreen("supplier");
-              return;
-            }
-          } catch {
-            // fall through to landing reset
+        />
+        <Route
+          path="/login"
+          element={
+            user
+              ? <Navigate to={getRolePath(user.role)} replace />
+              : <LoginPage
+                  onLogin={(_role, userData) => login(userData)}
+                  onBack={() => navigate("/")}
+                  onGoToRegister={() => navigate("/register")}
+                />
           }
-        }
+        />
+        <Route
+          path="/register"
+          element={
+            user
+              ? <Navigate to={getRolePath(user.role)} replace />
+              : <RegisterPage
+                  onBack={() => navigate("/")}
+                  onSuccess={() => navigate("/login")}
+                  onGoToLogin={() => navigate("/login")}
+                />
+          }
+        />
+        <Route path="/results" element={<PublicResultsPage onBack={() => navigate("/")} />} />
 
-        sessionStorage.removeItem("access_token");
-        sessionStorage.removeItem("refresh_token");
-        sessionStorage.removeItem("current_supplier");
-        setCurrentUser(null);
-        setCurrentScreen("landing");
-      } finally {
-        setIsInitializing(false);
-      }
-    }
+        {/* Protected routes */}
+        <Route path="/admin/*" element={<ProtectedRoute allowedRoles={["admin"]}><AdminLayout currentUser={user} onLogout={logout} /></ProtectedRoute>} />
+        <Route path="/supplier/*" element={<ProtectedRoute allowedRoles={["supplier"]}><SupplierLayout user={user} currentUser={user} onLogout={logout} /></ProtectedRoute>} />
+        <Route path="/school-head/*" element={<ProtectedRoute allowedRoles={["school_head"]}><SchoolHeadLayout user={user} currentUser={user} onLogout={logout} /></ProtectedRoute>} />
 
-    restoreSession();
-  }, []);
-
-  function handleLogin(role, user) {
-    setCurrentUser(user || null);
-    setCurrentScreen(role);
-  }
-
-  function handleLogout() {
-    sessionStorage.removeItem("access_token");
-    sessionStorage.removeItem("refresh_token");
-    sessionStorage.removeItem("current_supplier");
-    setCurrentUser(null);
-    setCurrentScreen("landing");
-  }
-
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6 py-8">
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-7 text-center text-slate-700 shadow-sm">
-          <p className="text-sm font-medium">Restoring session, please wait...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (currentScreen === "landing") {
-    return (
-      <LandingPage
-        onAdminLogin={() => setCurrentScreen("login")}
-        onViewResults={() => setCurrentScreen("public-results")}
-        onRegister={() => setCurrentScreen("register")}
-      />
-    );
-  }
-
-  if (currentScreen === "login") {
-    return (
-      <LoginPage
-        onLogin={handleLogin}
-        onBack={() => setCurrentScreen("landing")}
-        onGoToRegister={() => setCurrentScreen("register")}
-      />
-    );
-  }
-
-  if (currentScreen === "register") {
-    return (
-      <RegisterPage
-        onBack={() => setCurrentScreen("landing")}
-        onSuccess={() => {
-          setCurrentScreen("login");
-        }}
-      />
-    );
-  }
-
-  if (currentScreen === "public-results") {
-    return <PublicResultsPage onBack={() => setCurrentScreen("landing")} />;
-  }
-
-  if (currentScreen === "admin") {
-    return <AdminLayout user={currentUser} currentUser={currentUser} onLogout={handleLogout} />;
-  }
-
-  if (currentScreen === "supplier") {
-    return <SupplierLayout user={currentUser} currentUser={currentUser} onLogout={handleLogout} />;
-  }
-
-  if (currentScreen === "school_head") {
-    return <SchoolHeadLayout user={currentUser} currentUser={currentUser} onLogout={handleLogout} />;
-  }
-
-  return <LandingPage onAdminLogin={() => setCurrentScreen("login")} onViewResults={() => setCurrentScreen("public-results")} onRegister={() => setCurrentScreen("register")} />;
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
+  );
 }

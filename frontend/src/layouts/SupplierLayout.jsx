@@ -1,5 +1,5 @@
-// c:\Users\Mico\Bidding-System\frontend\src\layouts\SupplierLayout.jsx
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import SupplierProfileModal from "../components/supplier/SupplierProfileModal";
 import SupplierSettingsModal from "../components/supplier/SupplierSettingsModal";
 import SupplierHeader from "../components/supplier/SupplierHeader";
@@ -10,14 +10,40 @@ import SupplierProjects from "../pages/supplier/SupplierProjects";
 import SupplierResults from "../pages/supplier/SupplierResults";
 import SupplierProfile from "../pages/supplier/SupplierProfile";
 import { DataProvider, useData } from "../context/DataContext";
-import { ProcurementContext } from "../lib/ProcurementContext";
 import { getStatusLabel } from "../lib/procurementStatus";
+
+const PATH_TO_PAGE = {
+  "": "dashboard",
+  "projects": "available-projects",
+  "bids": "my-bids",
+  "results": "results",
+  "profile": "profile",
+};
+
+const PAGE_TO_PATH = {
+  "dashboard": "",
+  "available-projects": "projects",
+  "my-bids": "bids",
+  "results": "results",
+  "profile": "profile",
+};
 
 function SupplierLayoutContent({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
-  const { cache, isInitialLoading } = useData();
-  const procurement = useContext(ProcurementContext);
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const { cache, isInitialLoading, refresh } = useData();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const currentPage = useMemo(() => {
+    const segment = location.pathname.replace(/^\/supplier\/?/, "").split("/")[0] || "";
+    return PATH_TO_PAGE[segment] || "dashboard";
+  }, [location.pathname]);
+
+  const setCurrentPage = useCallback((page) => {
+    const path = PAGE_TO_PATH[page] || "";
+    navigate(`/supplier${path ? `/${path}` : ""}`, { replace: false });
+  }, [navigate]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -51,14 +77,15 @@ function SupplierLayoutContent({ user, currentUser, onLogout }) {
           supplierBids={supplierBids}
           activeUser={activeUser}
           setActivePage={setCurrentPage}
+          onBidSubmitted={refresh}
         />
       );
     }
-    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} />;
+    if (currentPage === "my-bids") return <SupplierMyBids supplierBids={supplierBids} onNavigate={setCurrentPage} isLoading={isInitialLoading} />;
     if (currentPage === "results") return <SupplierResults supplierResults={supplierResults} supplierBids={supplierBids} user={activeUser} />;
     if (currentPage === "profile") return <SupplierProfile currentUser={activeUser} />;
-    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} />;
-  }, [activeUser, currentPage, supplierBids, supplierProjects, supplierResults]);
+    return <SupplierDashboard supplierProjects={supplierProjects} supplierBids={supplierBids} user={activeUser} setActivePage={setCurrentPage} isLoading={isInitialLoading} />;
+  }, [activeUser, currentPage, isInitialLoading, refresh, setCurrentPage, supplierBids, supplierProjects, supplierResults]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">

@@ -19,15 +19,14 @@ function normalizeDashboardStats(source) {
   };
 }
 
-export default function AdminDashboard({ setActivePage }) {
+export default function AdminDashboard({ setActivePage, stats, projects = [], bids = [], blockchainRecords = [] }) {
   const { cache } = useData();
-  const isCacheReady = Boolean(cache.loaded);
 
-  const projectItems = cache.projects || [];
-  const bidItems = cache.bids || [];
-  const blockchainItems = cache.blockchainRecords || [];
+  const projectItems = projects.length ? projects : cache.projects || [];
+  const bidItems = bids.length ? bids : cache.bids || [];
+  const blockchainItems = blockchainRecords.length ? blockchainRecords : cache.blockchainRecords || [];
   const normalizedProjects = projectItems.map(normalizeProject);
-  const counts = normalizeDashboardStats(cache.stats) || {
+  const counts = normalizeDashboardStats(stats || cache.stats) || {
     total_projects: normalizedProjects.length,
     total_bids: bidItems.length,
     active_bidding: normalizedProjects.filter((project) => ["active", "open for bidding"].includes(String(project.status || "").toLowerCase()) || project.status === 3).length,
@@ -44,10 +43,10 @@ export default function AdminDashboard({ setActivePage }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Projects" value={isCacheReady ? (counts.total_projects ?? 0) : <span className="inline-block h-8 w-8 rounded bg-slate-200 animate-pulse" />} leftBorderColor="#3B82F6" iconColor="#3B82F6" />
-        <StatCard title="Total Bids" value={isCacheReady ? (counts.total_bids ?? 0) : <span className="inline-block h-8 w-8 rounded bg-slate-200 animate-pulse" />} leftBorderColor="#8B5CF6" iconColor="#8B5CF6" />
-        <StatCard title="Active Bidding" value={isCacheReady ? (counts.active_bidding ?? 0) : <span className="inline-block h-8 w-8 rounded bg-slate-200 animate-pulse" />} leftBorderColor="#10B981" iconColor="#10B981" />
-        <StatCard title="Awarded Contracts" value={isCacheReady ? (counts.awarded_contracts ?? 0) : <span className="inline-block h-8 w-8 rounded bg-slate-200 animate-pulse" />} leftBorderColor="#F59E0B" iconColor="#F59E0B" />
+        <StatCard title="Total Projects" value={counts.total_projects ?? 0} leftBorderColor="#3B82F6" iconColor="#3B82F6" />
+        <StatCard title="Total Bids" value={counts.total_bids ?? 0} leftBorderColor="#8B5CF6" iconColor="#8B5CF6" />
+        <StatCard title="Active Bidding" value={counts.active_bidding ?? 0} leftBorderColor="#10B981" iconColor="#10B981" />
+        <StatCard title="Awarded Contracts" value={counts.awarded_contracts ?? 0} leftBorderColor="#F59E0B" iconColor="#F59E0B" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">

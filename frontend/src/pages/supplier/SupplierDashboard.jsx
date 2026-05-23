@@ -1,7 +1,22 @@
 import StatCard from "../../components/shared/StatCard";
 import StatusBadge from "../../components/shared/StatusBadge";
+import { SkeletonTable } from "../../components/ui/Skeleton";
 
-export default function SupplierDashboard({ supplierProjects = [], supplierBids = [], user, setActivePage }) {
+export default function SupplierDashboard({ supplierProjects = [], supplierBids = [], user, setActivePage, isLoading }) {
+  if (isLoading) {
+    return (
+      <div>
+        <div className="mb-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+          <div className="h-6 w-48 animate-pulse rounded bg-slate-200" />
+          <div className="mt-2 h-4 w-32 animate-pulse rounded bg-slate-100" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          {[1,2,3,4].map((i) => <div key={i} className="h-24 animate-pulse rounded-2xl border border-slate-100 bg-white" />)}
+        </div>
+      </div>
+    );
+  }
+
   const hasSubmittedBid = (projectId) => supplierBids.some((bid) => String(bid.projectId || bid.project_id || bid.project) === String(projectId));
   const isProjectOpen = (project) => String(project.status || "").toLowerCase() === "open for bidding";
 

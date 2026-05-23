@@ -1,5 +1,5 @@
-// c:\Users\HUAWEI\OneDrive\Desktop\Bidding System\src\layouts\SchoolHeadLayout.jsx
-import { useContext, useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import SchoolHeadHeader from "../components/school_head/SchoolHeadHeader";
 import SchoolHeadSidebar from "../components/school_head/SchoolHeadSidebar";
 import SchoolHeadDashboard from "../pages/school_head/SchoolHeadDashboard";
@@ -7,10 +7,34 @@ import SchoolHeadApprovedProjects from "../pages/school_head/SchoolHeadApprovedP
 import SchoolHeadRequests from "../pages/school_head/SchoolHeadRequests";
 import { DataProvider, useData } from "../context/DataContext";
 
+const PATH_TO_PAGE = {
+  "": "dashboard",
+  "requests": "requests",
+  "history": "history",
+};
+
+const PAGE_TO_PATH = {
+  "dashboard": "",
+  "requests": "requests",
+  "history": "history",
+};
+
 function SchoolHeadLayoutContent({ user, currentUser, onLogout }) {
   const activeUser = user || currentUser;
-  const { cache, isInitialLoading } = useData();
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const { cache } = useData();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const currentPage = useMemo(() => {
+    const segment = location.pathname.replace(/^\/school-head\/?/, "").split("/")[0] || "";
+    return PATH_TO_PAGE[segment] || "dashboard";
+  }, [location.pathname]);
+
+  const setCurrentPage = useCallback((page) => {
+    const path = PAGE_TO_PATH[page] || "";
+    navigate(`/school-head${path ? `/${path}` : ""}`, { replace: false });
+  }, [navigate]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function handleNotificationNavigate(link) {
@@ -28,7 +52,7 @@ function SchoolHeadLayoutContent({ user, currentUser, onLogout }) {
     if (currentPage === "requests") return <SchoolHeadRequests user={activeUser} requests={cache.procurementRequests || []} />;
     if (currentPage === "history") return <SchoolHeadApprovedProjects projects={cache.projects || []} />;
     return <SchoolHeadDashboard user={activeUser} requests={cache.procurementRequests || []} setActivePage={setCurrentPage} />;
-  }, [activeUser, cache.procurementRequests, currentPage]);
+  }, [activeUser, cache.procurementRequests, cache.projects, currentPage, setCurrentPage]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -53,5 +77,5 @@ export default function SchoolHeadLayout({ user, currentUser, onLogout }) {
     <DataProvider>
       <SchoolHeadLayoutContent user={user} currentUser={currentUser} onLogout={onLogout} />
     </DataProvider>
-  )
+  );
 }

@@ -32,6 +32,7 @@ export default function SupplierResults({ supplierResults = [], supplierBids = [
       bidAmount: bid.bidAmount || bid.bid_amount,
       submittedAt: bid.submittedAt || bid.submitted_at,
       status: String(bid.status || "").toLowerCase(),
+      recorded: Boolean(bid.recorded),
     }));
   }, [supplierBids, supplierResults]);
 
@@ -96,6 +97,7 @@ export default function SupplierResults({ supplierResults = [], supplierBids = [
               </p>
             </div>
 
+            {result.recorded && (
             <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -108,6 +110,7 @@ export default function SupplierResults({ supplierResults = [], supplierBids = [
               </div>
               <p className="mt-1.5 text-xs text-slate-400">Result permanently recorded. Cannot be altered.</p>
             </div>
+            )}
           </div>
         ))}
       </div>

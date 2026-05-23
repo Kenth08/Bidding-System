@@ -1,6 +1,6 @@
 // c:\Users\Mico\Bidding-System\frontend\src\pages\admin\AdminSuppliers.jsx
-import { CheckCircle, Eye, Pencil, Users, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Eye, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "../../components/shared/EmptyState";
 import LoadingButton from "../../components/ui/LoadingButton";
 import Modal from "../../components/shared/Modal";
@@ -8,15 +8,64 @@ import SearchBar from "../../components/shared/SearchBar";
 import StatusBadge from "../../components/shared/StatusBadge";
 import Toast from "../../components/shared/Toast";
 import { suppliersAPI, documentAPI, usersAPI } from "../../services/api";
-import { useData } from "../../context/DataContext";
 
 function safeStr(val) {
   return (val ?? "").toString().toLowerCase();
 }
 
+function getSupplierStatus(supplier) {
+  const rawStatus = safeStr(supplier.status || supplier.status_display);
+
+  if (rawStatus === "pending" || rawStatus === "for review" || rawStatus === "submitted") {
+    return "pending";
+  }
+
+  if (rawStatus === "approved" || rawStatus === "verified" || rawStatus === "active") {
+    return "approved";
+  }
+
+  if (rawStatus === "rejected" || rawStatus === "declined") {
+    return "rejected";
+  }
+
+  return rawStatus || "pending";
+}
+
+function getSupplierStatusLabel(supplier) {
+  const status = getSupplierStatus(supplier);
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  return "Pending";
+}
+
+function getSupplierStatusClass(supplier) {
+  const status = getSupplierStatus(supplier);
+
+  if (status === "approved") return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (status === "rejected") return "border-red-100 bg-red-50 text-red-700";
+  return "border-amber-100 bg-amber-50 text-amber-700";
+}
+
+function getInitials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "S";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+}
+
+function formatReadableDate(value) {
+  if (!value) return "-";
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "-";
+  return parsedDate.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function AdminSuppliers({ notificationTargetSupplierId = null, notificationTargetVersion = 0 }) {
-  const { cache, loadSuppliers, updateItem } = useData();
-  const [suppliers, setSuppliers] = useState(() => cache.suppliers || []);
+  const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [viewingSupplier, setViewingSupplier] = useState(null);
@@ -26,17 +75,18 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [editForm, setEditForm] = useState({});
 
-  useEffect(() => {
-    if (!Array.isArray(cache.suppliers)) {
-      loadSuppliers();
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const res = await suppliersAPI.getAll();
+      setSuppliers(res.data.results || res.data || []);
+    } catch {
+      setSuppliers([]);
     }
-  }, [cache.suppliers, loadSuppliers]);
+  }, []);
 
   useEffect(() => {
-    if (Array.isArray(cache.suppliers)) {
-      setSuppliers(cache.suppliers);
-    }
-  }, [cache.suppliers]);
+    fetchSuppliers();
+  }, [fetchSuppliers]);
 
   // Load documents for the supplier when viewingSupplier changes
   useEffect(() => {
@@ -98,8 +148,7 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
       const localStatus = isApproved ? 'Verified' : 'Rejected';
 
       await suppliersAPI.updateStatus(id, backendStatus);
-      setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status: localStatus } : supplier)));
-      updateItem('suppliers', id, { status: localStatus, status_display: localStatus });
+      setSuppliers((prev) => prev.map((supplier) => (supplier.id === id ? { ...supplier, status: localStatus, status_display: localStatus } : supplier)));
       const message = isApproved ? "Supplier approved successfully" : "Supplier rejected successfully";
       const type = isApproved ? "success" : "warning";
       setToast({ message, type });
@@ -117,7 +166,6 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
     try {
       await usersAPI.update(editingSupplier.id, editForm);
       setSuppliers((previous) => previous.map((supplier) => (supplier.id === editingSupplier.id ? { ...supplier, ...editForm } : supplier)));
-      updateItem('suppliers', editingSupplier.id, editForm);
       setEditingSupplier(null);
       setToast({ message: "Supplier details updated successfully.", type: "success" });
     } catch (error) {
@@ -135,7 +183,7 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div className="px-6 pt-4 flex gap-4 border-b border-slate-50">
           {["All", "Pending", "Approved", "Rejected"].map((tab) => (
             <button key={tab} onClick={() => setFilter(tab)} className={`pb-3 text-sm font-medium border-b-2 ${filter === tab ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-400"}`}>
@@ -147,61 +195,131 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
           <SearchBar value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or company" />
         </div>
 
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-100">
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Full Name</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Company</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Business Type</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Permit Document</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Registered</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8}>
-                  <EmptyState icon={Users} title="No suppliers registered yet" subtitle="New supplier registrations will appear here." />
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1420px] table-fixed">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[24%]" />
+              <col className="w-[10%]" />
+              <col className="w-[11%]" />
+              <col className="w-[13%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+              <col className="w-[16%]" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/70">
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Full Name</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Email</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Phone</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Business Type</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Permit Document</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Registered</th>
+                <th className="px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Status</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Actions</th>
               </tr>
-            ) : filtered.map((supplier) => (
-              <tr key={supplier.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-6 py-4 text-sm font-medium text-slate-800">{supplier.full_name}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.company_name}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.email}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.phone || "-"}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_type || "-"}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.business_permit_document_name || "-"}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{supplier.created_at?.slice(0, 10)}</td>
-                <td className="px-6 py-4"><StatusBadge status={supplier.status || supplier.status_display} /></td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    <button onClick={() => setViewingSupplier(supplier)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"><Eye className="h-4 w-4" /></button>
-                    {supplier.status !== "Verified" && supplier.status !== "approved" && (
-                      <LoadingButton onClick={() => changeStatus(supplier.id, "approved")} isLoading={actionLoading === `${supplier.id}:approved`} loadingText="Approving..." className="rounded-lg border border-emerald-200 px-2 py-1 text-xs text-emerald-600">
-                        Approve
-                      </LoadingButton>
-                    )}
-                    {supplier.status !== "Rejected" && (
-                      <LoadingButton onClick={() => changeStatus(supplier.id, "rejected")} isLoading={actionLoading === `${supplier.id}:rejected`} loadingText="Rejecting..." className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
-                        Reject
-                      </LoadingButton>
-                    )}
-                    {String(supplier.status).toLowerCase() === "rejected" && (
-                      <button onClick={() => setEditingSupplier(supplier)} className="flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50" title="Edit rejected supplier details">
-                        <Pencil className="h-3.5 w-3.5" /> Edit
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-14">
+                    <EmptyState
+                      icon={Users}
+                      title={suppliers.length === 0 ? "No suppliers found" : "No matching suppliers"}
+                      subtitle={suppliers.length === 0 ? "Supplier registrations will appear here once they start coming in." : "Try adjusting your search or filter to find a supplier."}
+                    />
+                  </td>
+                </tr>
+              ) : filtered.map((supplier) => {
+                const status = getSupplierStatus(supplier);
+                const statusLabel = getSupplierStatusLabel(supplier);
+                const isPending = status === "pending";
+                const initials = getInitials(supplier.full_name || supplier.company_name);
+
+                return (
+                  <tr key={supplier.id} className="group transition-colors hover:bg-slate-50/70">
+                    <td className="px-6 py-3.5 align-middle">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold uppercase text-slate-600">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{supplier.full_name || "-"}</p>
+                          <p className="truncate text-xs text-slate-500">{supplier.company_name || "No company listed"}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3.5 align-middle text-sm text-slate-600 whitespace-nowrap overflow-hidden text-ellipsis">
+                      <span className="block truncate">{supplier.email || "-"}</span>
+                    </td>
+                    <td className="px-6 py-3.5 align-middle text-sm text-slate-600 whitespace-nowrap">{supplier.phone || "-"}</td>
+                    <td className="px-6 py-3.5 align-middle text-sm text-slate-600 whitespace-nowrap">
+                      <span className="block truncate">{supplier.business_type || "-"}</span>
+                    </td>
+                    <td className="px-6 py-3.5 align-middle text-sm text-slate-600 whitespace-nowrap">
+                      {supplier.business_permit_document_url ? (
+                        <a
+                          href={supplier.business_permit_document_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800"
+                        >
+                          View Document
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3.5 align-middle text-sm text-slate-600 whitespace-nowrap">
+                      {formatReadableDate(supplier.created_at)}
+                    </td>
+                    <td className="px-6 py-3.5 align-middle text-center">
+                      <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold ${getSupplierStatusClass(supplier)}`}>
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 align-middle">
+                      <div className="flex items-center justify-end gap-3 whitespace-nowrap">
+                        {isPending ? (
+                          <>
+                            <button
+                              onClick={() => setViewingSupplier(supplier)}
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                              title="View supplier details"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </button>
+                            <LoadingButton
+                              onClick={() => changeStatus(supplier.id, "approved")}
+                              isLoading={actionLoading === `${supplier.id}:approved`}
+                              loadingText="Approving..."
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                            >
+                              Approve
+                            </LoadingButton>
+                            <LoadingButton
+                              onClick={() => changeStatus(supplier.id, "rejected")}
+                              isLoading={actionLoading === `${supplier.id}:rejected`}
+                              loadingText="Rejecting..."
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
+                            >
+                              Reject
+                            </LoadingButton>
+                          </>
+                        ) : (
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${status === "approved" ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-red-100 bg-red-50 text-red-700"}`}>
+                            {statusLabel}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <Modal isOpen={Boolean(viewingSupplier)} onClose={() => setViewingSupplier(null)} title="Supplier Profile" subtitle="Registration details" size="md">
