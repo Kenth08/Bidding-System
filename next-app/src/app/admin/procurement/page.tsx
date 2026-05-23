@@ -1,0 +1,157 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { procurementAPI } from '@/services/api';
+import StatusBadge from '@/components/shared/StatusBadge';
+import EmptyState from '@/components/shared/EmptyState';
+import Modal from '@/components/shared/Modal';
+import Toast from '@/components/shared/Toast';
+import SearchBar from '@/components/shared/SearchBar';
+import LoadingButton from '@/components/ui/LoadingButton';
+import { SkeletonTable } from '@/components/ui/Skeleton';
+
+const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
+const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: 'Services', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
+
+export default function AdminProcurement() {
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<any>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchRequests = () => {
+    setLoading(true);
+    procurementAPI.getAll().then((res) => { setRequests(Array.isArray(res.data) ? res.data : res.data.results || []); setLoading(false); }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchRequests(); }, []);
+
+  const openCreate = () => { setEditingRequest(null); setForm(EMPTY_FORM); setShowModal(true); };
+  const openEdit = (r: any) => {
+    setEditingRequest(r);
+    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType: r.procurement_type || 'Services', technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
+    setShowModal(true);
+  };
+
+  const saveRequest = async () => {
+    if (!form.projectTitle.trim() || !form.budget) return;
+    setIsSaving(true);
+    try {
+      const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: form.procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
+      if (editingRequest) await procurementAPI.update(editingRequest.id, payload);
+      else await procurementAPI.create(payload);
+      setToast({ message: editingRequest ? 'Request updated' : 'Request created', type: 'success' });
+      setShowModal(false); fetchRequests();
+    } catch { setToast({ message: 'Failed to save', type: 'error' }); }
+    finally { setIsSaving(false); }
+  };
+
+  const filtered = requests.filter((r: any) => r.project_title?.toLowerCase().includes(search.toLowerCase()));
+  if (loading) return <div className="p-6"><SkeletonTable /></div>;
+
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20";
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div />
+        <button onClick={openCreate} className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-600">+ New Request</button>
+      </div>
+      <SearchBar value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title or type" className="mb-4" />
+      {filtered.length === 0 ? <EmptyState title="No procurement requests found" subtitle="Create a new procurement request to get started." actionLabel="Create Request" onAction={openCreate} /> : (
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+          <table className="min-w-full">
+            <thead className="border-b border-slate-100 bg-slate-50/50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Project Title</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Budget</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Deadline</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map((r: any) => (
+                <tr key={r.id} className="transition-colors hover:bg-slate-50/50">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-800">{r.project_title}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{'\u20B1'}{Number(r.budget).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{r.procurement_type || '\u2014'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{r.deadline ? new Date(r.deadline).toLocaleDateString() : '\u2014'}</td>
+                  <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
+                  <td className="px-6 py-4">
+                    {['Pending Review', 'Revision Required'].includes(r.status) && (
+                      <button onClick={() => openEdit(r)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50">Edit</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRequest ? "Edit Procurement Request" : "New Procurement Request"} size="lg">
+        <form onSubmit={(e) => { e.preventDefault(); saveRequest(); }} className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Project Title</span>
+            <input type="text" value={form.projectTitle} onChange={(e) => setForm({ ...form, projectTitle: e.target.value })} className={inputClass} placeholder="Enter project title" />
+          </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Budget ({'\u20B1'})</span>
+              <input type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className={inputClass} placeholder="Enter budget" min="0" step="1000" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Bidding Closes On</span>
+              <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={inputClass} />
+            </label>
+          </div>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Public Result Visible Until</span>
+            <input type="date" value={form.publicResultExpiryDate} onChange={(e) => setForm({ ...form, publicResultExpiryDate: e.target.value })} className={inputClass} />
+            <p className="mt-1 text-xs text-slate-400">Set how long the awarded result stays visible to the public</p>
+          </label>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm text-slate-700">Bidding closes on {form.deadline || '\u2014'}.</p>
+            <p className="text-sm text-slate-700">Public result will be visible until {form.publicResultExpiryDate || '\u2014'}.</p>
+          </div>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span>
+            <select value={form.procurementType} onChange={(e) => setForm({ ...form, procurementType: e.target.value })} className={inputClass}>
+              {PROCUREMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span>
+            <textarea value={form.technicalSpecifications} onChange={(e) => setForm({ ...form, technicalSpecifications: e.target.value })} className={inputClass} placeholder="Describe technical specifications" rows={3} />
+          </label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Schedule</span>
+              <input type="date" value={form.procurementSchedule} onChange={(e) => setForm({ ...form, procurementSchedule: e.target.value })} className={inputClass} min={new Date().toISOString().split("T")[0]} />
+              <p className="mt-1 text-xs text-slate-400">Project will automatically go live on this date</p>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Expected Delivery Date</span>
+              <input type="date" value={form.deliveryPeriod} onChange={(e) => setForm({ ...form, deliveryPeriod: e.target.value })} className={inputClass} min={form.deadline || new Date().toISOString().split("T")[0]} />
+              <p className="mt-1 text-xs text-slate-400">The expected date for delivery of goods or services</p>
+            </label>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+            <LoadingButton type="submit" isLoading={isSaving} loadingText="Saving..." className="flex-1 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">
+              {editingRequest ? "Update Request" : "Create Request"}
+            </LoadingButton>
+          </div>
+        </form>
+      </Modal>
+
+      {toast && <Toast isVisible={true} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+}
