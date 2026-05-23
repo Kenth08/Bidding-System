@@ -3,10 +3,25 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
+
+
+def _database_url() -> str:
+    raw_url = os.getenv("DATABASE_URL", "").strip()
+    if not raw_url:
+        raise ImproperlyConfigured(
+            "DATABASE_URL is required. Set it to your Supabase PostgreSQL connection string."
+        )
+
+    if "sslmode=" not in raw_url:
+        separator = "&" if "?" in raw_url else "?"
+        raw_url = f"{raw_url}{separator}sslmode=require"
+
+    return raw_url
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
 DEBUG = os.getenv("DEBUG", "False").strip().lower() == "true"
@@ -64,16 +79,7 @@ TEMPLATES = [
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.getenv(
-            "DATABASE_URL",
-            (
-                f"postgresql://{os.getenv('DB_USER', 'postgres')}"
-                f":{os.getenv('DB_PASSWORD', '')}"
-                f"@{os.getenv('DB_HOST', 'localhost')}"
-                f":{os.getenv('DB_PORT', '5432')}"
-                f"/{os.getenv('DB_NAME', 'postgres')}"
-            ),
-        ),
+        default=_database_url(),
         conn_max_age=600,
         conn_health_checks=True,
     )

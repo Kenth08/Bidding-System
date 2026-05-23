@@ -112,6 +112,14 @@ class MeView(APIView):
     def get(self, request):
         return Response(UserSerializer(request.user).data)
 
+    def patch(self, request):
+        allowed_fields = {"full_name", "company_name", "company_address", "phone", "business_type"}
+        data = {k: v for k, v in request.data.items() if k in allowed_fields}
+        serializer = UserSerializer(request.user, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(request.user).data)
+
 
 class UserListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdmin]

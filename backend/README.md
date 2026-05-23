@@ -17,7 +17,7 @@ Professional Django backend scaffold, separated from frontend.
 pip install -r requirements.txt
 ```
 
-3. Copy `.env.example` to `.env` and update the Supabase `DATABASE_URL`.
+3. Copy `.env.example` to `.env` and set `DATABASE_URL` to your Supabase Session Pooler connection string.
 4. Run migrations:
 
 ```bash
@@ -32,7 +32,16 @@ python manage.py runserver
 
 ## PostgreSQL with Supabase
 
-Set `DATABASE_URL` in `.env` to your Supabase pooler connection string.
+Set `DATABASE_URL` in `.env` to your Supabase Session Pooler connection string on Windows or other IPv4-only networks.
+Keep `sslmode=require` in the URL unless Supabase already includes it.
+
+## Authentication Model
+
+This backend uses Django for authentication and authorization only.
+
+- Supabase provides PostgreSQL storage.
+- Django stores users, permissions, sessions, and application data in that database.
+- Login, registration, and JWT issuance stay in Django.
 
 ## API base path
 
