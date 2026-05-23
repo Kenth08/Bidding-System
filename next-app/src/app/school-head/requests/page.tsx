@@ -9,7 +9,8 @@ export default function SchoolHeadRequests() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
   const [remarks, setRemarks] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const fetchRequests = () => {
     setLoading(true);
@@ -20,13 +21,20 @@ export default function SchoolHeadRequests() {
 
   const handleReview = async (action: string) => {
     if (!selected) return;
-    setSubmitting(true);
+    if ((action === "rejected" || action === "revision_required") && !remarks.trim()) {
+      setError(action === "rejected" ? "Rejection reason is required." : "Revision notes are required.");
+      return;
+    }
+    setError("");
+    setSubmittingAction(action);
     try {
       await procurementAPI.review(selected.id, action, remarks);
       setSelected(null);
       setRemarks("");
       fetchRequests();
-    } finally { setSubmitting(false); }
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Something went wrong.");
+    } finally { setSubmittingAction(null); }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20 text-slate-400">Loading...</div>;
@@ -52,7 +60,7 @@ export default function SchoolHeadRequests() {
                 <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                 <td className="px-5 py-3 text-slate-500">{r.deadline ? new Date(r.deadline).toLocaleDateString() : "—"}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => setSelected(r)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700">Review</button>
+                  <button onClick={() => setSelected(r)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700">Review</button>
                 </td>
               </tr>
             ))}
@@ -61,7 +69,7 @@ export default function SchoolHeadRequests() {
         </table>
       </div>
 
-      <Modal isOpen={!!selected} onClose={() => { setSelected(null); setRemarks(""); }} title="Review Request" subtitle={selected?.project_title}>
+      <Modal isOpen={!!selected} onClose={() => { setSelected(null); setRemarks(""); setError(""); }} title="Review Request" subtitle={selected?.project_title}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div><span className="text-slate-400">Budget:</span> <span className="font-medium">₱{Number(selected?.budget || 0).toLocaleString()}</span></div>
@@ -72,10 +80,20 @@ export default function SchoolHeadRequests() {
             <label className="mb-1.5 block text-xs font-medium text-slate-600">Remarks</label>
             <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="Add remarks (optional)..." />
           </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2 pt-2">
-            <button disabled={submitting} onClick={() => handleReview("approve")} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">Approve</button>
-            <button disabled={submitting} onClick={() => handleReview("reject")} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50">Reject</button>
-            <button disabled={submitting} onClick={() => handleReview("revision")} className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50">Return for Revision</button>
+            <button disabled={!!submittingAction} onClick={() => handleReview("approved")} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
+              {submittingAction === "approved" && <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>}
+              Approve
+            </button>
+            <button disabled={!!submittingAction} onClick={() => handleReview("rejected")} className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50">
+              {submittingAction === "rejected" && <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>}
+              Reject
+            </button>
+            <button disabled={!!submittingAction} onClick={() => handleReview("revision_required")} className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50">
+              {submittingAction === "revision_required" && <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>}
+              Return for Revision
+            </button>
           </div>
         </div>
       </Modal>
