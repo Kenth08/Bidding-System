@@ -27,6 +27,7 @@ export default function AdminUsers() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetch = () => { setLoading(true); usersAPI.getAll().then((r) => { setUsers(Array.isArray(r.data) ? r.data : r.data.results || []); setLoading(false); }).catch(() => setLoading(false)); };
@@ -62,9 +63,10 @@ export default function AdminUsers() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    setIsConfirmLoading(true);
     try { await usersAPI.delete(deleteTarget.id); setToast({ message: "User deleted", type: "success" }); fetch(); }
     catch { setToast({ message: "Failed to delete", type: "error" }); }
-    finally { setDeleteTarget(null); }
+    finally { setIsConfirmLoading(false); setDeleteTarget(null); }
   }
 
   if (loading) return <SkeletonTable />;
@@ -135,7 +137,7 @@ export default function AdminUsers() {
         </div>
       </Modal>
 
-      <ConfirmDialog isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete User" message={`Are you sure you want to delete "${deleteTarget?.full_name}"? This action cannot be undone.`} confirmLabel="Delete" confirmVariant="danger" />
+      <ConfirmDialog isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete User" message={`Are you sure you want to delete "${deleteTarget?.full_name}"? This action cannot be undone.`} confirmLabel="Delete" confirmVariant="danger" isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );

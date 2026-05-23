@@ -18,6 +18,7 @@ export default function AdminSuppliers() {
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<any>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" } | null>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
@@ -32,12 +33,13 @@ export default function AdminSuppliers() {
 
   async function handleStatusChange() {
     if (!confirmAction) return;
+    setIsConfirmLoading(true);
     try {
       await suppliersAPI.updateStatus(confirmAction.id, confirmAction.action);
       setToast({ message: `Supplier ${confirmAction.action}`, type: "success" });
       fetchData();
     } catch { setToast({ message: "Failed to update status", type: "error" }); }
-    finally { setConfirmAction(null); }
+    finally { setIsConfirmLoading(false); setConfirmAction(null); }
   }
 
   if (loading) return <SkeletonTable />;
@@ -145,7 +147,7 @@ export default function AdminSuppliers() {
         )}
       </Modal>
 
-      <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleStatusChange} title={confirmAction?.action === "approved" ? "Approve Supplier" : "Reject Supplier"} message={`Are you sure you want to ${confirmAction?.action === "approved" ? "approve" : "reject"} "${confirmAction?.name}"?`} confirmLabel={confirmAction?.action === "approved" ? "Approve" : "Reject"} confirmVariant={confirmAction?.action === "approved" ? "primary" : "danger"} />
+      <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleStatusChange} title={confirmAction?.action === "approved" ? "Approve Supplier" : "Reject Supplier"} message={`Are you sure you want to ${confirmAction?.action === "approved" ? "approve" : "reject"} "${confirmAction?.name}"?`} confirmLabel={confirmAction?.action === "approved" ? "Approve" : "Reject"} confirmVariant={confirmAction?.action === "approved" ? "primary" : "danger"} isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );

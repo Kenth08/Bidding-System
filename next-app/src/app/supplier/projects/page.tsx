@@ -3,7 +3,10 @@ import { useState, useEffect } from "react";
 import { Calendar, DollarSign } from "lucide-react";
 import { projectsAPI, bidsAPI } from "@/services/api";
 import Modal from "@/components/shared/Modal";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import Toast from "@/components/shared/Toast";
 import EmptyState from "@/components/shared/EmptyState";
+import LoadingButton from "@/components/ui/LoadingButton";
 import { Project } from "@/types/project";
 
 export default function SupplierProjects() {
@@ -12,23 +15,29 @@ export default function SupplierProjects() {
   const [selected, setSelected] = useState<Project | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [proposal, setProposal] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     projectsAPI.getAll("active").then((r) => setProjects(r.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  async function handleSubmitBid(e: React.FormEvent) {
+  function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!bidAmount || !proposal) return;
+    setConfirmSubmit(true);
+  }
+
+  async function handleConfirmBid() {
     if (!selected) return;
-    setSubmitting(true);
+    setIsConfirmLoading(true);
     try {
       await bidsAPI.create({ project: selected.id, bid_amount: parseFloat(bidAmount), proposal });
-      setSelected(null);
-      setBidAmount("");
-      setProposal("");
-    } catch { /* ignore */ }
-    setSubmitting(false);
+      setToast({ message: "Bid submitted successfully!", type: "success" });
+      setSelected(null); setBidAmount(""); setProposal("");
+    } catch { setToast({ message: "Failed to submit bid", type: "error" }); }
+    finally { setIsConfirmLoading(false); setConfirmSubmit(false); }
   }
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-24 rounded-2xl bg-slate-100" /><div className="h-24 rounded-2xl bg-slate-100" /></div>;
@@ -52,7 +61,7 @@ export default function SupplierProjects() {
       ))}
 
       <Modal isOpen={!!selected} onClose={() => setSelected(null)} title="Submit Bid" subtitle={selected?.title}>
-        <form onSubmit={handleSubmitBid} className="space-y-4">
+        <form onSubmit={handleFormSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-700">Bid Amount (₱)</label>
             <input type="number" step="0.01" required value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />
@@ -61,11 +70,12 @@ export default function SupplierProjects() {
             <label className="mb-1 block text-xs font-medium text-slate-700">Proposal</label>
             <textarea required rows={4} value={proposal} onChange={(e) => setProposal(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />
           </div>
-          <button type="submit" disabled={submitting} className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">
-            {submitting ? "Submitting…" : "Submit Bid"}
-          </button>
+          <LoadingButton type="submit" isLoading={false} className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">Submit Bid</LoadingButton>
         </form>
       </Modal>
+
+      <ConfirmDialog isOpen={confirmSubmit} onClose={() => setConfirmSubmit(false)} onConfirm={handleConfirmBid} title="Confirm Bid Submission" message={`Submit a bid of ₱${Number(bidAmount || 0).toLocaleString()} for "${selected?.title}"? This cannot be changed after submission.`} confirmLabel="Submit Bid" isConfirmLoading={isConfirmLoading} />
+      <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );
 }

@@ -31,6 +31,8 @@ export default function AdminProjects() {
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [archiveTarget, setArchiveTarget] = useState<any>(null);
+  const [publishTarget, setPublishTarget] = useState<any>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); projectsAPI.getAll().then((r) => { setProjects(Array.isArray(r.data) ? r.data : r.data.results || []); setLoading(false); }).catch(() => setLoading(false)); };
@@ -62,23 +64,28 @@ export default function AdminProjects() {
     finally { setIsSaving(false); }
   }
 
-  async function handlePublish(id: string) {
-    try { await projectsAPI.publish(id); setToast({ message: "Project published!", type: "success" }); fetchData(); }
+  async function handlePublish() {
+    if (!publishTarget) return;
+    setIsConfirmLoading(true);
+    try { await projectsAPI.publish(publishTarget.id); setToast({ message: "Project published!", type: "success" }); fetchData(); }
     catch { setToast({ message: "Failed to publish", type: "error" }); }
+    finally { setIsConfirmLoading(false); setPublishTarget(null); }
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    setIsConfirmLoading(true);
     try { await projectsAPI.delete(deleteTarget.id); setToast({ message: "Project deleted", type: "success" }); fetchData(); }
     catch { setToast({ message: "Failed to delete", type: "error" }); }
-    finally { setDeleteTarget(null); }
+    finally { setIsConfirmLoading(false); setDeleteTarget(null); }
   }
 
   async function handleArchive() {
     if (!archiveTarget) return;
+    setIsConfirmLoading(true);
     try { await projectsAPI.archive(archiveTarget.id, "Archived by admin"); setToast({ message: "Project archived", type: "success" }); fetchData(); }
     catch { setToast({ message: "Failed to archive", type: "error" }); }
-    finally { setArchiveTarget(null); }
+    finally { setIsConfirmLoading(false); setArchiveTarget(null); }
   }
 
   if (loading) return <SkeletonTable />;
@@ -117,7 +124,7 @@ export default function AdminProjects() {
                   <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1.5">
-                      {p.status === "draft" && <button onClick={() => handlePublish(p.id)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs text-emerald-600 hover:bg-emerald-100">Publish</button>}
+                      {p.status === "draft" && <button onClick={() => setPublishTarget(p)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs text-emerald-600 hover:bg-emerald-100">Publish</button>}
                       {p.status === "draft" && <button onClick={() => openEdit(p)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Edit</button>}
                       {p.status === "draft" && <button onClick={() => setDeleteTarget(p)} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Delete</button>}
                       {["active", "closed", "awarded"].includes(p.status) && <button onClick={() => router.push(`/admin/bid-evaluation?project=${p.id}`)} className="rounded-lg border border-blue-200 px-2.5 py-1 text-xs text-blue-600 hover:bg-blue-50">View Bids</button>}
@@ -152,8 +159,9 @@ export default function AdminProjects() {
         </form>
       </Modal>
 
-      <ConfirmDialog isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Project" message={`Delete "${deleteTarget?.title}"? This cannot be undone.`} confirmLabel="Delete" confirmVariant="danger" />
-      <ConfirmDialog isOpen={Boolean(archiveTarget)} onClose={() => setArchiveTarget(null)} onConfirm={handleArchive} title="Archive Project" message={`Archive "${archiveTarget?.title}"?`} confirmLabel="Archive" />
+      <ConfirmDialog isOpen={Boolean(publishTarget)} onClose={() => setPublishTarget(null)} onConfirm={handlePublish} title="Publish Project" message={`Publish "${publishTarget?.title}"? This will make it visible to all approved suppliers for bidding.`} confirmLabel="Publish" isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Project" message={`Delete "${deleteTarget?.title}"? This cannot be undone.`} confirmLabel="Delete" confirmVariant="danger" isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={Boolean(archiveTarget)} onClose={() => setArchiveTarget(null)} onConfirm={handleArchive} title="Archive Project" message={`Archive "${archiveTarget?.title}"? It will be hidden from active listings.`} confirmLabel="Archive" isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );

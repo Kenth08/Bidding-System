@@ -8,6 +8,7 @@ import Modal from "@/components/shared/Modal";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Toast from "@/components/shared/Toast";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import LoadingButton from "@/components/ui/LoadingButton";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Number(v || 0)); }
@@ -21,6 +22,9 @@ export default function AdminBidEvaluation() {
   const [evalModal, setEvalModal] = useState<any>(null);
   const [evalForm, setEvalForm] = useState({ technical_compliance: false, evaluation_remarks: "" });
   const [winnerConfirm, setWinnerConfirm] = useState<any>(null);
+  const [reviewConfirm, setReviewConfirm] = useState<any>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
+  const [isEvalSaving, setIsEvalSaving] = useState(false);
   const [bidDetail, setBidDetail] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -44,18 +48,25 @@ export default function AdminBidEvaluation() {
 
   const selectedProjectData = projects.find((p) => p.id === selectedProject);
 
-  async function handleMarkReview(id: string) {
-    try { await bidsAPI.markReview(id); setToast({ message: "Marked under evaluation", type: "success" }); refreshBids(); } catch { setToast({ message: "Failed", type: "error" }); }
+  async function handleMarkReview() {
+    if (!reviewConfirm) return;
+    setIsConfirmLoading(true);
+    try { await bidsAPI.markReview(reviewConfirm.id); setToast({ message: "Marked under evaluation", type: "success" }); refreshBids(); } catch { setToast({ message: "Failed", type: "error" }); }
+    finally { setIsConfirmLoading(false); setReviewConfirm(null); }
   }
 
   async function handleSaveRemarks() {
     if (!evalModal) return;
+    setIsEvalSaving(true);
     try { await bidsAPI.saveRemarks(evalModal.id, { technical_compliance: evalForm.technical_compliance, evaluation_remarks: evalForm.evaluation_remarks }); setToast({ message: "Evaluation saved", type: "success" }); setEvalModal(null); refreshBids(); } catch { setToast({ message: "Failed to save", type: "error" }); }
+    finally { setIsEvalSaving(false); }
   }
 
   async function handleSelectWinner() {
     if (!winnerConfirm) return;
+    setIsConfirmLoading(true);
     try { await bidsAPI.selectWinner(winnerConfirm.id); setToast({ message: "Winner selected!", type: "success" }); setWinnerConfirm(null); refreshBids(); } catch (e: any) { setToast({ message: e?.response?.data?.error || "Failed", type: "error" }); setWinnerConfirm(null); }
+    finally { setIsConfirmLoading(false); }
   }
 
   function refreshBids() { bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])); }
@@ -116,7 +127,7 @@ export default function AdminBidEvaluation() {
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1.5">
                       <button onClick={() => setBidDetail(b)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">View</button>
-                      {b.status === "submitted" && <button onClick={() => handleMarkReview(b.id)} className="rounded-lg border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">Review</button>}
+                      {b.status === "submitted" && <button onClick={() => setReviewConfirm(b)} className="rounded-lg border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">Review</button>}
                       <button onClick={() => { setEvalModal(b); setEvalForm({ technical_compliance: b.technical_compliance || false, evaluation_remarks: b.evaluation_remarks || "" }); }} className="rounded-lg border border-amber-200 px-2 py-1 text-xs text-amber-600 hover:bg-amber-50">Evaluate</button>
                       {b.technical_compliance && b.status !== "won" && b.status !== "lost" && <button onClick={() => setWinnerConfirm(b)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-100">Select Winner</button>}
                     </div>
@@ -135,7 +146,7 @@ export default function AdminBidEvaluation() {
             <button onClick={() => setEvalForm({ ...evalForm, technical_compliance: !evalForm.technical_compliance })} className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${evalForm.technical_compliance ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-red-100 text-red-700 border border-red-200"}`}>{evalForm.technical_compliance ? "PASS" : "FAIL"}</button>
           </div>
           <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Evaluation Remarks</span><textarea value={evalForm.evaluation_remarks} onChange={(e) => setEvalForm({ ...evalForm, evaluation_remarks: e.target.value })} rows={4} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Enter evaluation notes..." /></label>
-          <div className="flex gap-3"><button onClick={() => setEvalModal(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button><button onClick={handleSaveRemarks} className="flex-1 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Save Evaluation</button></div>
+          <div className="flex gap-3"><button onClick={() => setEvalModal(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button><LoadingButton isLoading={isEvalSaving} onClick={handleSaveRemarks} loadingText="Saving..." className="flex-1 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Save Evaluation</LoadingButton></div>
         </div>
       </Modal>
 
@@ -153,7 +164,8 @@ export default function AdminBidEvaluation() {
         )}
       </Modal>
 
-      <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and record the award on blockchain.`} confirmLabel="Select Winner" />
+      <ConfirmDialog isOpen={Boolean(reviewConfirm)} onClose={() => setReviewConfirm(null)} onConfirm={handleMarkReview} title="Mark for Review" message={`Mark this bid from "${reviewConfirm?.supplier?.full_name || reviewConfirm?.company_name}" as under evaluation?`} confirmLabel="Mark for Review" isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and record the award on blockchain.`} confirmLabel="Select Winner" isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );

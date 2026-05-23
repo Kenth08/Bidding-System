@@ -3,14 +3,18 @@ import { useState, useEffect } from "react";
 import { procurementAPI } from "@/services/api";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Modal from "@/components/shared/Modal";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import Toast from "@/components/shared/Toast";
 
 export default function SchoolHeadRequests() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
   const [remarks, setRemarks] = useState("");
-  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchRequests = () => {
     setLoading(true);
@@ -19,25 +23,35 @@ export default function SchoolHeadRequests() {
 
   useEffect(() => { fetchRequests(); }, []);
 
-  const handleReview = async (action: string) => {
-    if (!selected) return;
+  const initiateReview = (action: string) => {
     if ((action === "rejected" || action === "revision_required") && !remarks.trim()) {
       setError(action === "rejected" ? "Rejection reason is required." : "Revision notes are required.");
       return;
     }
     setError("");
-    setSubmittingAction(action);
+    setConfirmAction(action);
+  };
+
+  const handleConfirmReview = async () => {
+    if (!selected || !confirmAction) return;
+    setIsConfirmLoading(true);
     try {
-      await procurementAPI.review(selected.id, action, remarks);
-      setSelected(null);
-      setRemarks("");
+      await procurementAPI.review(selected.id, confirmAction, remarks);
+      setToast({ message: `Request ${confirmAction === "approved" ? "approved" : confirmAction === "rejected" ? "rejected" : "returned for revision"}`, type: "success" });
+      setSelected(null); setRemarks("");
       fetchRequests();
     } catch (err: any) {
-      setError(err.response?.data?.error || "Something went wrong.");
-    } finally { setSubmittingAction(null); }
+      setToast({ message: err.response?.data?.error || "Something went wrong.", type: "error" });
+    } finally { setIsConfirmLoading(false); setConfirmAction(null); }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20 text-slate-400">Loading...</div>;
+
+  const confirmMessages: Record<string, string> = {
+    approved: `Approve "${selected?.project_title}"? This will create a project from this request.`,
+    rejected: `Reject "${selected?.project_title}"? The requester will be notified.`,
+    revision_required: `Return "${selected?.project_title}" for revision? The requester will need to update and resubmit.`,
+  };
 
   return (
     <>
@@ -78,25 +92,19 @@ export default function SchoolHeadRequests() {
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">Remarks</label>
-            <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="Add remarks (optional)..." />
+            <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="Add remarks (required for reject/revision)..." />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2 pt-2">
-            <button disabled={!!submittingAction} onClick={() => handleReview("approved")} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
-              {submittingAction === "approved" && <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>}
-              Approve
-            </button>
-            <button disabled={!!submittingAction} onClick={() => handleReview("rejected")} className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50">
-              {submittingAction === "rejected" && <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>}
-              Reject
-            </button>
-            <button disabled={!!submittingAction} onClick={() => handleReview("revision_required")} className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50">
-              {submittingAction === "revision_required" && <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>}
-              Return for Revision
-            </button>
+            <button onClick={() => initiateReview("approved")} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700">Approve</button>
+            <button onClick={() => initiateReview("rejected")} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700">Reject</button>
+            <button onClick={() => initiateReview("revision_required")} className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">Return for Revision</button>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleConfirmReview} title={confirmAction === "approved" ? "Approve Request" : confirmAction === "rejected" ? "Reject Request" : "Return for Revision"} message={confirmAction ? confirmMessages[confirmAction] || "" : ""} confirmLabel={confirmAction === "approved" ? "Approve" : confirmAction === "rejected" ? "Reject" : "Return"} confirmVariant={confirmAction === "rejected" ? "danger" : "primary"} isConfirmLoading={isConfirmLoading} />
+      <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </>
   );
 }
