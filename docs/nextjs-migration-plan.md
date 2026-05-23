@@ -40,9 +40,10 @@ Into:
 |------|--------|-------|
 | 1. Scaffold Next.js | ✅ Done | `npx create-next-app@latest next-app --typescript --tailwind --eslint --app --src-dir` |
 | 2. Configure Tailwind + globals.css | ✅ Done | Copied exact CSS variables, Inter font, custom theme (navy-900, glow shadow) |
-| 3. Install dependencies | 🔄 In Progress | Base deps installed, additional deps need `npm install` |
-| 4. Define TypeScript types | ⬜ Pending | |
-| 5. Set up Prisma schema | ⬜ Pending | |
+| 3. Install dependencies | ✅ Done | axios, lucide-react, zustand, @tanstack/react-query, zod, jose, bcryptjs, prisma, @prisma/client, uuid, @supabase/supabase-js |
+| 4. Define TypeScript types | ✅ Done | src/types/ — user, project, bid, procurement, blockchain, notification |
+| 5. Set up Prisma schema | ✅ Done | prisma/schema.prisma — all Django models mirrored, validated, client generated |
+| 5b. Set up lib + stores + services | ✅ Done | db.ts, auth.ts (jose JWT), supabase.ts, stores/auth.ts (zustand), services/api.ts |
 | 6. Build API routes | ⬜ Pending | |
 | 7. Set up auth (middleware) | ⬜ Pending | |
 | 8. Migrate frontend components | ⬜ Pending | |
