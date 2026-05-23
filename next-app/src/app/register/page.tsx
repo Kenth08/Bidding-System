@@ -80,13 +80,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50 lg:flex">
-      <button type="button" onClick={() => router.push("/")} className="absolute left-6 top-6 z-20 flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-slate-600"><ArrowLeft className="h-4 w-4" />Back to Home</button>
-
-      <div className="relative hidden w-[480px] overflow-hidden bg-slate-900 px-12 py-10 lg:flex lg:flex-col">
+    <div className="relative min-h-screen bg-slate-50">
+      <div className="fixed left-0 top-0 hidden h-screen w-[480px] overflow-hidden bg-slate-900 lg:flex lg:flex-col px-12 py-10">
         <div className="absolute -left-20 bottom-10 h-64 w-64 rounded-full bg-emerald-500/10" />
         <div className="absolute -right-16 top-14 h-72 w-72 rounded-full bg-emerald-500/10" />
-        <div className="relative mb-auto flex items-center gap-3 text-white"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500"><Shield className="h-5 w-5" /></div><p className="text-base font-bold">Blockchain E-Procurement</p></div>
+        <button type="button" onClick={() => router.push("/")} className="relative z-10 mb-6 flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"><ArrowLeft className="h-4 w-4" />Back to Home</button>
+        <div className="relative z-10 flex items-center gap-3 text-white"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500"><Shield className="h-5 w-5" /></div><p className="text-base font-bold">Blockchain E-Procurement</p></div>
         <div className="relative z-10 my-auto text-white">
           <h2 className="text-3xl font-bold leading-tight">Join as a Supplier</h2>
           <p className="mt-2 text-sm text-slate-300">Register your company and start bidding on procurement projects</p>
@@ -96,8 +95,9 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="flex min-h-screen flex-1 items-center justify-center bg-white px-4 py-8 lg:px-12">
+      <div className="flex min-h-screen flex-1 items-center justify-center bg-white px-4 py-8 lg:ml-[480px] lg:px-12">
         <div className="w-full max-w-2xl rounded-2xl border border-slate-100 bg-white p-8">
+          <button type="button" onClick={() => router.push("/")} className="mb-4 flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-slate-600 lg:hidden"><ArrowLeft className="h-4 w-4" />Back to Home</button>
           {submitted ? (
             <div className="py-8 text-center">
               <div className="mx-auto w-fit rounded-full border border-emerald-100 bg-emerald-50 p-3 text-emerald-600"><CheckCircle2 className="h-8 w-8" /></div>
