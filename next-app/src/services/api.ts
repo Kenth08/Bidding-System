@@ -24,14 +24,14 @@ api.interceptors.response.use(
       try {
         const refresh = sessionStorage.getItem("refresh_token");
         if (!refresh) throw new Error("No refresh token");
-        const res = await axios.post("/api/auth/token/refresh", { refresh });
+        const res = await api.post("/auth/token/refresh", { refresh });
         sessionStorage.setItem("access_token", res.data.access);
         original.headers.Authorization = `Bearer ${res.data.access}`;
         return api(original);
       } catch {
         sessionStorage.removeItem("access_token");
         sessionStorage.removeItem("refresh_token");
-        window.location.href = "/";
+        window.location.href = "/login";
       }
     }
     return Promise.reject(error);

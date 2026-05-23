@@ -6,7 +6,7 @@ interface AuthState {
   isLoading: boolean;
   setUser: (user: User | null) => void;
   login: (access: string, refresh: string, user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
 }
 
@@ -22,11 +22,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user });
   },
 
-  logout: () => {
+  logout: async () => {
     sessionStorage.removeItem("access_token");
     sessionStorage.removeItem("refresh_token");
-    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     set({ user: null });
+    window.location.href = "/login";
   },
 
   restoreSession: async () => {

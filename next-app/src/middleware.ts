@@ -37,7 +37,11 @@ export async function middleware(request: NextRequest) {
     }
 
     return NextResponse.next();
-  } catch {
+  } catch (err: any) {
+    // If token is expired but structurally valid, let client-side refresh handle it
+    if (err?.code === "ERR_JWT_EXPIRED") {
+      return NextResponse.next();
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 }
