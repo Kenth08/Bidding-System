@@ -78,9 +78,12 @@ export default function AdminSuppliers({ notificationTargetSupplierId = null, no
   const fetchSuppliers = useCallback(async () => {
     try {
       const res = await suppliersAPI.getAll();
-      setSuppliers(res.data.results || res.data || []);
-    } catch {
+      const data = res.data.results || res.data || [];
+      setSuppliers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch suppliers:", err);
       setSuppliers([]);
+      setToast({ message: "Failed to load suppliers. Please refresh.", type: "error" });
     }
   }, []);
 
