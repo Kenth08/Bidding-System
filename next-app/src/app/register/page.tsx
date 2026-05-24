@@ -40,6 +40,7 @@ export default function RegisterPage() {
   const searchParams = useSearchParams();
   const googleEmail = searchParams.get("email") || "";
   const isFromGoogle = searchParams.get("from") === "google";
+  const noAccountMessage = searchParams.get("message") === "no_account";
   const [form, setForm] = useState<Record<string, string | File | null>>({ fullName: "", email: googleEmail, password: "", confirmPassword: "", companyName: "", companyAddress: "", phone: "", businessType: "", businessPermitDocument: null, philGepsRegistration: null, taxClearance: null, validId: null });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -116,6 +117,7 @@ export default function RegisterPage() {
           ) : (
             <>
               <h1 className="text-2xl font-bold text-slate-900">Supplier Registration</h1>
+              {noAccountMessage && <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">No account found for this email. Please complete the registration below.</div>}
               <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {[{ key: "fullName", label: "Full Name", span: true }, { key: "email", label: "Email Address", span: true, type: "email", readOnly: isFromGoogle }].map(({ key, label, span, type, readOnly }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>

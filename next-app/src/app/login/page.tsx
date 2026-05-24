@@ -24,6 +24,7 @@ export default function LoginPage() {
     else if (err === "rejected") setError("Your registration has been rejected. Please contact the administrator.");
     else if (err === "inactive") setError("Your account is inactive.");
     else if (err === "auth_failed") setError("Google authentication failed. Please try again.");
+    else if (err === "missing_code") setError("Google sign-in was interrupted. Please try again.");
   }, [searchParams]);
 
   async function handleGoogleLogin() {
@@ -31,7 +32,7 @@ export default function LoginPage() {
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/api/auth/google/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) {
       setError(error.message);

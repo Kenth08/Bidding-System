@@ -36,11 +36,9 @@ export async function POST(request: Request) {
 
   const existing = await db.user.findUnique({ where: { email } });
 
-  // Google flow: update existing incomplete_registration user
+  // Google flow: create new user without password
   if (fromGoogle) {
-    if (!existing || existing.status !== "incomplete_registration") {
-      return NextResponse.json({ error: "Invalid registration state." }, { status: 400 });
-    }
+    if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
 
     const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id"] as const;
     const docPaths: Record<string, string | null> = {};
@@ -49,30 +47,27 @@ export async function POST(request: Request) {
       docPaths[key] = file && file.size > 0 ? await saveFile(file, "documents") : null;
     }
 
-    await db.user.update({
-      where: { id: existing.id },
+    const user = await db.user.create({
       data: {
+        id: uuid(),
         full_name,
+        email,
+        password_hash: "",
+        role: "supplier",
         status: "pending",
         company_name,
         company_address,
         phone,
         business_type,
         business_permit_document: docPaths.business_permit_document,
+        philgeps_registration: docPaths.philgeps_registration,
+        tax_clearance: docPaths.tax_clearance,
+        valid_id: docPaths.valid_id,
       },
     });
 
-    // Save document uploads
-    for (const key of docFields) {
-      if (docPaths[key]) {
-        await db.documentUpload.create({
-          data: { user_id: existing.id, document_type: key, file_name: key, file: docPaths[key] },
-        });
-      }
-    }
-
-    await logAudit("CREATE", existing.id, `Supplier registration completed for ${company_name}`, "supplier", existing.id).catch(() => {});
-    await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", existing.id).catch(() => {});
+    await logAudit("CREATE", user.id, `Supplier registration completed for ${company_name}`, "supplier", user.id).catch(() => {});
+    await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", user.id).catch(() => {});
 
     return NextResponse.json({ message: "Registration submitted. Pending admin approval." }, { status: 201 });
   }
@@ -102,6 +97,9 @@ export async function POST(request: Request) {
       phone,
       business_type,
       business_permit_document: docPaths.business_permit_document,
+      philgeps_registration: docPaths.philgeps_registration,
+      tax_clearance: docPaths.tax_clearance,
+      valid_id: docPaths.valid_id,
     },
   });
 

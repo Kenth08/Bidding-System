@@ -1,31 +1,68 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth";
 
-export default function AuthCallbackPage() {
+export default function AuthCallback() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { login, restoreSession } = useAuthStore();
+  const { login } = useAuthStore();
 
   useEffect(() => {
-    const access = searchParams.get("access");
-    const refresh = searchParams.get("refresh");
+    async function handleCallback() {
+      // PKCE: if there's a code in the URL, exchange it first
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
 
-    if (access && refresh) {
-      sessionStorage.setItem("access_token", access);
-      sessionStorage.setItem("refresh_token", refresh);
-      restoreSession().then(() => {
-        router.replace("/supplier");
-      });
-    } else {
-      router.replace("/login");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          router.replace("/login?error=auth_failed");
+          return;
+        }
+      }
+
+      // Now get the session (either from exchange above or existing)
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error || !data.session?.user?.email) {
+        router.replace("/login?error=auth_failed");
+        return;
+      }
+
+      // Send email to our API to get app JWT tokens
+      try {
+        const res = await fetch("/api/auth/google/callback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: data.session.user.email }),
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          router.replace(result.redirect || "/login?error=auth_failed");
+          return;
+        }
+
+        login(result.access, result.refresh, result.user);
+        const role = result.user?.role;
+        if (role === "admin") window.location.href = "/admin";
+        else if (role === "school_head") window.location.href = "/school-head";
+        else window.location.href = "/supplier";
+      } catch {
+        router.replace("/login?error=auth_failed");
+      }
     }
-  }, [searchParams, restoreSession, router]);
+
+    handleCallback();
+  }, [router, login]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-slate-500">Signing you in...</p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+        <p className="text-sm text-slate-600">Signing you in...</p>
+      </div>
     </div>
   );
 }
