@@ -25,15 +25,59 @@ export async function POST(request: Request) {
   const company_address = String(formData.get("company_address") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const business_type = String(formData.get("business_type") || "Other").trim();
+  const fromGoogle = formData.get("from_google") === "true";
 
-  if (!full_name || !email || !password || !company_name) {
+  if (!full_name || !email || !company_name) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
-  if (password.length < 6) {
+  if (!fromGoogle && (!password || password.length < 6)) {
     return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
   }
 
   const existing = await db.user.findUnique({ where: { email } });
+
+  // Google flow: update existing incomplete_registration user
+  if (fromGoogle) {
+    if (!existing || existing.status !== "incomplete_registration") {
+      return NextResponse.json({ error: "Invalid registration state." }, { status: 400 });
+    }
+
+    const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id"] as const;
+    const docPaths: Record<string, string | null> = {};
+    for (const key of docFields) {
+      const file = formData.get(key) as File | null;
+      docPaths[key] = file && file.size > 0 ? await saveFile(file, "documents") : null;
+    }
+
+    await db.user.update({
+      where: { id: existing.id },
+      data: {
+        full_name,
+        status: "pending",
+        company_name,
+        company_address,
+        phone,
+        business_type,
+        business_permit_document: docPaths.business_permit_document,
+      },
+    });
+
+    // Save document uploads
+    for (const key of docFields) {
+      if (docPaths[key]) {
+        await db.documentUpload.create({
+          data: { user_id: existing.id, document_type: key, file_name: key, file: docPaths[key] },
+        });
+      }
+    }
+
+    await logAudit("CREATE", existing.id, `Supplier registration completed for ${company_name}`, "supplier", existing.id).catch(() => {});
+    await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", existing.id).catch(() => {});
+
+    return NextResponse.json({ message: "Registration submitted. Pending admin approval." }, { status: 201 });
+  }
+
+  // Normal email/password flow
   if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
 
   // Save uploaded documents
@@ -58,20 +102,20 @@ export async function POST(request: Request) {
       phone,
       business_type,
       business_permit_document: docPaths.business_permit_document,
-      philgeps_registration: docPaths.philgeps_registration,
-      tax_clearance: docPaths.tax_clearance,
-      valid_id: docPaths.valid_id,
     },
   });
 
+  // Save document uploads
+  for (const key of docFields) {
+    if (docPaths[key]) {
+      await db.documentUpload.create({
+        data: { user_id: user.id, document_type: key, file_name: key, file: docPaths[key] },
+      });
+    }
+  }
+
   await logAudit("CREATE", user.id, `Supplier registration submitted for ${company_name}`, "supplier", user.id).catch(() => {});
-  await notifyAdmins(
-    "new_supplier",
-    "New Supplier Registration",
-    `${full_name} from ${company_name} has registered and is pending approval.`,
-    "/admin/suppliers",
-    user.id
-  ).catch(() => {});
+  await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", user.id).catch(() => {});
 
   return NextResponse.json({ message: "Registration submitted. Pending admin approval." }, { status: 201 });
 }

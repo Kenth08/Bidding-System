@@ -16,6 +16,11 @@ export async function POST(request: Request) {
   const user = await db.user.findUnique({ where: { email } });
   if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
+  if (user.role === "supplier" && user.status === "incomplete_registration") {
+    const { password_hash: _, ...safeUser } = user;
+    return NextResponse.json({ error: "Please complete your registration first.", user: safeUser, incomplete: true }, { status: 403 });
+  }
+
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return NextResponse.json({ error: "Wrong password." }, { status: 401 });
 

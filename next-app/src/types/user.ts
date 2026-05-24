@@ -1,5 +1,5 @@
 export type UserRole = "admin" | "school_head" | "supplier" | "viewer";
-export type UserStatus = "active" | "inactive" | "pending" | "approved" | "rejected";
+export type UserStatus = "active" | "inactive" | "pending" | "approved" | "rejected" | "incomplete_registration";
 
 export interface User {
   id: string;

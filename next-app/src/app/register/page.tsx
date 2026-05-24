@@ -2,7 +2,7 @@
 import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { useState, ChangeEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 
 const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting", "Other"];
@@ -37,7 +37,10 @@ function FileUploadField({ label, file, error, onChange }: { label: string; file
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState<Record<string, string | File | null>>({ fullName: "", email: "", password: "", confirmPassword: "", companyName: "", companyAddress: "", phone: "", businessType: "", businessPermitDocument: null, philGepsRegistration: null, taxClearance: null, validId: null });
+  const searchParams = useSearchParams();
+  const googleEmail = searchParams.get("email") || "";
+  const isFromGoogle = searchParams.get("from") === "google";
+  const [form, setForm] = useState<Record<string, string | File | null>>({ fullName: "", email: googleEmail, password: "", confirmPassword: "", companyName: "", companyAddress: "", phone: "", businessType: "", businessPermitDocument: null, philGepsRegistration: null, taxClearance: null, validId: null });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -53,17 +56,20 @@ export default function RegisterPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault(); setError("");
-    if (!form.fullName || !form.email || !form.password || !form.companyName) { setError("Please fill in all required fields."); return; }
+    if (!form.fullName || !form.email || !form.companyName) { setError("Please fill in all required fields."); return; }
+    if (!isFromGoogle && (!form.password || !form.confirmPassword)) { setError("Please fill in all required fields."); return; }
     const missing = REQUIRED_DOCUMENTS.find(({ key }) => !form[key]);
     if (missing) { setError(`Please upload ${missing.label}.`); return; }
-    if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
-    if (String(form.password).length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (!isFromGoogle) {
+      if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
+      if (String(form.password).length < 6) { setError("Password must be at least 6 characters."); return; }
+    }
     setIsLoading(true);
     try {
       const payload = new FormData();
       payload.append("full_name", form.fullName as string);
       payload.append("email", form.email as string);
-      payload.append("password", form.password as string);
+      if (!isFromGoogle) payload.append("password", form.password as string);
       payload.append("company_name", form.companyName as string);
       payload.append("company_address", form.companyAddress as string);
       payload.append("phone", form.phone as string);
@@ -72,6 +78,7 @@ export default function RegisterPage() {
       if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration as File);
       if (form.taxClearance) payload.append("tax_clearance", form.taxClearance as File);
       if (form.validId) payload.append("valid_id", form.validId as File);
+      if (isFromGoogle) payload.append("from_google", "true");
       await authAPI.register(payload);
       setSubmitted(true);
     } catch (err: unknown) {
@@ -110,20 +117,24 @@ export default function RegisterPage() {
             <>
               <h1 className="text-2xl font-bold text-slate-900">Supplier Registration</h1>
               <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                {[{ key: "fullName", label: "Full Name", span: true }, { key: "email", label: "Email Address", span: true, type: "email" }].map(({ key, label, span, type }) => (
+                {[{ key: "fullName", label: "Full Name", span: true }, { key: "email", label: "Email Address", span: true, type: "email", readOnly: isFromGoogle }].map(({ key, label, span, type, readOnly }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>
                     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-                    <input type={type || "text"} value={form[key] as string} onChange={(e) => updateForm(key, e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+                    <input type={type || "text"} value={form[key] as string} onChange={(e) => updateForm(key, e.target.value)} readOnly={readOnly} className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20 ${readOnly ? "cursor-not-allowed opacity-60" : ""}`} />
                   </label>
                 ))}
-                <label>
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</span>
-                  <div className="relative"><input type={showPassword ? "text" : "password"} value={form.password as string} onChange={(e) => updateForm("password", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" /><button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
-                </label>
-                <label>
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Password</span>
-                  <div className="relative"><input type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword as string} onChange={(e) => updateForm("confirmPassword", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" /><button type="button" onClick={() => setShowConfirmPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
-                </label>
+                {!isFromGoogle && (
+                  <>
+                    <label>
+                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</span>
+                      <div className="relative"><input type={showPassword ? "text" : "password"} value={form.password as string} onChange={(e) => updateForm("password", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" /><button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                    </label>
+                    <label>
+                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Password</span>
+                      <div className="relative"><input type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword as string} onChange={(e) => updateForm("confirmPassword", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" /><button type="button" onClick={() => setShowConfirmPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                    </label>
+                  </>
+                )}
                 {[{ key: "companyName", label: "Company Name", span: true }, { key: "companyAddress", label: "Company Address", span: true }].map(({ key, label, span }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>
                     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>

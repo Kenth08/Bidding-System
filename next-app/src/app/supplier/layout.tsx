@@ -20,6 +20,17 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => { restoreSession(); }, [restoreSession]);
 
+  useEffect(() => {
+    if (!user) return;
+    if (user.status === "incomplete_registration") {
+      router.replace(`/register?email=${encodeURIComponent(user.email)}&from=google`);
+    } else if (user.status === "pending") {
+      router.replace("/login?error=pending");
+    } else if (user.status === "rejected") {
+      router.replace("/login?error=rejected");
+    }
+  }, [user, router]);
+
   const currentPage = useMemo(() => {
     const segment = pathname.replace(/^\/supplier\/?/, "").split("/")[0] || "";
     return PATH_TO_PAGE[segment] || "dashboard";

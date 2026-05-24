@@ -36,6 +36,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
+    // For supplier routes, verify the user's status in the token claims
+    // The actual status check happens client-side via restoreSession
+    // But we can check if the user has a valid supplier role
     return NextResponse.next();
   } catch (err: any) {
     // If token is expired but structurally valid, let client-side refresh handle it
