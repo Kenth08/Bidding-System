@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback, ReactNode } from "react";
+import { useState, useMemo, useCallback, useEffect, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import SupplierHeader from "@/components/supplier/SupplierHeader";
 import SupplierSidebar from "@/components/supplier/SupplierSidebar";
@@ -13,10 +13,12 @@ const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "available-proje
 export default function SupplierLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, restoreSession } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  useEffect(() => { restoreSession(); }, [restoreSession]);
 
   const currentPage = useMemo(() => {
     const segment = pathname.replace(/^\/supplier\/?/, "").split("/")[0] || "";

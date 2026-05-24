@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback, ReactNode } from "react";
+import { useState, useMemo, useCallback, useEffect, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import SchoolHeadHeader from "@/components/school_head/SchoolHeadHeader";
 import SchoolHeadSidebar from "@/components/school_head/SchoolHeadSidebar";
@@ -11,8 +11,10 @@ const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "requests": "req
 export default function SchoolHeadLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, restoreSession } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => { restoreSession(); }, [restoreSession]);
 
   const currentPage = useMemo(() => {
     const segment = pathname.replace(/^\/school-head\/?/, "").split("/")[0] || "";

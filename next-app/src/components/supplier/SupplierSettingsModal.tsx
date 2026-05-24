@@ -9,16 +9,38 @@ export default function SupplierSettingsModal({ isOpen, onClose }: { isOpen: boo
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [notifications, setNotifications] = useState<Record<string, boolean>>({
     bidUpdates: true, projectDeadlines: true, bidResults: true, systemUpdates: false,
   });
 
   if (!isOpen) return null;
 
-  function handlePasswordChange() {
-    if (newPassword !== confirmPassword) { alert("Passwords do not match"); return; }
-    alert("Password changed successfully");
-    setPassword(""); setNewPassword(""); setConfirmPassword("");
+  async function handlePasswordChange() {
+    setMessage(null);
+    if (!password) { setMessage({ text: "Please enter your current password.", type: "error" }); return; }
+    if (!newPassword) { setMessage({ text: "Please enter a new password.", type: "error" }); return; }
+    if (newPassword.length < 6) { setMessage({ text: "New password must be at least 6 characters.", type: "error" }); return; }
+    if (newPassword !== confirmPassword) { setMessage({ text: "New password and confirm password do not match.", type: "error" }); return; }
+
+    setLoading(true);
+    try {
+      const token = sessionStorage.getItem("access_token");
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ current_password: password, new_password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMessage({ text: data.error || "Failed to change password.", type: "error" }); return; }
+      setMessage({ text: "Password changed successfully.", type: "success" });
+      setPassword(""); setNewPassword(""); setConfirmPassword("");
+    } catch {
+      setMessage({ text: "Network error. Please try again.", type: "error" });
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleNotificationSave() { alert("Notification preferences saved"); }
@@ -79,7 +101,10 @@ export default function SupplierSettingsModal({ isOpen, onClose }: { isOpen: boo
 
         <div className="border-t border-slate-200 px-6 py-3">
           {tab === "password" ? (
-            <button type="button" onClick={handlePasswordChange} className="w-full rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600">Change Password</button>
+            <>
+              {message ? <p className={`mb-2 text-sm ${message.type === "success" ? "text-emerald-600" : "text-red-500"}`}>{message.text}</p> : null}
+              <button type="button" onClick={handlePasswordChange} disabled={loading} className="w-full rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50">{loading ? "Changing..." : "Change Password"}</button>
+            </>
           ) : (
             <button type="button" onClick={handleNotificationSave} className="w-full rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600">Save Preferences</button>
           )}

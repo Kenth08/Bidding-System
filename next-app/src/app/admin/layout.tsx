@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback, ReactNode } from "react";
+import { useState, useMemo, useCallback, useEffect, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AdminHeader from "@/components/admin/AdminHeader";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -17,8 +17,10 @@ const PAGE_TO_PATH: Record<string, string> = {
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, restoreSession } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => { restoreSession(); }, [restoreSession]);
 
   const currentPage = useMemo(() => {
     const segment = pathname.replace(/^\/admin\/?/, "").split("/")[0] || "";

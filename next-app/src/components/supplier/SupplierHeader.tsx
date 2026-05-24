@@ -18,7 +18,7 @@ function SupplierProfileDropdown({ user, onLogout, onOpenProfile, onOpenSettings
     <div className="relative" ref={dropdownRef}>
       <button type="button" onClick={() => setIsOpen((p) => !p)} className="flex items-center gap-2.5 rounded-2xl px-2 py-1.5 transition-colors hover:bg-slate-50">
         <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">{avatarInitial}</div>
-        <div className="text-left"><p className="text-xs font-semibold leading-none text-slate-700">{displayName}</p><p className="mt-0.5 text-xs text-slate-400">Registered Supplier</p></div>
+        <p className="text-xs font-semibold leading-none text-slate-700">{displayName}</p>
         <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
       </button>
       {isOpen ? (

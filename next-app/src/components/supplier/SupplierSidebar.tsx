@@ -1,12 +1,11 @@
 "use client";
-import { CheckCircle, ChevronRight, FileText, FolderOpen, LayoutDashboard, Shield, User, X } from "lucide-react";
+import { CheckCircle, ChevronRight, FileText, FolderOpen, LayoutDashboard, Shield, X } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "available-projects", label: "Opportunities", icon: FolderOpen },
   { key: "my-bids", label: "Bids", icon: FileText },
   { key: "results", label: "Results", icon: CheckCircle },
-  { key: "profile", label: "Profile", icon: User },
 ];
 
 interface SupplierSidebarProps {
@@ -48,7 +47,7 @@ export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOp
         <nav className="flex-1">{NavBlock}</nav>
         <div className="mt-auto border-t border-slate-800 pt-4">
           <button type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-white/5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">S</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">{(currentUser?.fullName || "S").charAt(0).toUpperCase()}</div>
             <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{currentUser?.fullName || "Supplier User"}</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "supplier@eprocurement.gov"}</p></div>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />
           </button>
@@ -70,7 +69,7 @@ export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOp
             <nav className="flex-1">{NavBlock}</nav>
             <div className="mt-auto border-t border-slate-800 pt-4">
               <button type="button" className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white">S</div>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white">{(currentUser?.fullName || "S").charAt(0).toUpperCase()}</div>
                 <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{currentUser?.fullName || "Supplier User"}</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "supplier@eprocurement.gov"}</p></div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />
               </button>
