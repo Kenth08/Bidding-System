@@ -5,11 +5,16 @@ import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 
 export async function GET(request: Request) {
-  const { error } = await requireRole(request, "admin");
-  if (error) return error;
-  const users = await db.user.findMany({ orderBy: { created_at: "desc" } });
-  const safe = users.map(({ password_hash: _, ...u }) => u);
-  return json(safe);
+  try {
+    const { error } = await requireRole(request, "admin");
+    if (error) return error;
+    const users = await db.user.findMany({ orderBy: { created_at: "desc" } });
+    const safe = users.map(({ password_hash: _, ...u }) => u);
+    return json(safe);
+  } catch (error) {
+    console.error("[api/auth/users]", error);
+    return json({ error: error instanceof Error ? error.message : "Failed to load users." }, 500);
+  }
 }
 
 export async function POST(request: Request) {

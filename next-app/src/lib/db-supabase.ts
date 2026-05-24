@@ -1,4 +1,5 @@
 import { supabaseServer } from "./supabase-server";
+import { dbDirect } from "./db-direct";
 import { v4 as uuid } from "uuid";
 
 const USERS_TABLE = "users";
@@ -364,41 +365,73 @@ function applyGroupBy(rows: any[], by: string[], orderBy?: Record<string, "asc" 
   return grouped;
 }
 
+async function buildUserCount(userId: string, select?: Record<string, boolean>) {
+  const count: Record<string, number> = {};
+
+  if (!select) return count;
+
+  if (select.bids) {
+    const rows = await fetchRows(BIDS_TABLE);
+    count.bids = rows.filter((row: any) => row.supplier_id === userId).length;
+  }
+
+  if (select.blockchain_records) {
+    const rows = await fetchRows("blockchain_blockchainrecord");
+    count.blockchain_records = rows.filter((row: any) => row.winner_id === userId).length;
+  }
+
+  if (select.document_uploads) {
+    const rows = await fetchRows(DOCUMENT_UPLOADS_TABLE);
+    count.document_uploads = rows.filter((row: any) => row.user_id === userId).length;
+  }
+
+  if (select.notifications) {
+    const rows = await fetchRows(NOTIFICATIONS_TABLE);
+    count.notifications = rows.filter((row: any) => row.recipient_id === userId).length;
+  }
+
+  if (select.procurements) {
+    const rows = await fetchRows(PROCUREMENTS_TABLE);
+    count.procurements = rows.filter((row: any) => row.created_by_id === userId).length;
+  }
+
+  if (select.reviewed_procurements) {
+    const rows = await fetchRows(PROCUREMENTS_TABLE);
+    count.reviewed_procurements = rows.filter((row: any) => row.reviewed_by_id === userId).length;
+  }
+
+  if (select.projects) {
+    const rows = await fetchRows(PROJECTS_TABLE);
+    count.projects = rows.filter((row: any) => row.created_by_id === userId).length;
+  }
+
+  return count;
+}
+
 // Database utility using Supabase (replaces Prisma)
 export const db = {
   user: {
-    findUnique: async (where: { email?: string; id?: string }) => {
-      if (where.email) {
-        const { data, error } = await supabaseServer.from(USERS_TABLE).select("*").eq("email", where.email).single();
-        if (error) return null;
-        return hydrateUser(data);
-      }
-
-      if (where.id) {
-        const { data, error } = await supabaseServer.from(USERS_TABLE).select("*").eq("id", where.id).single();
-        if (error) return null;
-        return hydrateUser(data);
-      }
-
-      return null;
+    findUnique: async (params: { email?: string; id?: string; where?: { email?: string; id?: string } }) => {
+      return dbDirect.user.findUnique(params);
     },
 
-    findMany: async (where?: Record<string, any>) => {
-      const rows = await fetchRows(USERS_TABLE);
-      return rows.filter((row: any) => matchesWhere(row, where)).map(hydrateUser);
+    findFirst: async (params: any = {}) => {
+      return dbDirect.user.findFirst(params);
+    },
+
+    findMany: async (params: any = {}) => {
+      return dbDirect.user.findMany(params);
     },
 
     create: async (params: any) => {
-      const data = params.data || params;
-      const { data: result, error } = await supabaseServer.from(USERS_TABLE).insert(data).select().single();
-      if (error) throw error;
-      return hydrateUser(result);
+      return dbDirect.user.create(params);
     },
 
     update: async (where: { id: string }, data: any) => {
-      const { data: result, error } = await supabaseServer.from(USERS_TABLE).update(data).eq("id", where.id).select().single();
-      if (error) throw error;
-      return hydrateUser(result);
+      return dbDirect.user.update(where, data);
+    },
+    count: async (params: any = {}) => {
+      return dbDirect.user.count(params);
     },
   },
 
