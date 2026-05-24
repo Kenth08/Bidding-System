@@ -56,7 +56,7 @@ export default function PublicResultsPage() {
       </nav>
 
       <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="mb-8"><span className="text-xs font-semibold uppercase tracking-widest text-emerald-500">Public Access</span><h1 className="text-2xl font-bold text-slate-900">Procurement Results</h1><p className="mt-1 text-sm text-slate-500">All awarded contracts are publicly accessible and blockchain-verified.</p></div>
+        <div className="mb-8"><span className="text-xs font-semibold uppercase tracking-widest text-emerald-500">Public Access</span><h1 className="text-2xl font-bold text-slate-900">Procurement Results</h1></div>
 
         <div className="mb-6 rounded-2xl bg-slate-900 p-4 text-white">
           <div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500"><Shield className="h-5 w-5 text-white" /></div><div className="flex-1"><p className="text-sm font-semibold text-white">Immutable Public Record</p><p className="mt-0.5 text-xs text-slate-400">Awarded procurement results are permanently visible for public verification.</p></div><div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /><span className="text-xs font-medium text-emerald-400">Live</span></div></div>

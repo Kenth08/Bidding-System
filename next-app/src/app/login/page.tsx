@@ -67,7 +67,6 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
-            <p className="mt-1 text-sm text-slate-500">Sign in to your account</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block">

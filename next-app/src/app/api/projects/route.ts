@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const statusFilter = url.searchParams.get("status");
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   // Auto-close expired active projects
   await db.project.updateMany({

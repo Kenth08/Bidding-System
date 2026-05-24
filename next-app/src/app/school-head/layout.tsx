@@ -25,9 +25,9 @@ export default function SchoolHeadLayout({ children }: { children: ReactNode }) 
   }, [router]);
 
   const pageMeta = useMemo(() => {
-    if (currentPage === "requests") return { title: "Procurement Requests", subtitle: "Review and decide on planning requests" };
-    if (currentPage === "history") return { title: "Approved Records", subtitle: "View projects created from approved requests" };
-    return { title: "School Head Dashboard", subtitle: "" };
+    if (currentPage === "requests") return { title: "Procurement Requests" };
+    if (currentPage === "history") return { title: "Approved Records" };
+    return { title: "School Head Dashboard" };
   }, [currentPage]);
 
   function handleNotificationNavigate(link: string) {
@@ -40,7 +40,7 @@ export default function SchoolHeadLayout({ children }: { children: ReactNode }) 
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <SchoolHeadSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} />
       <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-[248px]">
-        <SchoolHeadHeader title={pageMeta.title} subtitle={pageMeta.subtitle} currentUser={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} />
+        <SchoolHeadHeader title={pageMeta.title} currentUser={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} />
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>

@@ -29,11 +29,11 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
   }, [router]);
 
   const pageMeta = useMemo(() => {
-    if (currentPage === "available-projects") return { title: "Available Projects", subtitle: "Browse active opportunities and submit proposals" };
-    if (currentPage === "my-bids") return { title: "My Bids", subtitle: "Track submitted bids and evaluation status" };
-    if (currentPage === "results") return { title: "Results", subtitle: "View blockchain-verified procurement outcomes" };
-    if (currentPage === "profile") return { title: "My Profile", subtitle: "Manage your profile and uploaded documents" };
-    return { title: "Supplier Dashboard", subtitle: "" };
+    if (currentPage === "available-projects") return { title: "Available Projects" };
+    if (currentPage === "my-bids") return { title: "My Bids" };
+    if (currentPage === "results") return { title: "Results" };
+    if (currentPage === "profile") return { title: "My Profile" };
+    return { title: "Supplier Dashboard" };
   }, [currentPage]);
 
   function handleNotificationNavigate(link: string) {
@@ -46,7 +46,7 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <SupplierSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} />
       <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-[248px]">
-        <SupplierHeader title={pageMeta.title} subtitle={pageMeta.subtitle} user={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} onOpenProfile={() => setShowProfileModal(true)} onOpenSettings={() => setShowSettingsModal(true)} />
+        <SupplierHeader title={pageMeta.title} user={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} onOpenProfile={() => setShowProfileModal(true)} onOpenSettings={() => setShowSettingsModal(true)} />
         <main className="flex-1 p-6">{children}</main>
       </div>
       <SupplierProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} currentUser={currentUser} />

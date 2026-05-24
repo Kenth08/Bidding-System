@@ -109,7 +109,6 @@ export default function RegisterPage() {
           ) : (
             <>
               <h1 className="text-2xl font-bold text-slate-900">Supplier Registration</h1>
-              <p className="mt-1 text-sm text-slate-500">Create your supplier account</p>
               <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {[{ key: "fullName", label: "Full Name", span: true }, { key: "email", label: "Email Address", span: true, type: "email" }].map(({ key, label, span, type }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>
