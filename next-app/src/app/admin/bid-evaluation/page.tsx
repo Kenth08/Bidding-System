@@ -30,8 +30,8 @@ export default function AdminBidEvaluation() {
 
   useEffect(() => {
     Promise.all([
-      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])),
-      bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])),
+      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setProjects([])),
+      bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setBids([])),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -69,7 +69,7 @@ export default function AdminBidEvaluation() {
     finally { setIsConfirmLoading(false); }
   }
 
-  function refreshBids() { bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])); }
+  function refreshBids() { bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setBids([])); }
 
   if (loading) return <SkeletonTable />;
 

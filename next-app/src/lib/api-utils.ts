@@ -1,13 +1,29 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { dbDirect } from "@/lib/db-direct";
 import { getUserFromRequest } from "@/lib/auth";
 import type { UserRole } from "@/types";
 
 export async function getAuthUser(request: Request) {
   const payload = await getUserFromRequest(request);
   if (!payload?.sub) return null;
-  const user = await db.user.findUnique({ where: { id: payload.sub } });
+  const user = await dbDirect.user.findUnique({ id: payload.sub });
   return user;
+}
+
+// Helper to extract token from request (cookie or header)
+export function getTokenFromRequest(request: Request): string | null {
+  // Try cookie first (httpOnly)
+  const cookieHeader = request.headers.get("cookie");
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(";").map(c => c.trim());
+    const accessCookie = cookies.find(c => c.startsWith("access_token="));
+    if (accessCookie) {
+      return accessCookie.split("=")[1];
+    }
+  }
+  
+  // Fallback to Authorization header
+  return extractToken(request.headers.get("authorization"));
 }
 
 export async function requireAuth(request: Request) {

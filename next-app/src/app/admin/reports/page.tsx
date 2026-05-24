@@ -14,8 +14,8 @@ export default function AdminReports() {
 
   useEffect(() => {
     Promise.all([
-      reportsAPI.getProcurement().then((r) => setProcData(r.data)),
-      reportsAPI.getSuppliers().then((r) => setSuppData(r.data)),
+      reportsAPI.getProcurement().then((r) => setProcData(r.data)).catch(() => setProcData(null)),
+      reportsAPI.getSuppliers().then((r) => setSuppData(r.data)).catch(() => setSuppData(null)),
     ]).finally(() => setLoading(false));
   }, []);
 

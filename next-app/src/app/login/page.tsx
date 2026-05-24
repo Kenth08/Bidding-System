@@ -54,10 +54,10 @@ export default function LoginPage() {
       }
       login(access, refresh, user);
       const role = user?.role;
-      if (role === "admin") window.location.href = "/admin";
-      else if (role === "school_head") window.location.href = "/school-head";
-      else if (role === "supplier") window.location.href = "/supplier";
-      else window.location.href = "/";
+      if (role === "admin") router.push("/admin");
+      else if (role === "school_head") router.push("/school-head");
+      else if (role === "supplier") router.push("/supplier");
+      else router.push("/");
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { error?: string; incomplete?: boolean; user?: { email?: string } } } })?.response?.data;
       if (response?.incomplete && response?.user?.email) {

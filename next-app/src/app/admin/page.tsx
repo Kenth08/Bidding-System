@@ -15,8 +15,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     Promise.all([
-      dashboardAPI.getStats().then((r) => setStats(r.data)),
-      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])),
+      dashboardAPI.getStats().then((r) => setStats(r.data)).catch(() => setStats(null)),
+      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setProjects([])),
     ]).finally(() => setLoading(false));
   }, []);
 

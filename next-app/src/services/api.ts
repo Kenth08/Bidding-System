@@ -3,12 +3,13 @@ import axios from "axios";
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
   timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem("access_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  // httpOnly cookies are sent automatically by browser
+  // No need to add Authorization header
   return config;
 });
 
@@ -22,9 +23,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && original && !original._retry && !isAuthRequest) {
       original._retry = true;
       try {
-        const refresh = sessionStorage.getItem("refresh_token");
-        if (!refresh) throw new Error("No refresh token");
-        const res = await api.post("/auth/token/refresh", { refresh });
+        // Browser will automatically send refresh_token cookie
+        const res = await api.post("/auth/token/refresh");
         sessionStorage.setItem("access_token", res.data.access);
         original.headers.Authorization = `Bearer ${res.data.access}`;
         return api(original);

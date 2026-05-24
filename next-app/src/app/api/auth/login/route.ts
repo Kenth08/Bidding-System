@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { dbDirect } from "@/lib/db-direct";
 import { signAccessToken, signRefreshToken } from "@/lib/auth";
 import { logAudit } from "@/lib/actions";
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter your email and password." }, { status: 400 });
   }
 
-  const user = await db.user.findUnique({ where: { email } });
+  const user = await dbDirect.user.findUnique({ email });
   if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
   if (user.role === "supplier" && user.status === "incomplete_registration") {
@@ -47,6 +47,13 @@ export async function POST(request: Request) {
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24, // 24 hours
+  });
+  response.cookies.set("refresh_token", refresh, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
   });
   return response;
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
-import { db } from "@/lib/db";
+import { dbDirect } from "@/lib/db-direct";
 import { logAudit, notifyAdmins } from "@/lib/actions";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
   }
 
-  const existing = await db.user.findUnique({ where: { email } });
+  const existing = await dbDirect.user.findUnique({ where: { email } });
 
   // Google flow: create new user without password
   if (fromGoogle) {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       docPaths[key] = file && file.size > 0 ? await saveFile(file, "documents") : null;
     }
 
-    const user = await db.user.create({
+    const user = await dbDirect.user.create({
       data: {
         id: uuid(),
         full_name,

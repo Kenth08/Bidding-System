@@ -34,7 +34,25 @@ export function extractToken(authHeader: string | null): string | null {
 }
 
 export async function getUserFromRequest(request: Request) {
-  const token = extractToken(request.headers.get("authorization"));
+  // Try cookie first, then header
+  const cookieHeader = request.headers.get("cookie");
+  let token: string | null = null;
+  
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(";").map(c => c.trim());
+    const accessCookie = cookies.find(c => c.startsWith("access_token="));
+    if (accessCookie) {
+      token = accessCookie.split("=")[1];
+    }
+  }
+  
+  // Fallback to Authorization header
+  if (!token) {
+    token = extractToken(request.headers.get("authorization"));
+  }
+  
   if (!token) return null;
   return verifyToken(token);
 }
+
+

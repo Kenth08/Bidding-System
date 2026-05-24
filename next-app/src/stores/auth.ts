@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { User } from "@/types";
+import { User } from "@/types";import { authAPI } from "@/services/api";
 
 interface AuthState {
   user: User | null;
@@ -31,17 +31,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   restoreSession: async () => {
-    const token = sessionStorage.getItem("access_token");
-    if (!token) {
-      set({ isLoading: false });
-      return;
-    }
     try {
-      const res = await fetch("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const user = await res.json();
+      const res = await authAPI.me();
+      if (res.data) {
+        const user = res.data;
         set({ user, isLoading: false });
       } else {
         sessionStorage.removeItem("access_token");

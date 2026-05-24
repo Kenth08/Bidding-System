@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { dbDirect } from "@/lib/db-direct";
 import { signAccessToken, signRefreshToken } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const email = String(rawEmail).toLowerCase();
 
   // Check if user exists in our DB
-  const existingUser = await db.user.findUnique({ where: { email } });
+  const existingUser = await dbDirect.user.findUnique({ email });
 
   if (!existingUser) {
     return NextResponse.json({ redirect: `/register?email=${encodeURIComponent(email)}&from=google&message=no_account` }, { status: 404 });
@@ -39,6 +39,13 @@ export async function POST(request: Request) {
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24,
+  });
+  response.cookies.set("refresh_token", refresh, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
   });
   return response;
 }
