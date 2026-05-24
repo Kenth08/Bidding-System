@@ -17,7 +17,7 @@ export default function AdminSuppliers() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<any>(null);
-  const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" | "verify" | "reject_verification" } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -35,8 +35,15 @@ export default function AdminSuppliers() {
     if (!confirmAction) return;
     setIsConfirmLoading(true);
     try {
-      await suppliersAPI.updateStatus(confirmAction.id, confirmAction.action);
-      setToast({ message: `Supplier ${confirmAction.action}`, type: "success" });
+      if (confirmAction.action === "verify" || confirmAction.action === "reject_verification") {
+        // For verification actions, we need to update verification status
+        await suppliersAPI.updateStatus(confirmAction.id, confirmAction.action === "verify" ? "verified" : "verification_rejected");
+        setToast({ message: `Documents ${confirmAction.action === "verify" ? "verified" : "verification rejected"}`, type: "success" });
+      } else {
+        // For regular status updates
+        await suppliersAPI.updateStatus(confirmAction.id, confirmAction.action);
+        setToast({ message: `Supplier ${confirmAction.action}`, type: "success" });
+      }
       fetchData();
     } catch { setToast({ message: "Failed to update status", type: "error" }); }
     finally { setIsConfirmLoading(false); setConfirmAction(null); }
@@ -62,6 +69,7 @@ export default function AdminSuppliers() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Contact</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Business Type</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Verification</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Registered</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
             </tr></thead>
@@ -72,6 +80,11 @@ export default function AdminSuppliers() {
                   <td className="px-6 py-4 text-sm text-slate-600">{s.full_name}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{s.business_type || "\u2014"}</td>
                   <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${s.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : s.verification_status === "verification_rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      {s.verification_status || "pending"}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{s.created_at ? new Date(s.created_at).toLocaleDateString() : "\u2014"}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
@@ -101,7 +114,9 @@ export default function AdminSuppliers() {
                 { label: "Company Address", value: viewing.company_address || "\u2014" },
                 { label: "Business Type", value: viewing.business_type || "\u2014" },
                 { label: "Status", value: viewing.status },
+                { label: "Verification Status", value: viewing.verification_status || "pending" },
                 { label: "Registered", value: viewing.created_at ? new Date(viewing.created_at).toLocaleDateString() : "\u2014" },
+                { label: "Verified At", value: viewing.verified_at ? new Date(viewing.verified_at).toLocaleDateString() : "\u2014" },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
               ))}
@@ -137,17 +152,30 @@ export default function AdminSuppliers() {
                 })}
               </div>
             </div>
-            {viewing.status === "pending" && (
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "approved" }); }} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors">Approve Supplier</button>
-                <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "rejected" }); }} className="flex-1 rounded-xl bg-red-50 border border-red-200 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors">Reject Supplier</button>
-              </div>
-            )}
+            <div className="flex gap-3 pt-2">
+              {viewing.status === "pending" && (
+                <>
+                  <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "approved" }); }} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors">Approve Supplier</button>
+                  <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "rejected" }); }} className="flex-1 rounded-xl bg-red-50 border border-red-200 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors">Reject Supplier</button>
+                </>
+              )}
+              {viewing.verification_status === "pending" && viewing.status === "approved" && (
+                <>
+                  <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "verify" }); }} className="flex-1 rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors">Verify Documents</button>
+                  <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "reject_verification" }); }} className="flex-1 rounded-xl bg-orange-50 border border-orange-200 py-2.5 text-sm font-semibold text-orange-600 hover:bg-orange-100 transition-colors">Reject Verification</button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </Modal>
 
-      <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleStatusChange} title={confirmAction?.action === "approved" ? "Approve Supplier" : "Reject Supplier"} message={`Are you sure you want to ${confirmAction?.action === "approved" ? "approve" : "reject"} "${confirmAction?.name}"?`} confirmLabel={confirmAction?.action === "approved" ? "Approve" : "Reject"} confirmVariant={confirmAction?.action === "approved" ? "primary" : "danger"} isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleStatusChange} 
+        title={confirmAction?.action === "approved" ? "Approve Supplier" : confirmAction?.action === "verify" ? "Verify Documents" : confirmAction?.action === "reject_verification" ? "Reject Verification" : "Reject Supplier"} 
+        message={`Are you sure you want to ${confirmAction?.action === "approved" ? "approve" : confirmAction?.action === "verify" ? "verify documents for" : confirmAction?.action === "reject_verification" ? "reject verification for" : "reject"} "${confirmAction?.name}"?`} 
+        confirmLabel={confirmAction?.action === "approved" ? "Approve" : confirmAction?.action === "verify" ? "Verify" : confirmAction?.action === "reject_verification" ? "Reject" : "Reject"} 
+        confirmVariant={confirmAction?.action === "approved" || confirmAction?.action === "verify" ? "primary" : "danger"} 
+        isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );

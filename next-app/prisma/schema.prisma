@@ -21,6 +21,10 @@ model User {
   philgeps_registration    String?
   tax_clearance            String?
   valid_id                 String?
+  verification_status      String             @default("pending") @db.VarChar(20)
+  verified_at              DateTime?
+  verified_by_id           String?            @db.Uuid
+  verification_notes       String?
   is_staff                 Boolean            @default(false)
   is_active                Boolean            @default(true)
   is_superuser             Boolean            @default(false)

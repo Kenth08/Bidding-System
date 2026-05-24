@@ -111,6 +111,7 @@ export default function AdminBidEvaluation() {
             <thead><tr className="bg-slate-50/50 border-b border-slate-100">
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Rank</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Supplier</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Verification</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Amount</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Compliance</th>
@@ -121,6 +122,11 @@ export default function AdminBidEvaluation() {
                 <tr key={b.id} className="hover:bg-slate-50/50">
                   <td className="px-6 py-4 text-sm text-slate-600">{b.rank || i + 1}</td>
                   <td className="px-6 py-4"><p className="text-sm font-medium text-slate-800">{b.supplier?.full_name || b.company_name}</p><p className="text-xs text-slate-400">{b.supplier?.company_name || b.company_name}</p></td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${b.supplier?.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : b.supplier?.verification_status === "verification_rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      {b.supplier?.verification_status || "pending"}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm font-semibold text-slate-800">{formatPeso(b.bid_amount)}</td>
                   <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
                   <td className="px-6 py-4">{b.technical_compliance ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-slate-300" />}</td>
@@ -154,7 +160,15 @@ export default function AdminBidEvaluation() {
         {bidDetail && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-4">
-              {[{ label: "Supplier", value: bidDetail.supplier?.full_name || bidDetail.company_name }, { label: "Company", value: bidDetail.supplier?.company_name || bidDetail.company_name }, { label: "Bid Amount", value: formatPeso(bidDetail.bid_amount) }, { label: "Status", value: bidDetail.status }, { label: "Rank", value: bidDetail.rank || "\u2014" }, { label: "Compliance", value: bidDetail.technical_compliance ? "Pass" : "Fail" }].map(({ label, value }) => (
+              {[
+                { label: "Supplier", value: bidDetail.supplier?.full_name || bidDetail.company_name }, 
+                { label: "Company", value: bidDetail.supplier?.company_name || bidDetail.company_name }, 
+                { label: "Verification Status", value: bidDetail.supplier?.verification_status || "pending" },
+                { label: "Bid Amount", value: formatPeso(bidDetail.bid_amount) }, 
+                { label: "Status", value: bidDetail.status }, 
+                { label: "Rank", value: bidDetail.rank || "\u2014" }, 
+                { label: "Compliance", value: bidDetail.technical_compliance ? "Pass" : "Fail" }
+              ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
               ))}
             </div>

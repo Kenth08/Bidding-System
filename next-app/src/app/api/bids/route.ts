@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     if (projectId) where.project_id = projectId;
     const bids = await db.bid.findMany({
       where,
-      include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } },
+      include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true, verification_status: true } } },
       orderBy: [{ bid_amount: "asc" }, { submitted_at: "asc" }],
     });
     return json(bids);
@@ -44,6 +44,10 @@ export async function POST(request: Request) {
 
   if (user!.role !== "supplier" || !["approved", "active"].includes(user!.status)) {
     return json({ error: "Only approved suppliers can submit bids." }, 403);
+  }
+
+  if (!user!.verification_status || user!.verification_status !== "verified") {
+    return json({ error: "Your documents must be verified before submitting bids." }, 403);
   }
 
   const body = await request.json();
