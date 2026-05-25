@@ -179,7 +179,7 @@ function AdminBidEvaluationContent() {
       </Modal>
 
       <ConfirmDialog isOpen={Boolean(reviewConfirm)} onClose={() => setReviewConfirm(null)} onConfirm={handleMarkReview} title="Mark for Review" message={`Mark this bid from "${reviewConfirm?.supplier?.full_name || reviewConfirm?.company_name}" as under evaluation?`} confirmLabel="Mark for Review" isConfirmLoading={isConfirmLoading} />
-      <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and record the award on blockchain.`} confirmLabel="Select Winner" isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and finalize the award.`} confirmLabel="Select Winner" isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
   );

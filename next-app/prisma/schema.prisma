@@ -17,10 +17,14 @@ model User {
   company_address          String             @default("") @db.VarChar(255)
   phone                    String             @default("") @db.VarChar(50)
   business_type            String             @default("") @db.VarChar(100)
+  representative_name      String?            @db.VarChar(255)
+  tin                      String?            @db.VarChar(50)
+  company_profile          String?            @db.Text
   business_permit_document String?
   philgeps_registration    String?
   tax_clearance            String?
   valid_id                 String?
+  supporting_documents     String?
   verification_status      String             @default("pending") @db.VarChar(20)
   verified_at              DateTime?
   verified_by_id           String?            @db.Uuid

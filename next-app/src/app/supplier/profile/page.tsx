@@ -10,17 +10,19 @@ import LoadingButton from "@/components/ui/LoadingButton";
 const FIELDS = [
   { key: "full_name", label: "Full Name", type: "text" },
   { key: "email", label: "Email", type: "email" },
+  { key: "representative_name", label: "Representative Name", type: "text" },
+  { key: "tin", label: "TIN", type: "text" },
   { key: "phone", label: "Phone", type: "tel" },
   { key: "company_name", label: "Company Name", type: "text" },
   { key: "company_address", label: "Company Address", type: "text" },
   { key: "business_type", label: "Business Type", type: "text" },
 ] as const;
 
-type FormData = Pick<User, "full_name" | "email" | "phone" | "company_name" | "company_address" | "business_type">;
+type FormData = Pick<User, "full_name" | "email" | "representative_name" | "tin" | "phone" | "company_name" | "company_address" | "business_type" | "company_profile">;
 
 export default function SupplierProfile() {
   const { setUser } = useAuthStore();
-  const [form, setForm] = useState<FormData>({ full_name: "", email: "", phone: "", company_name: "", company_address: "", business_type: "" });
+  const [form, setForm] = useState<FormData>({ full_name: "", email: "", representative_name: "", tin: "", phone: "", company_name: "", company_address: "", business_type: "", company_profile: "" });
   const [loading, setLoading] = useState(true);
   const [confirmSave, setConfirmSave] = useState(false);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
@@ -29,7 +31,7 @@ export default function SupplierProfile() {
   useEffect(() => {
     authAPI.me().then((r) => {
       const u = r.data;
-      setForm({ full_name: u.full_name, email: u.email, phone: u.phone || "", company_name: u.company_name || "", company_address: u.company_address || "", business_type: u.business_type || "" });
+      setForm({ full_name: u.full_name, email: u.email, representative_name: u.representative_name || "", tin: u.tin || "", phone: u.phone || "", company_name: u.company_name || "", company_address: u.company_address || "", business_type: u.business_type || "", company_profile: u.company_profile || "" });
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -51,9 +53,13 @@ export default function SupplierProfile() {
         {FIELDS.map((f) => (
           <div key={f.key}>
             <label className="mb-1 block text-xs font-medium text-slate-700">{f.label}</label>
-            <input type={f.type} value={form[f.key]} onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />
+            <input type={f.type} value={String(form[f.key] ?? "")} onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />
           </div>
         ))}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-700">Company Profile</label>
+          <textarea value={String(form.company_profile ?? "")} onChange={(e) => setForm((prev) => ({ ...prev, company_profile: e.target.value }))} rows={4} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />
+        </div>
         <LoadingButton type="submit" isLoading={false} className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">Save Changes</LoadingButton>
       </form>
       <ConfirmDialog isOpen={confirmSave} onClose={() => setConfirmSave(false)} onConfirm={handleConfirmSave} title="Save Profile Changes" message="Are you sure you want to update your profile information?" confirmLabel="Save Changes" isConfirmLoading={isConfirmLoading} />

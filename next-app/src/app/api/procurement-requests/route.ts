@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (user!.role === "supplier") return json([]);
 
   const where: Record<string, unknown> =
-    user!.role === "admin" ? { created_by_id: user!.id } : {};
+    user!.role === "admin" ? { created_by_id: user!.id } : user!.role === "school_head" ? { status: { not: "Draft" } } : {};
 
   const procurements = await db.procurement.findMany({
     where,
@@ -40,18 +40,12 @@ export async function POST(request: Request) {
       technical_specifications: body.technical_specifications || "",
       procurement_schedule: body.procurement_schedule || "",
       delivery_period: body.delivery_period || "",
-      status: "Pending Review",
+      status: "Draft",
       created_by_id: user!.id,
     },
   });
 
   await logAudit("CREATE", user!.id, `Created procurement request ${procurement.project_title}`, "procurement", procurement.id);
-
-  // Notify school heads
-  const schoolHeads = await db.user.findMany({ where: { role: "school_head", is_active: true } });
-  for (const sh of schoolHeads) {
-    await notifyUser(sh.id, "procurement_request", "New Procurement Request", `Admin submitted a new procurement request: ${procurement.project_title}.`, "/school-head/requests", procurement.id);
-  }
 
   return json(procurement, 201);
 }

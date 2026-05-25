@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { FileText, Clock, CheckCircle, XCircle, RotateCcw } from "lucide-react";
 import { procurementAPI } from "@/services/api";
 import StatCard from "@/components/shared/StatCard";
+import { normalizeStatusCode, STATUS } from "@/lib/procurementStatus";
 
 export default function SchoolHeadDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, revision: 0 });
@@ -13,10 +14,10 @@ export default function SchoolHeadDashboard() {
       const requests = res.data?.results || res.data || [];
       setStats({
         total: requests.length,
-        pending: requests.filter((r: any) => r.status === "pending").length,
-        approved: requests.filter((r: any) => r.status === "approved").length,
-        rejected: requests.filter((r: any) => r.status === "rejected").length,
-        revision: requests.filter((r: any) => r.status === "revision").length,
+        pending: requests.filter((r: any) => normalizeStatusCode(r.status) === STATUS.PENDING_REVIEW).length,
+        approved: requests.filter((r: any) => normalizeStatusCode(r.status) === STATUS.APPROVED).length,
+        rejected: requests.filter((r: any) => normalizeStatusCode(r.status) === STATUS.REJECTED).length,
+        revision: requests.filter((r: any) => normalizeStatusCode(r.status) === STATUS.REVISION_REQUIRED).length,
       });
     }).finally(() => setLoading(false));
   }, []);

@@ -26,9 +26,12 @@ export async function POST(request: Request) {
   const company_address = String(formData.get("company_address") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const business_type = String(formData.get("business_type") || "Other").trim();
+  const representative_name = String(formData.get("representative_name") || "").trim();
+  const tin = String(formData.get("tin") || "").trim();
+  const company_profile = String(formData.get("company_profile") || "").trim();
   const fromGoogle = formData.get("from_google") === "true";
 
-  if (!full_name || !email || !company_name) {
+  if (!full_name || !email || !company_name || !representative_name || !tin || !company_profile) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
   if (!fromGoogle && (!password || password.length < 6)) {
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
   if (fromGoogle) {
     if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
 
-    const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id"] as const;
+    const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id", "supporting_documents"] as const;
     const docPaths: Record<string, string | null> = {};
     for (const key of docFields) {
       const file = formData.get(key) as File | null;
@@ -60,10 +63,14 @@ export async function POST(request: Request) {
         company_address,
         phone,
         business_type,
+        representative_name,
+        tin,
+        company_profile,
         business_permit_document: docPaths.business_permit_document,
         philgeps_registration: docPaths.philgeps_registration,
         tax_clearance: docPaths.tax_clearance,
         valid_id: docPaths.valid_id,
+        supporting_documents: docPaths.supporting_documents,
       },
     });
 
@@ -77,7 +84,7 @@ export async function POST(request: Request) {
   if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
 
   // Save uploaded documents
-  const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id"] as const;
+  const docFields = ["business_permit_document", "philgeps_registration", "tax_clearance", "valid_id", "supporting_documents"] as const;
   const docPaths: Record<string, string | null> = {};
   for (const key of docFields) {
     const file = formData.get(key) as File | null;
@@ -97,10 +104,14 @@ export async function POST(request: Request) {
       company_address,
       phone,
       business_type,
+      representative_name,
+      tin,
+      company_profile,
       business_permit_document: docPaths.business_permit_document,
       philgeps_registration: docPaths.philgeps_registration,
       tax_clearance: docPaths.tax_clearance,
       valid_id: docPaths.valid_id,
+      supporting_documents: docPaths.supporting_documents,
     },
   });
 

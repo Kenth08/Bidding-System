@@ -11,7 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = await request.json();
   const data: Record<string, unknown> = {};
 
-  for (const key of ["full_name", "email", "role", "status", "company_name", "company_address", "phone", "business_type"]) {
+  for (const key of ["full_name", "email", "role", "status", "company_name", "company_address", "phone", "business_type", "representative_name", "tin", "company_profile"]) {
     if (body[key] !== undefined) data[key] = body[key];
   }
   if (body.password) data.password_hash = await bcrypt.hash(body.password, 12);

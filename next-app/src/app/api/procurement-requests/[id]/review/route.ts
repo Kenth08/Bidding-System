@@ -11,8 +11,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const procurement = await db.procurement.findUnique({ where: { id } });
   if (!procurement) return json({ error: "Procurement request not found." }, 404);
 
-  if (procurement.status === "Approved") return json({ error: "This request has already been approved." }, 400);
-  if (procurement.status === "Rejected") return json({ error: "This request has already been rejected." }, 400);
+  if (procurement.status !== "Pending Review") {
+    return json({ error: "Only pending review requests can be reviewed." }, 400);
+  }
 
   const body = await request.json();
   const action = String(body.action || "").trim().toLowerCase();

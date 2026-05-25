@@ -24,6 +24,10 @@ export default function SchoolHeadRequests() {
   useEffect(() => { fetchRequests(); }, []);
 
   const initiateReview = (action: string) => {
+    if (selected?.status !== "Pending Review") {
+      setError("Only requests pending review can be acted on.");
+      return;
+    }
     if ((action === "rejected" || action === "revision_required") && !remarks.trim()) {
       setError(action === "rejected" ? "Rejection reason is required." : "Revision notes are required.");
       return;
@@ -74,7 +78,7 @@ export default function SchoolHeadRequests() {
                 <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                 <td className="px-5 py-3 text-slate-500">{r.deadline ? new Date(r.deadline).toLocaleDateString() : "—"}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => setSelected(r)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700">Review</button>
+                  <button onClick={() => setSelected(r)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700">{r.status === "Pending Review" ? "Review" : "View"}</button>
                 </td>
               </tr>
             ))}
@@ -95,11 +99,15 @@ export default function SchoolHeadRequests() {
             <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="Add remarks (required for reject/revision)..." />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex flex-wrap gap-2 pt-2">
-            <button onClick={() => initiateReview("approved")} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700">Approve</button>
-            <button onClick={() => initiateReview("rejected")} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700">Reject</button>
-            <button onClick={() => initiateReview("revision_required")} className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">Return for Revision</button>
-          </div>
+          {selected?.status === "Pending Review" ? (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button onClick={() => initiateReview("approved")} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700">Approve</button>
+              <button onClick={() => initiateReview("rejected")} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700">Reject</button>
+              <button onClick={() => initiateReview("revision_required")} className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">Return for Revision</button>
+            </div>
+          ) : (
+            <p className="pt-2 text-sm text-slate-500">This request is not pending review, so it cannot be acted on from here.</p>
+          )}
         </div>
       </Modal>
 

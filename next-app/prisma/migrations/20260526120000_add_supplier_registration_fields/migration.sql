@@ -1,0 +1,5 @@
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "representative_name" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "tin" VARCHAR(50),
+ADD COLUMN IF NOT EXISTS "company_profile" TEXT,
+ADD COLUMN IF NOT EXISTS "supporting_documents" TEXT;

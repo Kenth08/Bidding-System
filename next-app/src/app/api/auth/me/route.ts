@@ -14,7 +14,7 @@ export async function PATCH(request: Request) {
   if (error) return error;
 
   const body = await request.json();
-  const allowed = ["full_name", "company_name", "company_address", "phone", "business_type"] as const;
+  const allowed = ["full_name", "company_name", "company_address", "phone", "business_type", "representative_name", "tin", "company_profile"] as const;
   const data: Record<string, string> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) data[key] = String(body[key]);

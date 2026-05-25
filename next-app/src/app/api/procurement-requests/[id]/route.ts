@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireAuth, requireRole, json } from "@/lib/api-utils";
+import { logAudit, notifyUser } from "@/lib/actions";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireAuth(request);
@@ -28,11 +29,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const procurement = await db.procurement.findUnique({ where: { id } });
   if (!procurement) return json({ error: "Not found." }, 404);
 
-  if (!["Pending Review", "Revision Required"].includes(procurement.status)) {
-    return json({ error: "Only pending review or revision required requests can be edited." }, 400);
+  const body = await request.json();
+  const action = String(body.action || "").trim().toLowerCase();
+
+  if (action === "submit_for_review") {
+    if (!["Draft", "Revision Required"].includes(procurement.status)) {
+      return json({ error: "Only draft or revision required requests can be submitted." }, 400);
+    }
+
+    const updated = await db.procurement.update({
+      where: { id },
+      data: { status: "Pending Review" },
+    });
+
+    await logAudit("UPDATE", user!.id, `Submitted procurement request ${procurement.project_title} for review`, "procurement", id);
+
+    const schoolHeads = await db.user.findMany({ where: { role: "school_head", is_active: true } });
+    for (const sh of schoolHeads) {
+      await notifyUser(sh.id, "procurement_request", "Procurement Request Ready for Review", `A procurement request is ready for review: ${procurement.project_title}.`, "/school-head/requests", procurement.id);
+    }
+
+    return json(updated);
   }
 
-  const body = await request.json();
+  if (!["Draft", "Revision Required"].includes(procurement.status)) {
+    return json({ error: "Only draft or revision required requests can be edited." }, 400);
+  }
+
   const data: Record<string, unknown> = {};
   for (const key of ["project_title", "procurement_type", "technical_specifications", "procurement_schedule", "delivery_period"]) {
     if (body[key] !== undefined) data[key] = body[key];

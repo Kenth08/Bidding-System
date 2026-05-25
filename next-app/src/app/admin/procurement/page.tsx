@@ -44,10 +44,23 @@ export default function AdminProcurement() {
       const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: form.procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
       if (editingRequest) await procurementAPI.update(editingRequest.id, payload);
       else await procurementAPI.create(payload);
-      setToast({ message: editingRequest ? 'Request updated' : 'Request created', type: 'success' });
+      setToast({ message: editingRequest ? 'Request updated' : 'Draft saved', type: 'success' });
       setShowModal(false); fetchRequests();
     } catch { setToast({ message: 'Failed to save', type: 'error' }); }
     finally { setIsSaving(false); }
+  };
+
+  const submitForReview = async (request: any) => {
+    setIsSaving(true);
+    try {
+      await procurementAPI.update(request.id, { action: 'submit_for_review' });
+      setToast({ message: 'Request submitted for review', type: 'success' });
+      fetchRequests();
+    } catch {
+      setToast({ message: 'Failed to submit for review', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filtered = requests.filter((r: any) => r.project_title?.toLowerCase().includes(search.toLowerCase()));
@@ -84,9 +97,14 @@ export default function AdminProcurement() {
                   <td className="px-6 py-4 text-sm text-slate-600">{r.deadline ? new Date(r.deadline).toLocaleDateString() : '\u2014'}</td>
                   <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
                   <td className="px-6 py-4">
-                    {['Pending Review', 'Revision Required'].includes(r.status) && (
-                      <button onClick={() => openEdit(r)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50">Edit</button>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {['Draft', 'Revision Required'].includes(r.status) && (
+                        <button onClick={() => openEdit(r)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50">Edit</button>
+                      )}
+                      {['Draft', 'Revision Required'].includes(r.status) && (
+                        <button onClick={() => submitForReview(r)} disabled={isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">Submit for Approval</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

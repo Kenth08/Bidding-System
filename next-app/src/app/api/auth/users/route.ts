@@ -36,6 +36,9 @@ export async function POST(request: Request) {
       company_address: body.company_address || "",
       phone: body.phone || "",
       business_type: body.business_type || "",
+      representative_name: body.representative_name || null,
+      tin: body.tin || null,
+      company_profile: body.company_profile || null,
     },
   });
 

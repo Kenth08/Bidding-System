@@ -9,6 +9,18 @@ export default function SupplierBids() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getProjectTitle = (project: Bid["project"]) => {
+    if (typeof project === "string") return project;
+    return project?.title || project?.project_title || "—";
+  };
+
+  const getBidStatusNote = (bid: Bid) => {
+    if (bid.status === "won") return "Awarded";
+    if (bid.status === "lost") return "Not selected";
+    if (bid.status === "under_evaluation") return "Under evaluation";
+    return "Submitted";
+  };
+
   useEffect(() => {
     bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -30,7 +42,12 @@ export default function SupplierBids() {
         <tbody className="divide-y divide-slate-50">
           {bids.map((b) => (
             <tr key={b.id} className="transition hover:bg-slate-50/50">
-              <td className="px-5 py-3.5 font-medium text-slate-900">{b.project}</td>
+              <td className="px-5 py-3.5 font-medium text-slate-900">
+                <div className="space-y-1">
+                  <p>{getProjectTitle(b.project)}</p>
+                  <p className="text-xs font-normal text-slate-400">{getBidStatusNote(b)}</p>
+                </div>
+              </td>
               <td className="px-5 py-3.5 text-slate-600">₱{Number(b.bid_amount).toLocaleString()}</td>
               <td className="px-5 py-3.5"><StatusBadge status={b.status} /></td>
               <td className="px-5 py-3.5 text-slate-600">{b.rank ?? "—"}</td>

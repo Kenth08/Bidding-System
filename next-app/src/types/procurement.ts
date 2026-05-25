@@ -1,4 +1,4 @@
-export type ProcurementStatus = "Pending Review" | "Approved" | "Rejected" | "Revision Required";
+export type ProcurementStatus = "Draft" | "Pending Review" | "Approved" | "Rejected" | "Revision Required";
 export type ProcurementRequestType = "Goods" | "Services" | "Infrastructure";
 
 export interface Procurement {

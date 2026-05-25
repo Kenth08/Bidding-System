@@ -14,7 +14,7 @@ export default function SupplierResults() {
   }, []);
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-16 rounded-2xl bg-slate-100" /><div className="h-16 rounded-2xl bg-slate-100" /></div>;
-  if (!records.length) return <EmptyState icon={Shield} title="No blockchain results" subtitle="Awarded bids will appear here once recorded on-chain." />;
+  if (!records.length) return <EmptyState icon={Shield} title="No award records yet" subtitle="Awarded bids will appear here once they are finalized." />;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">

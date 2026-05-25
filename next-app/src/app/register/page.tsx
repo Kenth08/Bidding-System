@@ -11,6 +11,7 @@ const REQUIRED_DOCUMENTS = [
   { key: "philGepsRegistration", label: "PhilGEPS Registration" },
   { key: "taxClearance", label: "Tax Clearance" },
   { key: "validId", label: "Valid ID" },
+  { key: "supportingDocuments", label: "Supporting Documents" },
 ];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -41,7 +42,7 @@ function RegisterPageContent() {
   const googleEmail = searchParams.get("email") || "";
   const isFromGoogle = searchParams.get("from") === "google";
   const noAccountMessage = searchParams.get("message") === "no_account";
-  const [form, setForm] = useState<Record<string, string | File | null>>({ fullName: "", email: googleEmail, password: "", confirmPassword: "", companyName: "", companyAddress: "", phone: "", businessType: "", businessPermitDocument: null, philGepsRegistration: null, taxClearance: null, validId: null });
+  const [form, setForm] = useState<Record<string, string | File | null>>({ fullName: "", email: googleEmail, password: "", confirmPassword: "", companyName: "", companyAddress: "", phone: "", businessType: "", representativeName: "", tin: "", companyProfile: "", businessPermitDocument: null, philGepsRegistration: null, taxClearance: null, validId: null, supportingDocuments: null });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +58,7 @@ function RegisterPageContent() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault(); setError("");
-    if (!form.fullName || !form.email || !form.companyName) { setError("Please fill in all required fields."); return; }
+    if (!form.fullName || !form.email || !form.companyName || !String(form.representativeName || "").trim() || !String(form.tin || "").trim() || !String(form.companyProfile || "").trim()) { setError("Please fill in all required fields."); return; }
     if (!isFromGoogle && (!form.password || !form.confirmPassword)) { setError("Please fill in all required fields."); return; }
     const missing = REQUIRED_DOCUMENTS.find(({ key }) => !form[key]);
     if (missing) { setError(`Please upload ${missing.label}.`); return; }
@@ -75,10 +76,14 @@ function RegisterPageContent() {
       payload.append("company_address", form.companyAddress as string);
       payload.append("phone", form.phone as string);
       payload.append("business_type", form.businessType as string);
+      payload.append("representative_name", form.representativeName as string);
+      payload.append("tin", form.tin as string);
+      payload.append("company_profile", form.companyProfile as string);
       payload.append("business_permit_document", form.businessPermitDocument as File);
       if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration as File);
       if (form.taxClearance) payload.append("tax_clearance", form.taxClearance as File);
       if (form.validId) payload.append("valid_id", form.validId as File);
+      if (form.supportingDocuments) payload.append("supporting_documents", form.supportingDocuments as File);
       if (isFromGoogle) payload.append("from_google", "true");
       await authAPI.register(payload);
       setSubmitted(true);
@@ -143,6 +148,18 @@ function RegisterPageContent() {
                     <input type="text" value={form[key] as string} onChange={(e) => updateForm(key, e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
                   </label>
                 ))}
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Representative Name</span>
+                  <input type="text" value={form.representativeName as string} onChange={(e) => updateForm("representativeName", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">TIN</span>
+                  <input type="text" value={form.tin as string} onChange={(e) => updateForm("tin", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Company Profile</span>
+                  <textarea rows={4} value={form.companyProfile as string} onChange={(e) => updateForm("companyProfile", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Brief company background and capability statement" />
+                </label>
                 <label>
                   <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Phone Number</span>
                   <input type="tel" value={form.phone as string} onChange={(e) => updateForm("phone", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />

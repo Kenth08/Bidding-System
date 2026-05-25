@@ -216,9 +216,10 @@ export const dbDirect = {
           `INSERT INTO users (
             id, full_name, email, password_hash, role, status,
             company_name, company_address, phone, business_type,
+            representative_name, tin, company_profile, supporting_documents,
             business_permit_document, philgeps_registration, tax_clearance, valid_id,
             created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
           RETURNING *`,
           [
             data.id || uuid(),
@@ -231,6 +232,10 @@ export const dbDirect = {
             data.company_address || '',
             data.phone || '',
             data.business_type || 'Other',
+            data.representative_name || null,
+            data.tin || null,
+            data.company_profile || null,
+            data.supporting_documents || null,
             data.business_permit_document || null,
             data.philgeps_registration || null,
             data.tax_clearance || null,

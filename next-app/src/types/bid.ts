@@ -1,9 +1,23 @@
 export type BidStatus = "submitted" | "under_evaluation" | "won" | "lost";
 
+export interface BidProjectRef {
+  id?: string;
+  title?: string;
+  project_title?: string;
+  status?: string;
+}
+
+export interface BidSupplierRef {
+  id?: string;
+  full_name?: string;
+  company_name?: string;
+  verification_status?: string;
+}
+
 export interface Bid {
   id: string;
-  project: string;
-  supplier: string;
+  project: string | BidProjectRef;
+  supplier: string | BidSupplierRef;
   company_name: string;
   bid_amount: number;
   proposal: string;

@@ -9,9 +9,13 @@ export interface User {
   status: UserStatus;
   company_name: string;
   company_address: string;
+  representative_name?: string | null;
+  tin?: string | null;
+  company_profile?: string | null;
   phone: string;
   business_type: string;
   business_permit_document: string | null;
+  supporting_documents?: string | null;
   is_staff: boolean;
   is_active: boolean;
   created_at: string;
@@ -34,6 +38,9 @@ export interface RegisterRequest {
   email: string;
   password: string;
   company_name: string;
+  representative_name: string;
+  tin: string;
+  company_profile: string;
   company_address?: string;
   phone?: string;
   business_type?: string;
