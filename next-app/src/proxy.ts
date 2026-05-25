@@ -10,13 +10,11 @@ const protectedPaths: Record<string, string[]> = {
   "/school-head": ["school_head"],
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Only protect page routes, not API routes (API routes handle their own auth)
   if (pathname.startsWith("/api")) return NextResponse.next();
 
-  // Check if path needs protection
   const matchedPrefix = Object.keys(protectedPaths).find((p) => pathname.startsWith(p));
   if (!matchedPrefix) return NextResponse.next();
 
@@ -36,12 +34,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    // For supplier routes, verify the user's status in the token claims
-    // The actual status check happens client-side via restoreSession
-    // But we can check if the user has a valid supplier role
     return NextResponse.next();
   } catch (err: any) {
-    // If token is expired but structurally valid, let client-side refresh handle it
     if (err?.code === "ERR_JWT_EXPIRED") {
       return NextResponse.next();
     }

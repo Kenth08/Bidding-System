@@ -755,6 +755,7 @@ export const db = {
         evaluation_remarks: data.evaluation_remarks ?? "",
         rank: data.rank ?? null,
         recorded: data.recorded ?? false,
+        updated_at: data.updated_at ?? new Date().toISOString(),
       };
       const { data: result, error } = await supabaseServer.from(BIDS_TABLE).insert(payload).select().single();
       if (error) throw error;
@@ -770,7 +771,7 @@ export const db = {
         return fetchBidById(id);
       }
 
-      const { data: result, error } = await supabaseServer.from(BIDS_TABLE).update(updateData).eq("id", id).select().single();
+      const { data: result, error } = await supabaseServer.from(BIDS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() }).eq("id", id).select().single();
       if (error) throw error;
       return hydrateBid(result);
     },
@@ -779,7 +780,7 @@ export const db = {
       const rows = await fetchRows(BIDS_TABLE);
       const matches = rows.filter((item: any) => matchesWhere(item, params.where));
       for (const row of matches) {
-        const { error } = await supabaseServer.from(BIDS_TABLE).update(params.data).eq("id", row.id);
+        const { error } = await supabaseServer.from(BIDS_TABLE).update({ ...(params.data || {}), updated_at: new Date().toISOString() }).eq("id", row.id);
         if (error) throw error;
       }
       return { count: matches.length };
