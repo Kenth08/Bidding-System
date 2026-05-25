@@ -109,6 +109,9 @@ model Bid {
   technical_proposal   String?
   supporting_documents String?
   quotation_document   String?
+  no_conflict_of_interest Boolean          @default(false)
+  conflict_of_interest_person String?
+  no_past_scm_issues   Boolean            @default(false)
   technical_document   String?
   status               String             @default("submitted") @db.VarChar(50)
   technical_compliance Boolean?           @default(false)

@@ -11,6 +11,9 @@ export interface Bid {
   technical_proposal: string | null;
   supporting_documents: string | null;
   quotation_document: string | null;
+  no_conflict_of_interest: boolean;
+  conflict_of_interest_person: string | null;
+  no_past_scm_issues: boolean;
   technical_document: string | null;
   status: BidStatus;
   technical_compliance: boolean | null;
