@@ -500,6 +500,7 @@ export const db = {
         published_at: data.published_at ?? null,
         awarded_at: data.awarded_at ?? null,
         created_by_id: data.created_by_id ?? null,
+        updated_at: data.updated_at ?? new Date().toISOString(),
       };
       const { data: result, error } = await supabaseServer.from(PROJECTS_TABLE).insert(payload).select().single();
       if (error) throw error;
@@ -515,7 +516,7 @@ export const db = {
         return fetchProjectById(id);
       }
 
-      const { data: result, error } = await supabaseServer.from(PROJECTS_TABLE).update(updateData).eq("id", id).select().single();
+      const { data: result, error } = await supabaseServer.from(PROJECTS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() }).eq("id", id).select().single();
       if (error) throw error;
       return hydrateProject(result);
     },
@@ -543,7 +544,7 @@ export const db = {
       const where = params.where || {};
       const existing = where.id ? await fetchRowById(PROJECTS_TABLE, where.id) : null;
       if (existing) {
-        const { data, error } = await supabaseServer.from(PROJECTS_TABLE).update(params.update || {}).eq("id", where.id).select().single();
+        const { data, error } = await supabaseServer.from(PROJECTS_TABLE).update({ ...(params.update || {}), updated_at: new Date().toISOString() }).eq("id", where.id).select().single();
         if (error) throw error;
         return hydrateProject(data);
       }
@@ -598,6 +599,7 @@ export const db = {
         reviewed_by_id: data.reviewed_by_id ?? null,
         reviewed_at: data.reviewed_at ?? null,
         created_by_id: data.created_by_id ?? null,
+        updated_at: data.updated_at ?? new Date().toISOString(),
       };
       const { data: result, error } = await supabaseServer.from(PROCUREMENTS_TABLE).insert(payload).select().single();
       if (error) throw error;
@@ -613,7 +615,7 @@ export const db = {
         return fetchProcurementById(id);
       }
 
-      const { data: result, error } = await supabaseServer.from(PROCUREMENTS_TABLE).update(updateData).eq("id", id).select().single();
+      const { data: result, error } = await supabaseServer.from(PROCUREMENTS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() }).eq("id", id).select().single();
       if (error) throw error;
       return hydrateProcurement(result);
     },
@@ -632,7 +634,7 @@ export const db = {
       if (!where.id) throw new Error("Upsert requires an id-based where clause.");
       const existing = await fetchRowById(PROCUREMENTS_TABLE, where.id);
       if (existing) {
-        const { data, error } = await supabaseServer.from(PROCUREMENTS_TABLE).update(params.update || {}).eq("id", where.id).select().single();
+        const { data, error } = await supabaseServer.from(PROCUREMENTS_TABLE).update({ ...(params.update || {}), updated_at: new Date().toISOString() }).eq("id", where.id).select().single();
         if (error) throw error;
         return hydrateProcurement(data);
       }
