@@ -13,11 +13,4 @@ export default defineConfig({
   datasource: {
     url: process.env["DATABASE_URL"],
   },
-  // Disable all Prisma operations to prevent data loss
-  engine: {
-    enableConnectionTimeout: true,
-    connectionTimeout: 30000,
-  },
-  // Add warning to prevent accidental use
-  __warning: "PRISMA DISABLED - Using Supabase client instead to prevent data loss",
 });

@@ -14,8 +14,8 @@ type OrderBy = Record<string, "asc" | "desc"> | Array<Record<string, "asc" | "de
 
 type Takeable = { take?: number; limit?: number };
 
-function toDate(value: unknown) {
-  if (!value) return value;
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
   if (value instanceof Date) return value;
   return new Date(String(value));
 }
@@ -101,15 +101,17 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 
 function matchesValue(actual: unknown, expected: unknown) {
   if (isPlainObject(expected)) {
-    if ("lt" in expected && !(toDate(actual) < toDate(expected.lt))) return false;
-    if ("lte" in expected && !(toDate(actual) <= toDate(expected.lte))) return false;
-    if ("gt" in expected && !(toDate(actual) > toDate(expected.gt))) return false;
-    if ("gte" in expected && !(toDate(actual) >= toDate(expected.gte))) return false;
-    if ("in" in expected && Array.isArray(expected.in) && !expected.in.includes(actual)) return false;
-    if ("equals" in expected && actual !== expected.equals) return false;
-    if ("not" in expected && actual === expected.not) return false;
-    if (!("lt" in expected || "lte" in expected || "gt" in expected || "gte" in expected || "in" in expected || "equals" in expected || "not" in expected)) {
-      return Object.entries(expected).every(([key, value]) => (actual as any)?.[key] === value);
+    const expectedRecord: any = expected;
+    const actualDate = toDate(actual);
+    if ("lt" in expectedRecord && (!actualDate || !(actualDate < toDate(expectedRecord.lt)!))) return false;
+    if ("lte" in expectedRecord && (!actualDate || !(actualDate <= toDate(expectedRecord.lte)!))) return false;
+    if ("gt" in expectedRecord && (!actualDate || !(actualDate > toDate(expectedRecord.gt)!))) return false;
+    if ("gte" in expectedRecord && (!actualDate || !(actualDate >= toDate(expectedRecord.gte)!))) return false;
+    if ("in" in expectedRecord && Array.isArray(expectedRecord.in) && !expectedRecord.in.includes(actual)) return false;
+    if ("equals" in expectedRecord && actual !== expectedRecord.equals) return false;
+    if ("not" in expectedRecord && actual === expectedRecord.not) return false;
+    if (!("lt" in expectedRecord || "lte" in expectedRecord || "gt" in expectedRecord || "gte" in expectedRecord || "in" in expectedRecord || "equals" in expectedRecord || "not" in expectedRecord)) {
+      return Object.entries(expectedRecord).every(([key, value]) => (actual as any)?.[key] === value);
     }
     return true;
   }
@@ -121,7 +123,7 @@ function matchesValue(actual: unknown, expected: unknown) {
   return actual === expected;
 }
 
-function matchesWhere(row: any, where?: Record<string, any>) {
+function matchesWhere(row: any, where?: Record<string, any>): boolean {
   if (!where) return true;
 
   return Object.entries(where).every(([key, expected]) => {
@@ -134,6 +136,18 @@ function matchesWhere(row: any, where?: Record<string, any>) {
 
     return matchesValue(row?.[key], expected);
   });
+}
+
+function normalizeUpdateArgs(whereOrParams: any, dataArg?: any) {
+  if (dataArg !== undefined) {
+    return { id: whereOrParams?.id, data: dataArg };
+  }
+
+  if (isPlainObject(whereOrParams) && "where" in whereOrParams && "data" in whereOrParams) {
+    return { id: whereOrParams.where?.id, data: whereOrParams.data };
+  }
+
+  return { id: whereOrParams?.id, data: whereOrParams?.data };
 }
 
 function normalizeOrderBy(orderBy?: OrderBy) {
@@ -209,8 +223,7 @@ async function fetchBlockchainRecordById(id: string) {
 }
 
 async function fetchNotificationsByWhere(where?: Record<string, any>) {
-  const rows = await fetchRows(NOTIFICATIONS_TABLE);
-  return rows.filter((row: any) => matchesWhere(row, where)).map(hydrateNotification);
+  return dbDirect.notification.findMany({ where });
 }
 
 async function fetchBidsByWhere(where?: Record<string, any>) {
@@ -386,8 +399,7 @@ async function buildUserCount(userId: string, select?: Record<string, boolean>) 
   }
 
   if (select.notifications) {
-    const rows = await fetchRows(NOTIFICATIONS_TABLE);
-    count.notifications = rows.filter((row: any) => row.recipient_id === userId).length;
+    count.notifications = await dbDirect.notification.count({ where: { recipient_id: userId } });
   }
 
   if (select.procurements) {
@@ -427,8 +439,12 @@ export const db = {
       return dbDirect.user.create(params);
     },
 
-    update: async (where: { id: string }, data: any) => {
-      return dbDirect.user.update(where, data);
+    update: async (whereOrParams: any, dataArg?: any) => {
+      return dbDirect.user.update(whereOrParams, dataArg);
+    },
+
+    delete: async (whereOrParams: any) => {
+      return dbDirect.user.delete(whereOrParams);
     },
     count: async (params: any = {}) => {
       return dbDirect.user.count(params);
@@ -490,8 +506,16 @@ export const db = {
       return hydrateProject(result);
     },
 
-    update: async (where: { id: string }, data: any) => {
-      const { data: result, error } = await supabaseServer.from(PROJECTS_TABLE).update(data).eq("id", where.id).select().single();
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error("Update requires an id-based where clause.");
+
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return fetchProjectById(id);
+      }
+
+      const { data: result, error } = await supabaseServer.from(PROJECTS_TABLE).update(updateData).eq("id", id).select().single();
       if (error) throw error;
       return hydrateProject(result);
     },
@@ -506,8 +530,11 @@ export const db = {
       return { count: matches.length };
     },
 
-    delete: async (where: { id: string }) => {
-      const { data, error } = await supabaseServer.from(PROJECTS_TABLE).delete().eq("id", where.id).select().single();
+    delete: async (whereOrParams: { id?: string; where?: { id?: string } }) => {
+      const id = whereOrParams.id ?? whereOrParams.where?.id;
+      if (!id) throw new Error("Delete requires an id-based where clause.");
+
+      const { data, error } = await supabaseServer.from(PROJECTS_TABLE).delete().eq("id", id).select().single();
       if (error) throw error;
       return hydrateProject(data);
     },
@@ -577,14 +604,25 @@ export const db = {
       return hydrateProcurement(result);
     },
 
-    update: async (where: { id: string }, data: any) => {
-      const { data: result, error } = await supabaseServer.from(PROCUREMENTS_TABLE).update(data).eq("id", where.id).select().single();
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error("Update requires an id-based where clause.");
+
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return fetchProcurementById(id);
+      }
+
+      const { data: result, error } = await supabaseServer.from(PROCUREMENTS_TABLE).update(updateData).eq("id", id).select().single();
       if (error) throw error;
       return hydrateProcurement(result);
     },
 
-    delete: async (where: { id: string }) => {
-      const { data, error } = await supabaseServer.from(PROCUREMENTS_TABLE).delete().eq("id", where.id).select().single();
+    delete: async (whereOrParams: { id?: string; where?: { id?: string } }) => {
+      const id = whereOrParams.id ?? whereOrParams.where?.id;
+      if (!id) throw new Error("Delete requires an id-based where clause.");
+
+      const { data, error } = await supabaseServer.from(PROCUREMENTS_TABLE).delete().eq("id", id).select().single();
       if (error) throw error;
       return hydrateProcurement(data);
     },
@@ -645,8 +683,16 @@ export const db = {
       return loadBlockchainRecordWithInclude(result, params.include);
     },
 
-    update: async (where: { id: string }, data: any) => {
-      const { data: result, error } = await supabaseServer.from("blockchain_blockchainrecord").update(data).eq("id", where.id).select().single();
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error("Update requires an id-based where clause.");
+
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return fetchBlockchainRecordById(id);
+      }
+
+      const { data: result, error } = await supabaseServer.from("blockchain_blockchainrecord").update(updateData).eq("id", id).select().single();
       if (error) throw error;
       return loadBlockchainRecordWithInclude(result);
     },
@@ -713,8 +759,16 @@ export const db = {
       return hydrateBid(result);
     },
 
-    update: async (where: { id: string }, data: any) => {
-      const { data: result, error } = await supabaseServer.from(BIDS_TABLE).update(data).eq("id", where.id).select().single();
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error("Update requires an id-based where clause.");
+
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return fetchBidById(id);
+      }
+
+      const { data: result, error } = await supabaseServer.from(BIDS_TABLE).update(updateData).eq("id", id).select().single();
       if (error) throw error;
       return hydrateBid(result);
     },
@@ -729,8 +783,11 @@ export const db = {
       return { count: matches.length };
     },
 
-    delete: async (where: { id: string }) => {
-      const { data, error } = await supabaseServer.from(BIDS_TABLE).delete().eq("id", where.id).select().single();
+    delete: async (whereOrParams: { id?: string; where?: { id?: string } }) => {
+      const id = whereOrParams.id ?? whereOrParams.where?.id;
+      if (!id) throw new Error("Delete requires an id-based where clause.");
+
+      const { data, error } = await supabaseServer.from(BIDS_TABLE).delete().eq("id", id).select().single();
       if (error) throw error;
       return hydrateBid(data);
     },
@@ -738,61 +795,31 @@ export const db = {
 
   notification: {
     findUnique: async (params: any) => {
-      const rows = await fetchRows(NOTIFICATIONS_TABLE);
-      const row = rows.find((item: any) => matchesWhere(item, params?.where));
-      return row ? hydrateNotification(row) : null;
+      return dbDirect.notification.findUnique(params);
     },
 
     findFirst: async (params: any) => {
-      const rows = await fetchNotificationsByWhere(params?.where);
-      return rows[0] || null;
+      return dbDirect.notification.findFirst(params);
     },
 
     findMany: async (params: any = {}) => {
-      const rows = await fetchNotificationsByWhere(params.where);
-      const sorted = sortRows(rows, params.orderBy);
-      const limited = applyTake(sorted, params);
-      return limited.map(hydrateNotification);
+      return dbDirect.notification.findMany(params);
     },
 
     count: async (params: any = {}) => {
-      const rows = await fetchRows(NOTIFICATIONS_TABLE);
-      return rows.filter((item: any) => matchesWhere(item, params.where)).length;
+      return dbDirect.notification.count(params);
     },
 
     create: async (params: any) => {
-      const data = params.data || params;
-      const payload = {
-        id: data.id || uuid(),
-        recipient_id: data.recipient_id,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        is_read: data.is_read ?? false,
-        link: data.link ?? null,
-        related_id: data.related_id ?? null,
-        resource_type: data.resource_type ?? null,
-        resource_id: data.resource_id ?? null,
-      };
-      const { data: result, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).insert(payload).select().single();
-      if (error) throw error;
-      return hydrateNotification(result);
+      return dbDirect.notification.create(params);
     },
 
-    update: async (where: { id: string }, data: any) => {
-      const { data: result, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).update(data).eq("id", where.id).select().single();
-      if (error) throw error;
-      return hydrateNotification(result);
+    update: async (whereOrParams: any, dataArg?: any) => {
+      return dbDirect.notification.update(whereOrParams, dataArg);
     },
 
     updateMany: async (params: any) => {
-      const rows = await fetchRows(NOTIFICATIONS_TABLE);
-      const matches = rows.filter((item: any) => matchesWhere(item, params.where));
-      for (const row of matches) {
-        const { error } = await supabaseServer.from(NOTIFICATIONS_TABLE).update(params.data).eq("id", row.id);
-        if (error) throw error;
-      }
-      return { count: matches.length };
+      return dbDirect.notification.updateMany(params);
     },
   },
 
@@ -811,6 +838,30 @@ export const db = {
       if (error) throw error;
       return result;
     },
+
+    findMany: async (params: any = {}) => {
+      const rows = await fetchRows(AUDIT_LOGS_TABLE);
+      const filtered = rows.filter((row: any) => matchesWhere(row, params.where));
+      const sorted = sortRows(filtered, params.orderBy);
+      const limited = applyTake(sorted, params);
+
+      const mapped = [] as any[];
+      for (const row of limited) {
+        const hydrated = {
+          ...row,
+          created_at: row.created_at ? toDate(row.created_at) : row.created_at,
+        };
+
+        if (params.include?.user) {
+          const user = row.user_id ? await fetchUserById(row.user_id) : null;
+          hydrated.user = user ? pick(user, params.include.user.select) : null;
+        }
+
+        mapped.push(hydrated);
+      }
+
+      return mapped;
+    },
   },
 
   documentUpload: {
@@ -823,19 +874,30 @@ export const db = {
       return limited.map(hydrateDocumentUpload);
     },
 
-    create: async (data: {
-      user_id: string;
-      document_type: string;
-      file_name: string;
+    create: async (params: {
+      id?: string;
+      user_id?: string;
+      document_type?: string;
+      file_name?: string;
       file?: string | null;
+      file_size?: number;
+      data?: {
+        id?: string;
+        user_id: string;
+        document_type: string;
+        file_name: string;
+        file?: string | null;
+        file_size?: number;
+      };
     }) => {
+      const data = params.data || params;
       const { data: result, error } = await supabaseServer.from(DOCUMENT_UPLOADS_TABLE).insert({
-        id: uuid(),
+        id: data.id || uuid(),
         user_id: data.user_id,
         document_type: data.document_type,
         file_name: data.file_name,
         file: data.file,
-        file_size: 0,
+        file_size: data.file_size ?? 0,
         verification_status: "Pending",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

@@ -22,44 +22,9 @@ Migrated version of the Blockchain E-Procurement System. Originally Django + Rea
 - **Icons:** Lucide React
 - **Package Manager:** npm (not pnpm)
 
-## Project Structure
 
-```
-next-app/
-├── prisma/schema.prisma       # DB schema (mirrors Django models)
-├── prisma.config.ts           # Prisma config
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx         # Root layout
-│   │   ├── page.tsx           # Landing page
-│   │   ├── login/page.tsx
-│   │   ├── register/page.tsx
-│   │   ├── results/page.tsx   # Public blockchain results
-│   │   ├── admin/             # layout.tsx + 9 page dirs
-│   │   ├── supplier/          # layout.tsx + 5 page dirs
-│   │   ├── school-head/       # layout.tsx + 3 page dirs
-│   │   └── api/               # 44 API route handlers
-│   ├── components/
-│   │   ├── shared/            # Modal, Toast, StatusBadge, StatCard, etc.
-│   │   ├── admin/             # AdminHeader, AdminSidebar, AdminSearchDropdown
-│   │   ├── supplier/          # SupplierHeader, SupplierSidebar, modals
-│   │   ├── school_head/       # SchoolHeadHeader, SchoolHeadSidebar
-│   │   └── ui/                # Skeleton, LoadingButton
-│   ├── hooks/useOutsideClick.ts
-│   ├── lib/
-│   │   ├── db.ts              # Prisma client singleton
-│   │   ├── auth.ts            # JWT sign/verify (jose)
-│   │   ├── api-utils.ts       # requireAuth, requireRole, json helpers
-│   │   ├── actions.ts         # logAudit, notifyUser, notifyAdmins
-│   │   ├── procurementStatus.ts
-│   │   └── supabase.ts
-│   ├── services/api.ts        # Axios instance + all API functions
-│   ├── stores/auth.ts         # Zustand auth store (login, logout, restoreSession)
-│   ├── types/                 # TypeScript interfaces (User, Project, Bid, etc.)
-│   └── middleware.ts          # Protects /admin, /supplier, /school-head routes
-└── .env                       # DATABASE_URL, JWT_SECRET, SUPABASE keys
-```
 
+`
 ## Key Conventions
 
 1. **All components are `"use client"`** — pages use client-side data fetching via `useEffect` + API calls

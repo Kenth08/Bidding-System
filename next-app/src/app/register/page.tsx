@@ -1,7 +1,7 @@
 "use client";
 import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
-import { useState, ChangeEvent } from "react";
+import { Suspense, useState, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 
@@ -35,7 +35,7 @@ function FileUploadField({ label, file, error, onChange }: { label: string; file
   );
 }
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const googleEmail = searchParams.get("email") || "";
@@ -169,5 +169,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <RegisterPageContent />
+    </Suspense>
   );
 }

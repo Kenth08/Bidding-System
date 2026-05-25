@@ -48,12 +48,36 @@ function applyTake(rows: any[], params?: UserQueryParams) {
   return rows.slice(0, count);
 }
 
+function hydrateNotification(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    created_at: row.created_at ? new Date(String(row.created_at)) : row.created_at,
+  };
+}
+
 function matchesWhere(row: any, where?: Record<string, any>) {
   if (!where) return true;
   return Object.entries(where).every(([key, expected]) => {
     if (expected === undefined) return true;
     return row?.[key] === expected;
   });
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+}
+
+function normalizeUpdateArgs(whereOrParams: any, dataArg?: any) {
+  if (dataArg !== undefined) {
+    return { id: whereOrParams?.id, data: dataArg };
+  }
+
+  if (isPlainObject(whereOrParams) && "where" in whereOrParams && "data" in whereOrParams) {
+    return { id: whereOrParams.where?.id, data: whereOrParams.data };
+  }
+
+  return { id: whereOrParams?.id, data: whereOrParams?.data };
 }
 
 function pickUser(row: any, select?: Record<string, any>) {
@@ -117,17 +141,11 @@ export const dbDirect = {
       const client = await pool.connect();
       try {
         if (filter.email) {
-          const result = await client.query(
-            'SELECT * FROM users WHERE email = $1',
-            [filter.email]
-          );
+          const result = await client.query('SELECT * FROM users WHERE email = $1', [filter.email]);
           return result.rows[0] || null;
         }
         if (filter.id) {
-          const result = await client.query(
-            'SELECT * FROM users WHERE id = $1',
-            [filter.id]
-          );
+          const result = await client.query('SELECT * FROM users WHERE id = $1', [filter.id]);
           return result.rows[0] || null;
         }
         return null;
@@ -190,9 +208,8 @@ export const dbDirect = {
     },
 
     create: async (params: any) => {
-      // Handle Prisma-style { data: { ... } } or direct data object
       const data = params.data || params;
-      
+
       const client = await pool.connect();
       try {
         const result = await client.query(
@@ -217,7 +234,7 @@ export const dbDirect = {
             data.business_permit_document || null,
             data.philgeps_registration || null,
             data.tax_clearance || null,
-            data.valid_id || null
+            data.valid_id || null,
           ]
         );
         return result.rows[0];
@@ -226,24 +243,175 @@ export const dbDirect = {
       }
     },
 
-    update: async (where: { id: string }, data: any) => {
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) {
+        throw new Error('Update requires an id-based where clause.');
+      }
+
+      const updateData = isPlainObject(data) ? data : {};
       const client = await pool.connect();
       try {
-        const entries = Object.entries(data);
+        const entries = Object.entries(updateData);
         if (!entries.length) {
-          return await dbDirect.user.findUnique({ id: where.id });
+          return await dbDirect.user.findUnique({ id });
         }
 
         const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
         const values = entries.map(([, value]) => value);
         const result = await client.query(
           `UPDATE users SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`,
-          [where.id, ...values]
+          [id, ...values]
         );
         return result.rows[0] || null;
       } finally {
         client.release();
       }
-    }
-  }
+    },
+
+    delete: async (whereOrParams: any) => {
+      const id = whereOrParams?.id ?? whereOrParams?.where?.id;
+      if (!id) {
+        throw new Error('Delete requires an id-based where clause.');
+      }
+
+      const client = await pool.connect();
+      try {
+        const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
+        return result.rows[0] || null;
+      } finally {
+        client.release();
+      }
+    },
+  },
+
+  notification: {
+    findUnique: async (params: { where?: { id?: string; recipient_id?: string; is_read?: boolean } } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM notifications');
+        const row = result.rows.find((item) => matchesWhere(item, params.where ?? params)) || null;
+        return hydrateNotification(row);
+      } finally {
+        client.release();
+      }
+    },
+
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>; take?: number; limit?: number; select?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM notifications');
+        const filtered = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        const row = applyTake(sorted, { take: 1 })[0] || null;
+        return hydrateNotification(row);
+      } finally {
+        client.release();
+      }
+    },
+
+    findMany: async (params: { where?: Record<string, any>; orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>; take?: number; limit?: number; select?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM notifications');
+        const filtered = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        const limited = applyTake(sorted, params);
+        return limited.map(hydrateNotification);
+      } finally {
+        client.release();
+      }
+    },
+
+    count: async (params: { where?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM notifications');
+        return result.rows.filter((row) => matchesWhere(row, params.where ?? params)).length;
+      } finally {
+        client.release();
+      }
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const result = await client.query(
+          `INSERT INTO notifications (
+            id, recipient_id, type, title, message, is_read,
+            link, related_id, resource_type, resource_id, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          RETURNING *`,
+          [
+            data.id || uuid(),
+            data.recipient_id,
+            data.type,
+            data.title,
+            data.message,
+            data.is_read ?? false,
+            data.link ?? null,
+            data.related_id ?? null,
+            data.resource_type ?? null,
+            data.resource_id ?? null,
+          ]
+        );
+        return hydrateNotification(result.rows[0]);
+      } finally {
+        client.release();
+      }
+    },
+
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) {
+        throw new Error('Update requires an id-based where clause.');
+      }
+
+      const updateData = isPlainObject(data) ? data : {};
+      const client = await pool.connect();
+      try {
+        const entries = Object.entries(updateData);
+        if (!entries.length) {
+          return await dbDirect.notification.findUnique({ where: { id } });
+        }
+
+        const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
+        const values = entries.map(([, value]) => value);
+        const result = await client.query(
+          `UPDATE notifications SET ${assignments} WHERE id = $1 RETURNING *`,
+          [id, ...values]
+        );
+        return hydrateNotification(result.rows[0] || null);
+      } finally {
+        client.release();
+      }
+    },
+
+    updateMany: async (params: { where?: Record<string, any>; data?: Record<string, any> }) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM notifications');
+        const matches = result.rows.filter((row) => matchesWhere(row, params.where));
+        for (const row of matches) {
+          const updateData = isPlainObject(params.data) ? params.data : {};
+          const entries = Object.entries(updateData);
+          if (!entries.length) continue;
+
+          const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
+          const values = entries.map(([, value]) => value);
+          const updateResult = await client.query(
+            `UPDATE notifications SET ${assignments} WHERE id = $1 RETURNING *`,
+            [row.id, ...values]
+          );
+          if (!updateResult.rows[0]) {
+            throw new Error('Failed to update notification.');
+          }
+        }
+        return { count: matches.length };
+      } finally {
+        client.release();
+      }
+    },
+  },
 };

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbDirect } from "@/lib/db-direct";
-import { getUserFromRequest } from "@/lib/auth";
+import { getUserFromRequest, extractToken } from "@/lib/auth";
 import type { UserRole } from "@/types";
 
 export async function getAuthUser(request: Request) {

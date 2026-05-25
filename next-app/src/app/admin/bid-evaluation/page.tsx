@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, XCircle } from "lucide-react";
 import { bidsAPI, projectsAPI } from "@/services/api";
@@ -13,7 +13,7 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 
 function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Number(v || 0)); }
 
-export default function AdminBidEvaluation() {
+function AdminBidEvaluationContent() {
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<any[]>([]);
   const [bids, setBids] = useState<any[]>([]);
@@ -182,5 +182,13 @@ export default function AdminBidEvaluation() {
       <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and record the award on blockchain.`} confirmLabel="Select Winner" isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>
+  );
+}
+
+export default function AdminBidEvaluation() {
+  return (
+    <Suspense fallback={<SkeletonTable />}>
+      <AdminBidEvaluationContent />
+    </Suspense>
   );
 }

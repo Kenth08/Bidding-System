@@ -1,13 +1,13 @@
 "use client";
 import { ArrowLeft, Check, Eye, EyeOff, Lock, Shield } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 import { useAuthStore } from "@/stores/auth";
 import { supabase } from "@/lib/supabase";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -136,5 +136,13 @@ export default function LoginPage() {
         <p className="mt-2 text-center text-xs text-slate-300">&copy; 2026 Blockchain E-Procurement System</p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

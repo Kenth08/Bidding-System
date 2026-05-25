@@ -6,9 +6,9 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization") || "";
   
   const hasAccessCookie = cookies.includes("access_token=");
-  let token = null;
+  let token: string | null = null;
   let tokenValid = false;
-  let tokenPayload = null;
+  let tokenPayload: unknown = null;
   
   if (hasAccessCookie) {
     const cookieValue = cookies.split(";")
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       .find(c => c.startsWith("access_token="))
       ?.split("=")[1];
     
-    token = cookieValue;
+    token = cookieValue ?? null;
     
     if (token) {
       const payload = await verifyToken(token);
