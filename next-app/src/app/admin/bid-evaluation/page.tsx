@@ -30,6 +30,29 @@ function getBidDocuments(bid: any) {
   ].filter((item) => Boolean(item.url));
 }
 
+function getRankTone(rank: number) {
+  if (rank === 1) return "bg-amber-100 text-amber-700 border-amber-200";
+  if (rank === 2) return "bg-slate-100 text-slate-700 border-slate-200";
+  if (rank === 3) return "bg-orange-100 text-orange-700 border-orange-200";
+  return "bg-slate-50 text-slate-600 border-slate-200";
+}
+
+function getQualificationStatus(bid: any) {
+  if (bid?.status === "won") return "Winner Selected";
+  if (bid?.status === "under_evaluation") return "Under Review";
+  if (bid?.technical_compliance) return "Qualified";
+  if (bid?.status === "lost") return bid?.rank === 2 ? "Runner-Up" : "Disqualified";
+  return "Under Review";
+}
+
+function getQualificationTone(status: string) {
+  if (status === "Winner Selected") return "bg-amber-100 text-amber-700";
+  if (status === "Qualified") return "bg-emerald-100 text-emerald-700";
+  if (status === "Runner-Up") return "bg-slate-100 text-slate-700";
+  if (status === "Disqualified") return "bg-red-100 text-red-700";
+  return "bg-yellow-100 text-yellow-700";
+}
+
 function DetailBadge({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-slate-50 p-3">
@@ -79,6 +102,7 @@ function AdminBidEvaluationContent() {
     underReview: currentBids.filter((b) => b.status === "under_evaluation").length,
     compliant: currentBids.filter((b) => Boolean(b.technical_compliance)).length,
     selected: currentBids.filter((b) => b.status === "won").length,
+    suppliers: new Set(currentBids.map((b) => b.supplier_id || b.supplier?.id || b.company_name || b.id)).size,
   }), [currentBids]);
 
   const expandedBid = useMemo(() => currentBids.find((b) => b.id === expandedBidId) || null, [currentBids, expandedBidId]);
@@ -136,33 +160,19 @@ function AdminBidEvaluationContent() {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="text-2xl font-semibold text-slate-900">{selectedProjectData.title}</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Budget: {formatPeso(selectedProjectData.budget)} &middot; Deadline: {selectedProjectData.deadline ? new Date(selectedProjectData.deadline).toLocaleDateString() : "\u2014"} &middot; {currentBids.length} bids
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <span>Budget: {formatPeso(selectedProjectData.budget)}</span>
+                <span>&middot;</span>
+                <span>Deadline: {selectedProjectData.deadline ? new Date(selectedProjectData.deadline).toLocaleDateString() : "\u2014"}</span>
+                <span>&middot;</span>
+                <span>{currentBids.length} bids</span>
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">{summaryStats.suppliers} suppliers competed</span>
+              </div>
             </div>
             <StatusBadge status={selectedProjectData.status} />
           </div>
         </div>
       )}
-
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Total Bids</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{summaryStats.total}</p>
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Under Review</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{summaryStats.underReview}</p>
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Compliant</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{summaryStats.compliant}</p>
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Selected</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{summaryStats.selected}</p>
-        </div>
-      </div>
 
       {currentBids.length === 0 ? <EmptyState title="No bids for this project" /> : (
         <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
@@ -172,9 +182,8 @@ function AdminBidEvaluationContent() {
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Rank</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Supplier</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Bid Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Verification</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Compliance</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Qualification Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Submission Status</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Actions</th>
               </tr>
             </thead>
@@ -183,27 +192,31 @@ function AdminBidEvaluationContent() {
                 const isExpanded = expandedBidId === b.id;
                 const isWinner = b.status === "won";
                 const docs = getBidDocuments(b);
+                const qualificationStatus = getQualificationStatus(b);
 
                 return (
                   <Fragment key={b.id}>
                     <tr className="align-top hover:bg-slate-50/60">
-                      <td className="px-6 py-4 text-sm text-slate-600">{i + 1}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <span className={`inline-flex min-w-10 items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getRankTone(i + 1)}`}>
+                          {i + 1}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-slate-900">{getSupplierName(b)}</p>
                         <p className="text-xs text-slate-400">{getCompanyName(b)}</p>
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-slate-900">{formatPeso(b.bid_amount)}</td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${b.supplier?.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : b.supplier?.verification_status === "verification_rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                          {b.supplier?.verification_status || "pending"}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getQualificationTone(qualificationStatus)}`}>
+                          {qualificationStatus}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${b.technical_compliance ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                          {b.technical_compliance ? "Compliant" : "Non-Compliant"}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${b.status === "won" ? "bg-amber-100 text-amber-700" : b.status === "lost" ? "bg-red-100 text-red-700" : b.status === "under_evaluation" ? "bg-slate-100 text-slate-700" : "bg-yellow-100 text-yellow-700"}`}>
+                          {b.status === "won" ? "Winner Selected" : b.status === "lost" ? "Lost" : b.status === "under_evaluation" ? "Under Review" : "Submitted"}
                         </span>
                       </td>
-                      <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
                       <td className="px-6 py-4">
                         {isWinner ? (
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
@@ -234,9 +247,9 @@ function AdminBidEvaluationContent() {
                                 <DetailBadge label="Supplier" value={getSupplierName(b)} />
                                 <DetailBadge label="Company" value={getCompanyName(b)} />
                                 <DetailBadge label="Amount" value={formatPeso(b.bid_amount)} />
-                                <DetailBadge label="Verification" value={b.supplier?.verification_status || "pending"} />
-                                <DetailBadge label="Compliance" value={b.technical_compliance ? "Compliant" : "Non-Compliant"} />
-                                <DetailBadge label="Status" value={b.status} />
+                                <DetailBadge label="Qualification Status" value={getQualificationStatus(b)} />
+                                <DetailBadge label="Submission Status" value={b.status === "won" ? "Winner Selected" : b.status === "lost" ? "Lost" : b.status === "under_evaluation" ? "Under Review" : "Submitted"} />
+                                <DetailBadge label="Rank" value={`#${i + 1}`} />
                               </div>
 
                               {b.proposal ? (
@@ -262,23 +275,23 @@ function AdminBidEvaluationContent() {
                             </div>
 
                             <div className="rounded-2xl border border-slate-100 bg-white p-5">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Evaluation</p>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Qualification Evaluation</p>
                               <div className="mt-4 flex items-center gap-3">
-                                <span className="text-sm text-slate-700">Compliance</span>
+                                <span className="text-sm text-slate-700">Qualification Status</span>
                                 <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
                                   <button
                                     type="button"
                                     onClick={() => setEvalForm((prev) => ({ ...prev, technical_compliance: true }))}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${evalForm.technical_compliance ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-white"}`}
+                                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${evalForm.technical_compliance ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-white"}`}
                                   >
-                                    Compliant
+                                    Qualified
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setEvalForm((prev) => ({ ...prev, technical_compliance: false }))}
                                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${!evalForm.technical_compliance ? "bg-red-500 text-white" : "text-slate-600 hover:bg-white"}`}
                                   >
-                                    Non-Compliant
+                                    Disqualified
                                   </button>
                                 </div>
                               </div>
@@ -320,11 +333,10 @@ function AdminBidEvaluationContent() {
               {[
                 { label: "Supplier", value: getSupplierName(bidDetail) },
                 { label: "Company", value: getCompanyName(bidDetail) },
-                { label: "Verification Status", value: bidDetail.supplier?.verification_status || "pending" },
                 { label: "Bid Amount", value: formatPeso(bidDetail.bid_amount) },
-                { label: "Status", value: bidDetail.status },
-                { label: "Rank", value: bidDetail.rank || "\u2014" },
-                { label: "Compliance", value: bidDetail.technical_compliance ? "Pass" : "Fail" }
+                { label: "Qualification Status", value: getQualificationStatus(bidDetail) },
+                { label: "Submission Status", value: bidDetail.status === "won" ? "Winner Selected" : bidDetail.status === "lost" ? "Lost" : bidDetail.status === "under_evaluation" ? "Under Review" : "Submitted" },
+                { label: "Rank", value: bidDetail.rank || "\u2014" }
               ].map(({ label, value }) => (
                 <DetailBadge key={label} label={label} value={String(value)} />
               ))}
