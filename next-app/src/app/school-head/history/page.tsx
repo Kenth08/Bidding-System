@@ -13,7 +13,7 @@ export default function SchoolHeadHistory() {
 
   if (loading) return <div className="flex items-center justify-center py-20 text-slate-400">Loading...</div>;
 
-  if (!records.length) return <div className="flex items-center justify-center py-20 text-slate-400">No approved projects found for this school head.</div>;
+  if (!records.length) return <div className="flex items-center justify-center py-20 text-slate-400">No approved records found for this head.</div>;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
@@ -30,10 +30,10 @@ export default function SchoolHeadHistory() {
         <tbody className="divide-y divide-slate-50">
           {records.map((r) => (
             <tr key={r.id} className="transition-colors hover:bg-slate-50/50">
-              <td className="px-5 py-3 font-medium text-slate-800">{r.title}</td>
+              <td className="px-5 py-3 font-medium text-slate-800">{r.project_title}</td>
               <td className="px-5 py-3 text-slate-600">₱{Number(r.budget).toLocaleString()}</td>
-              <td className="px-5 py-3"><StatusBadge status={r.procurement_request?.status || r.status} /></td>
-              <td className="px-5 py-3 text-slate-500">{r.procurement_request?.reviewed_by?.full_name || "School Head"}</td>
+              <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
+              <td className="px-5 py-3 text-slate-500">{r.reviewed_by?.full_name || "Head"}</td>
               <td className="px-5 py-3 text-slate-500">{r.deadline ? new Date(r.deadline).toLocaleDateString() : "—"}</td>
             </tr>
           ))}

@@ -5,20 +5,17 @@ export async function GET(request: Request) {
   const { user, error } = await requireRole(request, "school_head");
   if (error) return error;
 
-  const projects = await db.project.findMany({
+  const records = await db.procurement.findMany({
     where: {
-      procurement_request: {
-        status: "Approved",
-        reviewed_by_id: user!.id,
-      },
+      status: "Approved",
+      reviewed_by_id: user!.id,
     },
     include: {
       created_by: { select: { id: true, full_name: true, email: true } },
-      procurement_request: { include: { reviewed_by: { select: { id: true, full_name: true, email: true } } } },
-      bids: true,
+      reviewed_by: { select: { id: true, full_name: true, email: true } },
     },
-    orderBy: [{ updated_at: "desc" }, { created_at: "desc" }],
+    orderBy: [{ reviewed_at: "desc" }, { created_at: "desc" }],
   });
 
-  return json(projects);
+  return json(records);
 }

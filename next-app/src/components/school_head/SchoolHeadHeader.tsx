@@ -15,7 +15,7 @@ function SchoolHeadProfileDropdown({ currentUser, onLogout }: { currentUser?: Sc
     <div className="relative" ref={dropdownRef}>
       <button type="button" onClick={() => setIsOpen((p) => !p)} className="flex items-center gap-2.5 rounded-2xl px-2 py-1.5 transition-colors hover:bg-slate-50">
         <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">S</div>
-        <div className="text-left"><p className="text-xs font-semibold leading-none text-slate-700">School Head</p></div>
+        <div className="text-left"><p className="text-xs font-semibold leading-none text-slate-700">Head</p></div>
         <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
       </button>
       {isOpen ? (
@@ -23,7 +23,7 @@ function SchoolHeadProfileDropdown({ currentUser, onLogout }: { currentUser?: Sc
           <div className="border-b border-slate-100 bg-slate-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-white">S</div>
-              <div><p className="text-sm font-semibold text-slate-800">School Head</p><p className="text-xs text-slate-400">{currentUser?.email || "head@gmail.com"}</p></div>
+              <div><p className="text-sm font-semibold text-slate-800">Head</p><p className="text-xs text-slate-400">{currentUser?.email || "head@gmail.com"}</p></div>
             </div>
           </div>
           <div className="border-t border-slate-100 p-1.5">
@@ -50,7 +50,7 @@ export default function SchoolHeadHeader({ title, subtitle, currentUser, setSide
       <div className="flex items-center gap-3">
         <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 lg:hidden" aria-label="Open sidebar"><Menu className="h-5 w-5" /></button>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">School Head Workspace</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Head Workspace</p>
           <h1 className="text-base font-semibold text-slate-900">{title}</h1>
           {subtitle ? <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p> : null}
         </div>

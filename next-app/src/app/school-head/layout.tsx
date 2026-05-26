@@ -29,7 +29,7 @@ export default function SchoolHeadLayout({ children }: { children: ReactNode }) 
   const pageMeta = useMemo(() => {
     if (currentPage === "requests") return { title: "Procurement Requests" };
     if (currentPage === "history") return { title: "Approved Records" };
-    return { title: "School Head Dashboard" };
+    return { title: "Head Dashboard" };
   }, [currentPage]);
 
   function handleNotificationNavigate(link: string) {
