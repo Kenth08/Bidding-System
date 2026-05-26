@@ -67,8 +67,23 @@ export default function AdminProjects() {
     setIsConfirmLoading(true);
     try { await projectsAPI.publish(publishTarget.id); setToast({ message: "Project published!", type: "success" }); fetchData(); }
     catch { setToast({ message: "Failed to publish", type: "error" }); }
-    finally { setIsConfirmLoading(false); setPublishTarget(null); }
+    finally {
+      setIsConfirmLoading(false);
+      // notify other windows/tabs in this browser immediately
+      try { window.dispatchEvent(new CustomEvent("project:published", { detail: { id: publishTarget?.id } })); } catch (e) {}
+      setPublishTarget(null);
+    }
   }
+
+  // Dispatch a window event so other open admin views update immediately
+  useEffect(() => {
+    const handler = (e: any) => {
+      // refresh list when a publish happens elsewhere
+      fetchData();
+    };
+    window.addEventListener("project:published", handler);
+    return () => window.removeEventListener("project:published", handler);
+  }, []);
 
   async function handleDelete() {
     if (!deleteTarget) return;

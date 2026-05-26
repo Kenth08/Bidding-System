@@ -29,6 +29,29 @@ export default function SupplierBids() {
 
   useEffect(() => {
     bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {}).finally(() => setLoading(false));
+
+    // subscribe to SSE updates; refresh when a bid for this supplier is created
+    let userId: string | null = null;
+    import("@/services/api").then(({ authAPI }) => {
+      authAPI.me().then((res) => { userId = res.data?.id; }).catch(() => {});
+    });
+    if (typeof window !== "undefined") {
+      const es = new EventSource("/api/updates/stream");
+      es.addEventListener("bid_created", (e: any) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (!userId) {
+            // fallback: refresh — typically the event is recent and client likely the submitter
+            bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
+            return;
+          }
+          if (String(payload.supplier_id) === String(userId)) {
+            bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
+          }
+        } catch (err) {}
+      });
+      return () => es.close();
+    }
   }, []);
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-16 rounded-2xl bg-slate-100" /><div className="h-16 rounded-2xl bg-slate-100" /></div>;

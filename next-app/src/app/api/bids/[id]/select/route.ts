@@ -19,8 +19,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return json({ error: "Cannot select winner. The bid must be qualified or the supplier must be verified before selecting a winner." }, 400);
   }
 
-  if (bid.project.status === "awarded") {
-    return json({ error: "Bidding is already completed for this project. A winner has already been selected." }, 400);
+  // Only allow selecting a winner after bidding has closed.
+  if (bid.project.status !== "closed") {
+    return json({ error: "Winner selection is only allowed after bidding is closed." }, 400);
   }
 
   const existingWinner = await db.bid.findFirst({ where: { project_id: bid.project_id, status: "won", NOT: { id } } });

@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, FolderOpen, Trophy, XCircle } from "lucide-react";
 import { bidsAPI, projectsAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
+import BiddingLifecycleProgress from "@/components/shared/BiddingLifecycleProgress";
 import Modal from "@/components/shared/Modal";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Toast from "@/components/shared/Toast";
@@ -82,12 +83,61 @@ function AdminBidEvaluationContent() {
       projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setProjects([])),
       bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setBids([])),
     ]).finally(() => setLoading(false));
+
+    // poll bids periodically so admin sees updated bid counts when suppliers submit
+    const bidPoll = setInterval(() => {
+      bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
+    }, 10000);
+
+    return () => clearInterval(bidPoll);
   }, []);
 
-  const projectsWithBids = useMemo(() => {
+  // Subscribe to server-sent events for live updates and window events for same-tab updates
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const es = new EventSource("/api/updates/stream");
+
+    const onBidCreated = (e: any) => {
+      try {
+        const payload = JSON.parse(e.data);
+        bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
+        projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
+      } catch (err) {}
+    };
+
+    const onProjectPublished = (e: any) => {
+      try {
+        const payload = JSON.parse(e.data);
+        projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
+      } catch (err) {}
+    };
+
+    es.addEventListener("bid_created", onBidCreated);
+    es.addEventListener("project_published", onProjectPublished);
+
+    const onWindowPublished = () => {
+      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
+    };
+    window.addEventListener("project:published", onWindowPublished);
+
+    return () => {
+      es.removeEventListener("bid_created", onBidCreated);
+      es.removeEventListener("project_published", onProjectPublished);
+      es.close();
+      window.removeEventListener("project:published", onWindowPublished);
+    };
+  }, []);
+
+  // Show all published projects (active/closed/awarded) even if there are 0 bids.
+  const projectsList = useMemo(() => {
     const bidsByProject: Record<string, any[]> = {};
     bids.forEach((b) => { const pid = b.project_id || b.project?.id; if (pid) { if (!bidsByProject[pid]) bidsByProject[pid] = []; bidsByProject[pid].push(b); } });
-    return projects.filter((p) => bidsByProject[p.id]?.length).map((p) => ({ ...p, bidCount: bidsByProject[p.id]?.length || 0 }));
+    return projects.filter((p) => ["active", "closed", "awarded"].includes(p.status)).map((p) => ({
+      ...p,
+      bidCount: bidsByProject[p.id]?.length || 0,
+      hasUnderEvaluation: (bidsByProject[p.id] || []).some((b) => b.status === "under_evaluation"),
+      hasWinner: (bidsByProject[p.id] || []).some((b) => b.status === "won"),
+    }));
   }, [projects, bids]);
 
   const currentBids = useMemo(() => {
@@ -146,9 +196,11 @@ function AdminBidEvaluationContent() {
           <h2 className="text-lg font-bold text-slate-900">Select a Project to Evaluate</h2>
           <p className="mt-1 text-sm text-slate-500">Click a project below to review and evaluate submitted bids.</p>
         </div>
-        {projectsWithBids.length === 0 ? <EmptyState title="No projects with bids" subtitle="Bids will appear here once suppliers submit them." /> : (
+        {projectsList.length === 0 ? (
+          <EmptyState title="No projects available for evaluation" subtitle="Published projects will appear here; bids will update automatically." />
+        ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {projectsWithBids.map((p) => (
+            {projectsList.map((p) => (
               <button key={p.id} onClick={() => setSelectedProject(p.id)} className="group flex min-h-[190px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -162,7 +214,7 @@ function AdminBidEvaluationContent() {
                   <ArrowRight className="mt-1 h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
                 </div>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">{p.bidCount} bid{p.bidCount > 1 ? "s" : ""}</span>
+                  <span className="inline-flex items-center rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">{p.bidCount} bid{p.bidCount !== 1 ? "s" : ""}</span>
                   <StatusBadge status={p.status} className={p.status === "awarded" ? "text-amber-700" : ""} />
                 </div>
               </button>
@@ -192,6 +244,15 @@ function AdminBidEvaluationContent() {
               </div>
             </div>
             <StatusBadge status={selectedProjectData.status} />
+          </div>
+          <div className="mt-5">
+            <BiddingLifecycleProgress
+              projectStatus={selectedProjectData.status}
+              procurementStatus={selectedProjectData.procurement_request?.status}
+              bidCount={currentBids.length}
+              hasUnderEvaluation={currentBids.some((b) => b.status === "under_evaluation")}
+              hasWinner={currentBids.some((b) => b.status === "won")}
+            />
           </div>
         </div>
       )}
