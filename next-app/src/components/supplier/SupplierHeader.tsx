@@ -1,5 +1,5 @@
 "use client";
-import { Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Search, Settings, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import NotificationPanel from "../shared/NotificationPanel";
@@ -32,7 +32,6 @@ function SupplierProfileDropdown({ user, onLogout, onOpenProfile, onOpenSettings
           <div className="p-1.5">
             <button type="button" onClick={() => { setIsOpen(false); onOpenProfile(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"><User className="h-4 w-4 text-slate-400" />My Profile</button>
             <button type="button" onClick={() => { setIsOpen(false); onOpenSettings(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"><Settings className="h-4 w-4 text-slate-400" />Settings</button>
-            <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"><Bell className="h-4 w-4 text-slate-400" /><span>Notifications</span></button>
           </div>
           <div className="border-t border-slate-100 p-1.5">
             <button type="button" onClick={() => { setIsOpen(false); onLogout(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"><LogOut className="h-4 w-4" />Sign Out</button>
