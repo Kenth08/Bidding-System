@@ -17,6 +17,11 @@ interface SupplierSidebarProps {
 }
 
 export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, currentUser }: SupplierSidebarProps) {
+  const navItemClass = (isActive: boolean) =>
+    `group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition-all duration-150 ${isActive
+      ? "bg-white/10 font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.12)] ring-1 ring-emerald-400/20"
+      : "text-slate-400 hover:bg-white/5 hover:text-white"}`;
+
   const NavBlock = (
     <ul className="space-y-1">
       {NAV_ITEMS.map((item) => {
@@ -24,9 +29,12 @@ export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOp
         const isActive = currentPage === item.key;
         return (
           <li key={item.key}>
-            <button type="button" onClick={() => { setCurrentPage(item.key); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition-all duration-150 ${isActive ? "bg-emerald-500/15 font-semibold text-white shadow-sm ring-1 ring-emerald-400/25" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
-              <Icon className="h-4 w-4 shrink-0" /><span>{item.label}</span>
-              {isActive ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-300" /> : null}
+            <button type="button" onClick={() => { setCurrentPage(item.key); setSidebarOpen(false); }} className={navItemClass(isActive)}>
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors ${isActive ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"}`}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <span>{item.label}</span>
+              {isActive ? <span className="ml-auto h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]" /> : null}
             </button>
           </li>
         );
@@ -46,7 +54,7 @@ export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOp
         <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600">Menu</p>
         <nav className="flex-1">{NavBlock}</nav>
         <div className="mt-auto border-t border-slate-800 pt-4">
-          <button type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-white/5">
+          <button type="button" className="flex w-full items-center gap-3 rounded-2xl border border-white/0 px-2 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">{(currentUser?.fullName || "S").charAt(0).toUpperCase()}</div>
             <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{currentUser?.fullName || "Supplier User"}</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "supplier@eprocurement.gov"}</p></div>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />
@@ -68,7 +76,7 @@ export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOp
             <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600">Menu</p>
             <nav className="flex-1">{NavBlock}</nav>
             <div className="mt-auto border-t border-slate-800 pt-4">
-              <button type="button" className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5">
+              <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-white/0 px-2 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white">{(currentUser?.fullName || "S").charAt(0).toUpperCase()}</div>
                 <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{currentUser?.fullName || "Supplier User"}</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "supplier@eprocurement.gov"}</p></div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />

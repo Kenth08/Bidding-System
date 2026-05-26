@@ -48,10 +48,10 @@ export default function SchoolHeadHeader({ title, subtitle, currentUser, setSide
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur sm:px-6 lg:px-8">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-50 lg:hidden" aria-label="Open sidebar"><Menu className="h-5 w-5" /></button>
+        <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 lg:hidden" aria-label="Open sidebar"><Menu className="h-5 w-5" /></button>
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">School Head Workspace</p>
-          <h1 className="text-base font-semibold text-slate-800">{title}</h1>
+          <h1 className="text-base font-semibold text-slate-900">{title}</h1>
           {subtitle ? <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p> : null}
         </div>
       </div>

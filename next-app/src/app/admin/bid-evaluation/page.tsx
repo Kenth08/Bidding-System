@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCircle, Trophy, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, FolderOpen, Trophy, XCircle } from "lucide-react";
 import { bidsAPI, projectsAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
@@ -135,14 +135,29 @@ function AdminBidEvaluationContent() {
   if (!selectedProject) {
     return (
       <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Select a Project to Evaluate</h2>
+        <div className="mb-5">
+          <h2 className="text-lg font-bold text-slate-900">Select a Project to Evaluate</h2>
+          <p className="mt-1 text-sm text-slate-500">Click a project below to review and evaluate submitted bids.</p>
+        </div>
         {projectsWithBids.length === 0 ? <EmptyState title="No projects with bids" subtitle="Bids will appear here once suppliers submit them." /> : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {projectsWithBids.map((p) => (
-              <button key={p.id} onClick={() => setSelectedProject(p.id)} className="rounded-2xl border border-slate-100 bg-white p-5 text-left transition-all hover:border-emerald-200 hover:shadow-sm">
-                <p className="text-sm font-semibold text-slate-800">{p.title}</p>
-                <p className="text-xs text-slate-400 mt-1">{formatPeso(p.budget)} &middot; {p.bidCount} bid{p.bidCount > 1 ? "s" : ""}</p>
-                <div className="mt-2"><StatusBadge status={p.status} /></div>
+              <button key={p.id} onClick={() => setSelectedProject(p.id)} className="group flex min-h-[190px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 ring-1 ring-emerald-100">
+                      <FolderOpen className="h-5 w-5" />
+                    </div>
+                    <p className="text-base font-semibold text-slate-900">{p.title}</p>
+                    <p className="mt-1 text-sm text-slate-500">{formatPeso(p.budget)} budget</p>
+                    <p className="mt-3 text-xs leading-5 text-slate-400">Click to open the project, review submitted bids, and mark the winning supplier.</p>
+                  </div>
+                  <ArrowRight className="mt-1 h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">{p.bidCount} bid{p.bidCount > 1 ? "s" : ""}</span>
+                  <StatusBadge status={p.status} className={p.status === "awarded" ? "text-amber-700" : ""} />
+                </div>
               </button>
             ))}
           </div>
@@ -156,7 +171,7 @@ function AdminBidEvaluationContent() {
       <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4"><ArrowLeft className="h-4 w-4" />Back to all projects</button>
 
       {selectedProjectData && (
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 mb-5">
+        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.04)] mb-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="text-2xl font-semibold text-slate-900">{selectedProjectData.title}</p>
