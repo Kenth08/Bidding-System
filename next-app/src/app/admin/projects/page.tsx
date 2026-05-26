@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { PlusCircle } from "lucide-react";
 import { projectsAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
@@ -44,7 +43,6 @@ export default function AdminProjects() {
     return statusMatch && (!q || (p.title || "").toLowerCase().includes(q));
   }), [projects, filter, search]);
 
-  function openCreate() { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); }
   function openEdit(p: any) {
     setEditing(p);
     setForm({ title: p.title || "", budget: String(p.budget || ""), deadline: String(p.deadline || "").slice(0, 10), procurement_type: p.procurement_type || "Services", technical_specifications: p.technical_specifications || "", delivery_period: String(p.delivery_period || ""), procurement_schedule: String(p.procurement_schedule || "").slice(0, 10), public_result_expiry_date: String(p.public_result_expiry_date || "").slice(0, 10) });
@@ -98,12 +96,11 @@ export default function AdminProjects() {
             <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all capitalize ${filter === t ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{t}</button>
           ))}
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600"><PlusCircle className="h-4 w-4" />New Project</button>
       </div>
 
       <SearchBar value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search projects" className="mb-4" />
 
-      {filtered.length === 0 ? <EmptyState title="No projects found" actionLabel="Create Project" onAction={openCreate} /> : (
+      {filtered.length === 0 ? <EmptyState title="No projects found" subtitle="Posted projects from Planning will appear here once they are created and published." /> : (
         <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
           <table className="w-full">
             <thead><tr className="bg-slate-50/50 border-b border-slate-100">
