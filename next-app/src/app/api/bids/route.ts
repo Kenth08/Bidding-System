@@ -25,6 +25,40 @@ function parseBoolean(value: unknown) {
   return value === true || value === "true" || value === "1" || value === "on";
 }
 
+// Supplier verification check
+async function checkSupplierVerification(user: any) {
+  const missingFields: string[] = [];
+  const expiredFields: Array<{ field: string; expireDate: string }> = [];
+  
+  // Check required fields
+  if (user.verification_status !== "approved") missingFields.push("Verification not approved");
+  if (!user.sec_dti_certificate) missingFields.push("SEC/DTI Certificate");
+  if (!user.mayors_permit) missingFields.push("Mayor's Permit");
+  if (!user.tax_clearance) missingFields.push("Tax Clearance");
+  if (!user.philgeps_registration) missingFields.push("PhilGEPS Registration");
+  if (!user.audited_financial_statements) missingFields.push("Audited Financial Statements");
+  if (!user.bank_reference_document) missingFields.push("Bank Reference Document");
+  if (!user.valid_id) missingFields.push("Valid ID");
+  if (!user.representative_authorization_document) missingFields.push("Representative Authorization");
+  if (!user.performance_certificates) missingFields.push("Performance Certificates");
+  if (!user.not_blacklisted_declaration) missingFields.push("Blacklist Declaration");
+  
+  // Check expiry dates
+  const now = new Date();
+  if (user.mayors_permit_expiry && new Date(user.mayors_permit_expiry) < now) {
+    expiredFields.push({ field: "Mayor's Permit", expireDate: new Date(user.mayors_permit_expiry).toLocaleDateString() });
+  }
+  if (user.tax_clearance_expiry && new Date(user.tax_clearance_expiry) < now) {
+    expiredFields.push({ field: "Tax Clearance", expireDate: new Date(user.tax_clearance_expiry).toLocaleDateString() });
+  }
+  
+  return {
+    isValid: missingFields.length === 0 && expiredFields.length === 0,
+    missingFields,
+    expiredFields,
+  };
+}
+
 export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -61,6 +95,19 @@ export async function POST(request: Request) {
 
   if (user!.role !== "supplier" || !["approved", "active"].includes(user!.status)) {
     return json({ error: "Only approved suppliers can submit bids." }, 403);
+  }
+
+  // Verify supplier documents
+  const verification = await checkSupplierVerification(user!);
+  if (!verification.isValid) {
+    return json(
+      {
+        error: "Your supplier profile is incomplete or has expired documents. Please update your profile before bidding.",
+        missingFields: verification.missingFields,
+        expiredFields: verification.expiredFields,
+      },
+      403
+    );
   }
 
   const contentType = request.headers.get("content-type") || "";

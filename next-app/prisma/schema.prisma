@@ -20,9 +20,22 @@ model User {
   representative_name      String?            @db.VarChar(255)
   tin                      String?            @db.VarChar(50)
   company_profile          String?            @db.Text
-  business_permit_document String?
-  philgeps_registration    String?
+  business_permit_document String?            // @deprecated Use sec_dti_certificate and mayors_permit instead
+  sec_dti_certificate      String?
+  mayors_permit            String?
+  mayors_permit_expiry     DateTime?
   tax_clearance            String?
+  tax_clearance_expiry     DateTime?
+  philgeps_registration    String?
+  not_blacklisted_declaration Boolean          @default(false)
+  blacklisting_declaration_document String?
+  past_contracts_document  String?
+  track_record_description String?
+  audited_financial_statements String?
+  financial_statement_year Int?
+  bank_reference_document  String?
+  performance_certificates String?
+  representative_authorization_document String?
   valid_id                 String?
   supporting_documents     String?
   verification_status      String             @default("pending") @db.VarChar(20)

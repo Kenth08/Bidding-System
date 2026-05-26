@@ -1,25 +1,21 @@
 "use client";
-import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload, AlertCircle } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { Suspense, useState, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 
 const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting", "Other"];
-const REQUIRED_DOCUMENTS = [
-  { key: "businessPermitDocument", label: "Business Permit Document" },
-  { key: "philGepsRegistration", label: "PhilGEPS Registration" },
-  { key: "taxClearance", label: "Tax Clearance" },
-  { key: "validId", label: "Valid ID" },
-  { key: "supportingDocuments", label: "Supporting Documents" },
-];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-function FileUploadField({ label, file, error, onChange }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void }) {
+function FileUploadField({ label, file, error, onChange, required = false }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; required?: boolean }) {
   const inputId = label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   return (
     <label htmlFor={inputId} className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+        {required && <span className="text-red-600">*</span>}
+      </span>
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-white">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><Upload className="h-4 w-4" /></div>
@@ -36,13 +32,54 @@ function FileUploadField({ label, file, error, onChange }: { label: string; file
   );
 }
 
+function DateInputField({ label, value, error, onChange, required = false }: { label: string; value: string; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; required?: boolean }) {
+  return (
+    <label>
+      <span className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+        {required && <span className="text-red-600">*</span>}
+      </span>
+      <input type="date" value={value} onChange={onChange} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+    </label>
+  );
+}
+
+function SectionTitle({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="md:col-span-2 mb-4">
+      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+    </div>
+  );
+}
+
 function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const googleEmail = searchParams.get("email") || "";
   const isFromGoogle = searchParams.get("from") === "google";
   const noAccountMessage = searchParams.get("message") === "no_account";
-  const [form, setForm] = useState<Record<string, string | File | null>>({ fullName: "", email: googleEmail, password: "", confirmPassword: "", companyName: "", companyAddress: "", phone: "", businessType: "", representativeName: "", tin: "", companyProfile: "", businessPermitDocument: null, philGepsRegistration: null, taxClearance: null, validId: null, supportingDocuments: null });
+  
+  const [form, setForm] = useState<Record<string, string | File | null | boolean>>({
+    fullName: "", email: googleEmail, password: "", confirmPassword: "",
+    companyName: "", companyAddress: "", phone: "", businessType: "", representativeName: "", tin: "", companyProfile: "",
+    // Documents - Basic
+    secDtiCertificate: null, mayorsPermit: null, mayorPermitExpiry: "",
+    taxClearance: null, taxClearanceExpiry: "",
+    philGepsRegistration: null, validId: null,
+    // Good Standing
+    notBlacklistedDeclaration: false, blacklistingDeclarationDocument: null,
+    // Track Record
+    pastContractsDocument: null, trackRecordDescription: "",
+    // Financial
+    auditedFinancialStatements: null, bankReferenceDocument: null, financialStatementYear: "",
+    // Qualifications
+    performanceCertificates: null, supportingDocuments: null,
+    // Representative
+    representativeAuthorizationDocument: null,
+  });
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -50,22 +87,62 @@ function RegisterPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
 
-  function updateForm(key: string, value: string | File | null) { setForm((p) => ({ ...p, [key]: value })); }
+  function updateForm(key: string, value: string | File | null | boolean) { setForm((p) => ({ ...p, [key]: value })); }
   function updateFile(key: string, file: File | undefined) {
     if (file && file.size > MAX_FILE_SIZE) { setFileErrors((p) => ({ ...p, [key]: "File must be 5MB or smaller." })); updateForm(key, null); return; }
     setFileErrors((p) => ({ ...p, [key]: "" })); updateForm(key, file || null);
   }
 
   async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault(); setError("");
-    if (!form.fullName || !form.email || !form.companyName || !String(form.representativeName || "").trim() || !String(form.tin || "").trim() || !String(form.companyProfile || "").trim()) { setError("Please fill in all required fields."); return; }
-    if (!isFromGoogle && (!form.password || !form.confirmPassword)) { setError("Please fill in all required fields."); return; }
-    const missing = REQUIRED_DOCUMENTS.find(({ key }) => !form[key]);
-    if (missing) { setError(`Please upload ${missing.label}.`); return; }
-    if (!isFromGoogle) {
-      if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
-      if (String(form.password).length < 6) { setError("Password must be at least 6 characters."); return; }
+    event.preventDefault();
+    setError("");
+    
+    // Validate required fields
+    if (!form.fullName || !form.email || !form.companyName || !String(form.representativeName || "").trim() || !String(form.tin || "").trim() || !String(form.companyProfile || "").trim()) {
+      setError("Please fill in all required basic information fields.");
+      return;
     }
+    
+    if (!isFromGoogle && (!form.password || !form.confirmPassword)) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+    
+    // Validate required documents
+    const requiredDocs = [
+      { key: "secDtiCertificate", label: "SEC/DTI Certificate" },
+      { key: "mayorsPermit", label: "Mayor's Permit" },
+      { key: "taxClearance", label: "Tax Clearance" },
+      { key: "philGepsRegistration", label: "PhilGEPS Registration" },
+      { key: "validId", label: "Valid ID" },
+      { key: "auditedFinancialStatements", label: "Audited Financial Statements" },
+      { key: "bankReferenceDocument", label: "Bank Reference Document" },
+      { key: "performanceCertificates", label: "Performance Certificates" },
+      { key: "representativeAuthorizationDocument", label: "Representative Authorization" },
+    ];
+    
+    const missing = requiredDocs.find(({ key }) => !form[key]);
+    if (missing) {
+      setError(`Please upload ${missing.label}.`);
+      return;
+    }
+    
+    if (!form.notBlacklistedDeclaration) {
+      setError("You must declare that your company is not blacklisted to proceed.");
+      return;
+    }
+    
+    if (!isFromGoogle) {
+      if (form.password !== form.confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      if (String(form.password).length < 6) {
+        setError("Password must be at least 6 characters.");
+        return;
+      }
+    }
+    
     setIsLoading(true);
     try {
       const payload = new FormData();
@@ -79,17 +156,45 @@ function RegisterPageContent() {
       payload.append("representative_name", form.representativeName as string);
       payload.append("tin", form.tin as string);
       payload.append("company_profile", form.companyProfile as string);
-      payload.append("business_permit_document", form.businessPermitDocument as File);
-      if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration as File);
+      
+      // Documents
+      if (form.secDtiCertificate) payload.append("sec_dti_certificate", form.secDtiCertificate as File);
+      if (form.mayorsPermit) payload.append("mayors_permit", form.mayorsPermit as File);
+      if (form.mayorPermitExpiry) payload.append("mayors_permit_expiry", form.mayorPermitExpiry as string);
       if (form.taxClearance) payload.append("tax_clearance", form.taxClearance as File);
+      if (form.taxClearanceExpiry) payload.append("tax_clearance_expiry", form.taxClearanceExpiry as string);
+      if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration as File);
       if (form.validId) payload.append("valid_id", form.validId as File);
+      
+      // Good Standing
+      payload.append("not_blacklisted_declaration", form.notBlacklistedDeclaration ? "true" : "false");
+      if (form.blacklistingDeclarationDocument) payload.append("blacklisting_declaration_document", form.blacklistingDeclarationDocument as File);
+      
+      // Track Record
+      if (form.pastContractsDocument) payload.append("past_contracts_document", form.pastContractsDocument as File);
+      if (form.trackRecordDescription) payload.append("track_record_description", form.trackRecordDescription as string);
+      
+      // Financial
+      if (form.auditedFinancialStatements) payload.append("audited_financial_statements", form.auditedFinancialStatements as File);
+      if (form.bankReferenceDocument) payload.append("bank_reference_document", form.bankReferenceDocument as File);
+      if (form.financialStatementYear) payload.append("financial_statement_year", form.financialStatementYear as string);
+      
+      // Qualifications
+      if (form.performanceCertificates) payload.append("performance_certificates", form.performanceCertificates as File);
       if (form.supportingDocuments) payload.append("supporting_documents", form.supportingDocuments as File);
+      
+      // Representative
+      if (form.representativeAuthorizationDocument) payload.append("representative_authorization_document", form.representativeAuthorizationDocument as File);
+      
       if (isFromGoogle) payload.append("from_google", "true");
+      
       await authAPI.register(payload);
       setSubmitted(true);
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Registration failed.");
-    } finally { setIsLoading(false); }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -123,47 +228,36 @@ function RegisterPageContent() {
             <>
               <h1 className="text-2xl font-bold text-slate-900">Supplier Registration</h1>
               {noAccountMessage && <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">No account found for this email. Please complete the registration below.</div>}
-              <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 max-h-[70vh] overflow-y-auto">
+                {/* Section 1: Basic Information */}
+                <SectionTitle title="Basic Information" />
                 {[{ key: "fullName", label: "Full Name", span: true }, { key: "email", label: "Email Address", span: true, type: "email", readOnly: isFromGoogle }].map(({ key, label, span, type, readOnly }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label} <span className="text-red-600">*</span></span>
                     <input type={type || "text"} value={form[key] as string} onChange={(e) => updateForm(key, e.target.value)} readOnly={readOnly} className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20 ${readOnly ? "cursor-not-allowed opacity-60" : ""}`} />
                   </label>
                 ))}
                 {!isFromGoogle && (
                   <>
                     <label>
-                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</span>
+                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password <span className="text-red-600">*</span></span>
                       <div className="relative"><input type={showPassword ? "text" : "password"} value={form.password as string} onChange={(e) => updateForm("password", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" /><button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
                     </label>
                     <label>
-                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Password</span>
+                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Password <span className="text-red-600">*</span></span>
                       <div className="relative"><input type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword as string} onChange={(e) => updateForm("confirmPassword", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" /><button type="button" onClick={() => setShowConfirmPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
                     </label>
                   </>
                 )}
+
+                {/* Section 2: Company Information */}
+                <SectionTitle title="Company Information" />
                 {[{ key: "companyName", label: "Company Name", span: true }, { key: "companyAddress", label: "Company Address", span: true }].map(({ key, label, span }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label} <span className="text-red-600">*</span></span>
                     <input type="text" value={form[key] as string} onChange={(e) => updateForm(key, e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
                   </label>
                 ))}
-                <label>
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Representative Name</span>
-                  <input type="text" value={form.representativeName as string} onChange={(e) => updateForm("representativeName", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
-                </label>
-                <label>
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">TIN</span>
-                  <input type="text" value={form.tin as string} onChange={(e) => updateForm("tin", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
-                </label>
-                <label className="md:col-span-2">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Company Profile</span>
-                  <textarea rows={4} value={form.companyProfile as string} onChange={(e) => updateForm("companyProfile", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Brief company background and capability statement" />
-                </label>
-                <label>
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Phone Number</span>
-                  <input type="tel" value={form.phone as string} onChange={(e) => updateForm("phone", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
-                </label>
                 <label>
                   <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Business Type</span>
                   <select value={form.businessType as string} onChange={(e) => updateForm("businessType", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20">
@@ -171,13 +265,70 @@ function RegisterPageContent() {
                     {BUSINESS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </label>
-                <div className="md:col-span-2 grid grid-cols-1 gap-4">
-                  {REQUIRED_DOCUMENTS.map(({ key, label }) => (
-                    <FileUploadField key={key} label={label} file={form[key] as File | null} error={fileErrors[key]} onChange={(e) => updateFile(key, e.target.files?.[0])} />
-                  ))}
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Phone Number</span>
+                  <input type="tel" value={form.phone as string} onChange={(e) => updateForm("phone", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Representative Name <span className="text-red-600">*</span></span>
+                  <input type="text" value={form.representativeName as string} onChange={(e) => updateForm("representativeName", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">TIN <span className="text-red-600">*</span></span>
+                  <input type="text" value={form.tin as string} onChange={(e) => updateForm("tin", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Company Profile <span className="text-red-600">*</span></span>
+                  <textarea rows={3} value={form.companyProfile as string} onChange={(e) => updateForm("companyProfile", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Brief company background and capability statement" />
+                </label>
+
+                {/* Section 3: Legal Documents */}
+                <SectionTitle title="Legal Documents" description="SEC/DTI Certificate, Mayor's Permit, and Tax Clearance" />
+                <FileUploadField label="SEC or DTI Certificate" file={form.secDtiCertificate as File | null} error={fileErrors.secDtiCertificate} onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])} required />
+                <FileUploadField label="Mayor's Permit / Business Permit" file={form.mayorsPermit as File | null} error={fileErrors.mayorsPermit} onChange={(e) => updateFile("mayorsPermit", e.target.files?.[0])} required />
+                <DateInputField label="Mayor's Permit Expiry Date" value={form.mayorPermitExpiry as string} onChange={(e) => updateForm("mayorPermitExpiry", e.target.value)} />
+                <FileUploadField label="Tax Clearance" file={form.taxClearance as File | null} error={fileErrors.taxClearance} onChange={(e) => updateFile("taxClearance", e.target.files?.[0])} required />
+                <DateInputField label="Tax Clearance Expiry Date" value={form.taxClearanceExpiry as string} onChange={(e) => updateForm("taxClearanceExpiry", e.target.value)} />
+                <FileUploadField label="PhilGEPS Registration" file={form.philGepsRegistration as File | null} error={fileErrors.philGepsRegistration} onChange={(e) => updateFile("philGepsRegistration", e.target.files?.[0])} required />
+
+                {/* Section 4: Identification & Authorization */}
+                <SectionTitle title="Identification & Authorization" />
+                <FileUploadField label="Valid ID" file={form.validId as File | null} error={fileErrors.validId} onChange={(e) => updateFile("validId", e.target.files?.[0])} required />
+                <FileUploadField label="Authorization Letter or Special Power of Attorney (SPA)" file={form.representativeAuthorizationDocument as File | null} error={fileErrors.representativeAuthorizationDocument} onChange={(e) => updateFile("representativeAuthorizationDocument", e.target.files?.[0])} required />
+
+                {/* Section 5: Good Standing Declaration */}
+                <SectionTitle title="Good Standing Declaration" description="Confirm your company's legal and regulatory standing" />
+                <div className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <input type="checkbox" id="notBlacklistedDeclaration" checked={form.notBlacklistedDeclaration as boolean} onChange={(e) => updateForm("notBlacklistedDeclaration", e.target.checked)} className="mt-1 cursor-pointer" />
+                  <label htmlFor="notBlacklistedDeclaration" className="cursor-pointer flex-1 text-sm">
+                    <span className="font-medium text-slate-900">I declare that our company is not blacklisted by any government agency or private corporation</span>
+                    <span className="text-red-600 ml-1">*</span>
+                    <p className="mt-1 text-xs text-slate-500">This is a mandatory requirement for bid submission</p>
+                  </label>
                 </div>
+                <FileUploadField label="Blacklisting Declaration Document (Optional)" file={form.blacklistingDeclarationDocument as File | null} error={fileErrors.blacklistingDeclarationDocument} onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])} required={false} />
+
+                {/* Section 6: Financial Documents */}
+                <SectionTitle title="Financial Documents" description="Audited financial statements and banking references" />
+                <FileUploadField label="Audited Financial Statements (Latest 1-2 Years)" file={form.auditedFinancialStatements as File | null} error={fileErrors.auditedFinancialStatements} onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])} required />
+                <DateInputField label="Financial Statement Year" value={form.financialStatementYear as string} onChange={(e) => updateForm("financialStatementYear", e.target.value)} />
+                <FileUploadField label="Bank Reference Letter or Credit Report" file={form.bankReferenceDocument as File | null} error={fileErrors.bankReferenceDocument} onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])} required />
+
+                {/* Section 7: Track Record */}
+                <SectionTitle title="Track Record" description="Past contracts and project experience" />
+                <FileUploadField label="Similar Past Contracts or Purchase Orders" file={form.pastContractsDocument as File | null} error={fileErrors.pastContractsDocument} onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])} required />
+                <label className="md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Brief Description of Similar Projects Completed (Last 5 Years)</span>
+                  <textarea rows={3} value={form.trackRecordDescription as string} onChange={(e) => updateForm("trackRecordDescription", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Describe similar projects you have completed in the last 5 years" />
+                </label>
+
+                {/* Section 8: Qualifications & Certifications */}
+                <SectionTitle title="Qualifications & Certifications" />
+                <FileUploadField label="Performance Certificates / Certificates of Completion / ISO Certifications" file={form.performanceCertificates as File | null} error={fileErrors.performanceCertificates} onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])} required />
+                <FileUploadField label="Other Supporting Documents (Optional)" file={form.supportingDocuments as File | null} error={fileErrors.supportingDocuments} onChange={(e) => updateFile("supportingDocuments", e.target.files?.[0])} required={false} />
+
                 <div className="md:col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"><p className="text-xs text-slate-400">Files must be 5MB or smaller. After registration, your account will be pending admin approval.</p></div>
-                {error ? <div className="md:col-span-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div> : null}
+                {error ? <div className="md:col-span-2 flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3"><AlertCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" /><p className="text-sm text-red-600">{error}</p></div> : null}
                 <LoadingButton type="submit" isLoading={isLoading} loadingText="Registering..." className="md:col-span-2 mt-2 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600">Submit Registration</LoadingButton>
               </form>
               <p className="mt-5 text-center text-sm text-slate-400">Already have an account?{" "}<button type="button" onClick={() => router.push("/login")} className="font-medium text-emerald-600 hover:text-emerald-700">Sign In</button></p>
