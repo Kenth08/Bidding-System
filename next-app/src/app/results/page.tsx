@@ -23,8 +23,24 @@ export default function PublicResultsPage() {
   const [verifyHash, setVerifyHash] = useState("");
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [hasBlockchainRecords, setHasBlockchainRecords] = useState(false);
 
   useEffect(() => { loadResults(); }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await axios.get('/api/blockchain/public');
+        if (!mounted) return;
+        setHasBlockchainRecords(Array.isArray(res.data) && res.data.length > 0);
+      } catch {
+        if (!mounted) return;
+        setHasBlockchainRecords(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   async function loadResults() {
     setLoading(true); setError(null);
@@ -63,11 +79,15 @@ export default function PublicResultsPage() {
         </div>
 
         <div className="mb-6 rounded-2xl border border-slate-100 bg-white p-5">
-          <div className="mb-4 flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50"><Shield className="h-5 w-5 text-emerald-500" /></div><div><h3 className="text-sm font-semibold text-slate-800">Verify Award Record</h3><p className="mt-0.5 text-xs text-slate-400">Paste a record hash to verify if a procurement result is authentic</p></div></div>
-          <div className="flex gap-3">
-            <input type="text" value={verifyHash} onChange={(e) => setVerifyHash(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleVerify()} placeholder="Paste record hash here" className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
-            <button onClick={handleVerify} disabled={verifyLoading || !verifyHash.trim()} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-600 disabled:bg-emerald-300">{verifyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}Verify</button>
-          </div>
+          <div className="mb-4 flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50"><Shield className="h-5 w-5 text-emerald-500" /></div><div><h3 className="text-sm font-semibold text-slate-800">Verify Award Record (optional)</h3><p className="mt-0.5 text-xs text-slate-400">Paste a record hash to verify if a procurement result is authentic</p></div></div>
+          {hasBlockchainRecords ? (
+            <div className="flex gap-3">
+              <input type="text" value={verifyHash} onChange={(e) => setVerifyHash(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleVerify()} placeholder="Paste record hash here" className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" />
+              <button onClick={handleVerify} disabled={verifyLoading || !verifyHash.trim()} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-600 disabled:bg-emerald-300">{verifyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}Verify</button>
+            </div>
+          ) : (
+            <div className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">No verifiable record available for this award.</div>
+          )}
           {verifyResult && (
             <div className={`mt-4 rounded-xl border p-4 ${verifyResult.verified ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
               <div className="mb-2 flex items-center gap-2">{verifyResult.verified ? <CheckCircle className="h-5 w-5 text-emerald-500" /> : <XCircle className="h-5 w-5 text-red-500" />}<p className={`text-sm font-semibold ${verifyResult.verified ? "text-emerald-700" : "text-red-600"}`}>{verifyResult.verified ? "\u2713 Record Verified and Authentic" : "\u2717 Record Not Found"}</p></div>

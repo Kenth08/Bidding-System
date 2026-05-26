@@ -26,6 +26,6 @@ export async function GET(request: Request) {
     winner_company: record.winner.company_name,
     bid_amount: Number(record.bid_amount),
     recorded_at: record.recorded_at,
-    message: "This record is authentic and has not been tampered with.",
+    message: 'This record is authentic and has not been tampered with.',
   });
 }

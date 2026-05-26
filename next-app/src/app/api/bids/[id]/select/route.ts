@@ -1,8 +1,8 @@
-import hashlib from "crypto";
 import { db } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifyUser } from "@/lib/actions";
+import hashlib from "crypto";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireRole(request, "admin");

@@ -62,10 +62,6 @@ export async function POST(request: Request) {
     return json({ error: "Only approved suppliers can submit bids." }, 403);
   }
 
-  if (!user!.verification_status || user!.verification_status !== "verified") {
-    return json({ error: "Your documents must be verified before submitting bids." }, 403);
-  }
-
   const contentType = request.headers.get("content-type") || "";
   let body: Record<string, any> = {};
   let quotationDocument: string | null = null;
