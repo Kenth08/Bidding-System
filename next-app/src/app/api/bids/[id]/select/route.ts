@@ -12,8 +12,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const bid = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: true } });
   if (!bid) return json({ error: "Bid not found" }, 404);
 
-  if (!bid.technical_compliance) {
-    return json({ error: "Cannot select winner. This bid is not technically compliant. Please evaluate and mark as compliant first." }, 400);
+  // Allow selecting a winner only when the bid is qualified (technical_compliance)
+  // or when the supplier account is verified. Qualification is the preferred
+  // gate for awarding; supplier verification is an alternate path.
+  if (!(bid.technical_compliance || bid.supplier?.verification_status === "verified")) {
+    return json({ error: "Cannot select winner. The bid must be qualified or the supplier must be verified before selecting a winner." }, 400);
   }
 
   if (bid.project.status === "awarded") {
@@ -43,6 +46,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     await db.blockchainRecord.create({
       data: { id: uuid(), project_id: bid.project_id, bid_id: id, winner_id: bid.supplier_id, bid_amount: bid.bid_amount, hash: hashValue, project_ref_id: projectRef },
+    });
+    await db.bid.update({ where: { id }, data: { recorded: true } });
+  } else {
+    await db.blockchainRecord.update({
+      where: { id: existingRecord.id },
+      data: {
+        bid_id: id,
+        winner_id: bid.supplier_id,
+        bid_amount: bid.bid_amount,
+        project_ref_id: existingRecord.project_ref_id || `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`,
+      },
     });
     await db.bid.update({ where: { id }, data: { recorded: true } });
   }

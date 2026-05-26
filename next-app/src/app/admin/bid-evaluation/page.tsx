@@ -232,6 +232,9 @@ function AdminBidEvaluationContent() {
                             }} className="rounded-lg border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50">
                               {isExpanded ? "Close" : "Evaluate"}
                             </button>
+                            {(b.technical_compliance || b.supplier?.verification_status === "verified") && b.status !== "won" && b.status !== "lost" && (
+                              <button onClick={() => setWinnerConfirm(b)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100">Select Winner</button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -359,7 +362,7 @@ function AdminBidEvaluationContent() {
             <div className="flex flex-wrap gap-2 pt-2">
               {bidDetail.status === "submitted" && <button onClick={() => { setBidDetail(null); setReviewConfirm(bidDetail); }} className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">Review Bid</button>}
               <button onClick={() => { setBidDetail(null); setExpandedBidId(bidDetail.id); setEvalForm({ technical_compliance: bidDetail.technical_compliance || false, evaluation_remarks: bidDetail.evaluation_remarks || "" }); }} className="rounded-xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-600 hover:bg-amber-50">Evaluate Bid</button>
-              {bidDetail.technical_compliance && bidDetail.status !== "won" && bidDetail.status !== "lost" && <button onClick={() => { setBidDetail(null); setWinnerConfirm(bidDetail); }} className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-100"><Trophy className="h-4 w-4" />Select Winner</button>}
+              {(bidDetail.technical_compliance || bidDetail.supplier?.verification_status === "verified") && bidDetail.status !== "won" && bidDetail.status !== "lost" && <button onClick={() => { setBidDetail(null); setWinnerConfirm(bidDetail); }} className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-100"><Trophy className="h-4 w-4" />Select Winner</button>}
             </div>
           </div>
         )}
