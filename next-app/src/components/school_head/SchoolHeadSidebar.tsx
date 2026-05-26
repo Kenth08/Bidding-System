@@ -55,7 +55,7 @@ export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebar
         <div className="mt-auto border-t border-slate-800 pt-4">
           <button type="button" className="flex w-full items-center gap-3 rounded-2xl border border-white/0 px-2 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">{currentUser?.full_name?.charAt(0) || "H"}</div>
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{currentUser?.full_name || "School Head"}</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "head@gmail.com"}</p></div>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">School Head</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "head@gmail.com"}</p></div>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />
           </button>
         </div>
@@ -77,7 +77,7 @@ export default function SchoolHeadSidebar({ currentPage, setCurrentPage, sidebar
             <div className="mt-auto border-t border-slate-800 pt-4">
               <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-white/0 px-2 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white">{currentUser?.full_name?.charAt(0) || "H"}</div>
-                <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{currentUser?.full_name || "School Head"}</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "head@gmail.com"}</p></div>
+                <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">School Head</p><p className="truncate text-xs text-slate-500">{currentUser?.email || "head@gmail.com"}</p></div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-600" />
               </button>
             </div>
