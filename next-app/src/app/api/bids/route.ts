@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
 import { requireAuth, json } from "@/lib/api-utils";
 import { logAudit, notifyAdmins } from "@/lib/actions";
+import { publishEvent } from "@/lib/sse";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
@@ -146,6 +147,13 @@ export async function POST(request: Request) {
 
   await logAudit("SUBMIT_BID", user!.id, `Submitted bid for ${project.title}`, "bid", project.id);
   await notifyAdmins("new_bid", "New Bid Submitted", `${user!.company_name || user!.full_name} submitted a bid of ₱${bidAmount.toLocaleString()} on ${project.title}.`, `/admin/bid-evaluation?project=${project.id}`, bid.id);
+
+  // publish SSE for real-time clients
+  try {
+    publishEvent("bid_created", { id: bid.id, project_id: projectId, supplier_id: user!.id, bid_amount: Number(bidAmount), project_title: project.title });
+  } catch (e) {
+    // non-fatal
+  }
 
   return json(bid, 201);
 }

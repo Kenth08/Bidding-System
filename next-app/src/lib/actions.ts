@@ -42,3 +42,10 @@ export async function notifyAdmins(type: string, title: string, message: string,
 export async function notifyUser(userId: string, type: string, title: string, message: string, link?: string, relatedId?: string) {
   await createNotification({ recipientId: userId, type, title, message, link, relatedId });
 }
+
+export async function notifySuppliers(type: string, title: string, message: string, link?: string, relatedId?: string) {
+  const suppliers = await db.user.findMany({ where: { role: "supplier", is_active: true } });
+  for (const supplier of suppliers) {
+    await createNotification({ recipientId: supplier.id, type, title, message, link, relatedId });
+  }
+}

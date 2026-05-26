@@ -21,8 +21,37 @@ export default function SupplierBids() {
     return "Submitted";
   };
 
+  const getEvaluationRemarks = (bid: Bid) => {
+    const remarks = bid.evaluation_remarks?.trim();
+    if (!remarks) return "No evaluation remarks yet.";
+    return remarks;
+  };
+
   useEffect(() => {
     bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {}).finally(() => setLoading(false));
+
+    // subscribe to SSE updates; refresh when a bid for this supplier is created
+    let userId: string | null = null;
+    import("@/services/api").then(({ authAPI }) => {
+      authAPI.me().then((res) => { userId = res.data?.id; }).catch(() => {});
+    });
+    if (typeof window !== "undefined") {
+      const es = new EventSource("/api/updates/stream");
+      es.addEventListener("bid_created", (e: any) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (!userId) {
+            // fallback: refresh — typically the event is recent and client likely the submitter
+            bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
+            return;
+          }
+          if (String(payload.supplier_id) === String(userId)) {
+            bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
+          }
+        } catch (err) {}
+      });
+      return () => es.close();
+    }
   }, []);
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-16 rounded-2xl bg-slate-100" /><div className="h-16 rounded-2xl bg-slate-100" /></div>;
@@ -37,6 +66,7 @@ export default function SupplierBids() {
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Amount</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Rank</th>
+            <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Evaluation Remarks</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
@@ -51,6 +81,9 @@ export default function SupplierBids() {
               <td className="px-5 py-3.5 text-slate-600">₱{Number(b.bid_amount).toLocaleString()}</td>
               <td className="px-5 py-3.5"><StatusBadge status={b.status} /></td>
               <td className="px-5 py-3.5 text-slate-600">{b.rank ?? "—"}</td>
+              <td className="px-5 py-3.5 text-slate-600">
+                <p className="max-w-[28rem] whitespace-pre-wrap text-sm leading-6 text-slate-600">{getEvaluationRemarks(b)}</p>
+              </td>
             </tr>
           ))}
         </tbody>

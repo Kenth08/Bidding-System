@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifyUser } from "@/lib/actions";
+import { publishEvent } from "@/lib/sse";
+import { normalizeStatusCode, STATUS } from "@/lib/procurementStatus";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireRole(request, "admin");
@@ -14,6 +16,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return json({ error: "Only draft projects can be published." }, 400);
   }
 
+  // If this project was created from a procurement request, ensure the
+  // procurement was approved by the Head before allowing publish.
+  if (project.procurement_request_id) {
+    const procurement = await db.procurement.findUnique({ where: { id: project.procurement_request_id } });
+    if (!procurement) return json({ error: "Linked procurement request not found." }, 400);
+    const code = normalizeStatusCode(procurement.status);
+    if (code !== STATUS.APPROVED) {
+      return json({ error: "Cannot publish. Procurement request must be approved by the Head before publishing." }, 400);
+    }
+  }
+
   const updated = await db.project.update({
     where: { id },
     data: { status: "active", published_at: new Date() },
@@ -25,6 +38,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const suppliers = await db.user.findMany({ where: { role: "supplier", status: "approved", is_active: true } });
   for (const supplier of suppliers) {
     await notifyUser(supplier.id, "project_published", "New Bidding Opportunity", `A new project "${project.title}" is now open for bidding.`, "/supplier/projects", id);
+  }
+
+  // Publish SSE to update connected clients
+  try {
+    publishEvent("project_published", { id, title: project.title, status: "active" });
+  } catch (e) {
+    // non-fatal
   }
 
   return json(updated);

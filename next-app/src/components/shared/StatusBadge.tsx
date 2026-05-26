@@ -9,7 +9,7 @@ const STATUS_CLASS_MAP: Record<string, string> = {
   Active: "border border-emerald-100 bg-emerald-50 text-emerald-700",
   "Open for Bidding": "border border-emerald-100 bg-emerald-50 text-emerald-700",
   Closed: "border border-slate-200 bg-slate-100 text-slate-500",
-  Awarded: "border border-blue-100 bg-blue-50 text-blue-600",
+  Awarded: "border border-amber-100 bg-amber-50 text-amber-700",
   Rejected: "border border-red-100 bg-red-50 text-red-500",
   "Revision Required": "border border-orange-100 bg-orange-50 text-orange-700",
   Submitted: "border border-slate-200 bg-slate-100 text-slate-600",

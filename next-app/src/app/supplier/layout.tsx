@@ -53,7 +53,18 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     if (link.startsWith("/supplier")) router.push(link);
   }
 
-  const currentUser = user ? { fullName: user.full_name, email: user.email, full_name: user.full_name, company_name: user.company_name } : null;
+  const currentUser = user ? {
+    fullName: user.full_name,
+    email: user.email,
+    full_name: user.full_name,
+    company_name: user.company_name,
+    company_address: user.company_address,
+    phone: user.phone,
+    business_type: user.business_type,
+    representative_name: user.representative_name,
+    tin: user.tin,
+    status: user.status,
+  } : null;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
