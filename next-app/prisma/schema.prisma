@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                       String             @id @default(uuid()) @db.Uuid
+  full_name                String             @db.VarChar(255)
+  email                    String             @unique @db.VarChar(255)
+  password_hash            String             @map("password_hash") @db.VarChar(128)
+  role                     String             @default("supplier") @db.VarChar(20)
+  status                   String             @default("pending") @db.VarChar(20)
+  company_name             String             @default("") @db.VarChar(255)
+  company_address          String             @default("") @db.VarChar(255)
+  phone                    String             @default("") @db.VarChar(50)
+  business_type            String             @default("") @db.VarChar(100)
+  representative_name      String?            @db.VarChar(255)
+  tin                      String?            @db.VarChar(50)
+  company_profile          String?            @db.Text
+  business_permit_document String?
+  philgeps_registration    String?
+  tax_clearance            String?
+  valid_id                 String?
+  supporting_documents     String?
+  verification_status      String             @default("pending") @db.VarChar(20)
+  verified_at              DateTime?
+  verified_by_id           String?            @db.Uuid
+  verification_notes       String?
+  is_staff                 Boolean            @default(false)
+  is_active                Boolean            @default(true)
+  is_superuser             Boolean            @default(false)
+  last_login               DateTime?
+  created_at               DateTime           @default(now())
+  updated_at               DateTime           @updatedAt
+  audit_logs               AuditLog[]
+  bids                     Bid[]
+  blockchain_records       BlockchainRecord[]
+  document_uploads         DocumentUpload[]
+  notifications            Notification[]
+  procurements             Procurement[]      @relation("CreatedProcurements")
+  reviewed_procurements    Procurement[]      @relation("ReviewedProcurements")
+  projects                 Project[]          @relation("CreatedProjects")
+
+  @@map("users")
+}
+
+model Project {
+  id                        String             @id @default(uuid()) @db.Uuid
+  procurement_request_id    String?            @unique @db.Uuid
+  title                     String             @db.VarChar(255)
+  budget                    Decimal            @db.Decimal(15, 2)
+  deadline                  DateTime           @db.Date
+  procurement_schedule      DateTime?          @db.Date
+  public_result_expiry_date DateTime?          @db.Date
+  requirements              String             @default("")
+  procurement_type          String             @default("Services") @db.VarChar(50)
+  delivery_period           Int                @default(0)
+  technical_specifications  String             @default("")
+  status                    String             @default("draft") @db.VarChar(20)
+  is_archived               Boolean            @default(false)
+  archived_at               DateTime?
+  archived_reason           String?            @db.VarChar(255)
+  published_at              DateTime?
+  awarded_at                DateTime?
+  created_by_id             String?            @db.Uuid
+  created_at                DateTime           @default(now())
+  updated_at                DateTime           @updatedAt
+  bids                      Bid[]
+  blockchain_records        BlockchainRecord[]
+  created_by                User?              @relation("CreatedProjects", fields: [created_by_id], references: [id])
+  procurement_request       Procurement?       @relation(fields: [procurement_request_id], references: [id])
+
+  @@map("projects_project")
+}
+
+model Procurement {
+  id                        String    @id @default(uuid()) @db.Uuid
+  project_title             String    @db.VarChar(255)
+  budget                    Decimal   @db.Decimal(15, 2)
+  deadline                  DateTime? @db.Date
+  public_result_expiry_date DateTime? @db.Date
+  procurement_type          String    @db.VarChar(50)
+  technical_specifications  String    @default("")
+  procurement_schedule      String    @default("") @db.VarChar(255)
+  delivery_period           String    @default("") @db.VarChar(255)
+  status                    String    @default("Pending Review") @db.VarChar(30)
+  rejection_reason          String    @default("")
+  revision_notes            String    @default("")
+  review_remarks            String?
+  reviewed_by_id            String?   @db.Uuid
+  reviewed_at               DateTime?
+  created_by_id             String?   @db.Uuid
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @updatedAt
+  created_by                User?     @relation("CreatedProcurements", fields: [created_by_id], references: [id])
+  reviewed_by               User?     @relation("ReviewedProcurements", fields: [reviewed_by_id], references: [id])
+  project                   Project?
+
+  @@map("procurements")
+}
+
+model Bid {
+  id                   String             @id @default(uuid()) @db.Uuid
+  project_id           String             @db.Uuid
+  supplier_id          String             @db.Uuid
+  company_name         String             @default("") @db.VarChar(255)
+  bid_amount           Decimal            @db.Decimal(12, 2)
+  proposal             String             @default("")
+  quotation_file       String?
+  technical_proposal   String?
+  supporting_documents String?
+  quotation_document   String?
+  no_conflict_of_interest Boolean          @default(false)
+  conflict_of_interest_person String?
+  no_past_scm_issues   Boolean            @default(false)
+  technical_document   String?
+  status               String             @default("submitted") @db.VarChar(50)
+  technical_compliance Boolean?           @default(false)
+  evaluation_remarks   String             @default("")
+  rank                 Int?
+  recorded             Boolean            @default(false)
+  submitted_at         DateTime           @default(now())
+  updated_at           DateTime           @updatedAt
+  project              Project            @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  supplier             User               @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  blockchain_records   BlockchainRecord[]
+
+  @@unique([project_id, supplier_id])
+  @@map("bids_bid")
+}
+
+model BlockchainRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  project_id     String   @db.Uuid
+  bid_id         String   @db.Uuid
+  winner_id      String   @db.Uuid
+  bid_amount     Decimal  @db.Decimal(15, 2)
+  hash           String   @unique
+  project_ref_id String?
+  recorded_at    DateTime @default(now())
+  bid            Bid      @relation(fields: [bid_id], references: [id], onDelete: Cascade)
+  project        Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  winner         User     @relation(fields: [winner_id], references: [id], onDelete: Cascade)
+
+  @@map("blockchain_blockchainrecord")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  action        String   @db.VarChar(50)
+  user_id       String?  @db.Uuid
+  description   String   @default("")
+  resource_type String   @default("") @db.VarChar(100)
+  resource_id   String   @default("") @db.VarChar(255)
+  created_at    DateTime @default(now())
+  user          User?    @relation(fields: [user_id], references: [id])
+
+  @@map("audit_logs")
+}
+
+model DocumentUpload {
+  id                  String   @id @default(uuid()) @db.Uuid
+  user_id             String   @db.Uuid
+  document_type       String   @db.VarChar(50)
+  file_name           String   @db.VarChar(255)
+  file                String?
+  file_size           Int      @default(0)
+  verification_status String   @default("Pending") @db.VarChar(20)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("document_uploads")
+}
+
+model Notification {
+  id            String   @id @default(uuid()) @db.Uuid
+  recipient_id  String   @db.Uuid
+  type          String   @db.VarChar(50)
+  title         String   @db.VarChar(255)
+  message       String
+  is_read       Boolean  @default(false)
+  link          String?  @db.VarChar(255)
+  related_id    String?  @db.VarChar(64)
+  resource_type String?  @db.VarChar(50)
+  resource_id   String?  @db.Uuid
+  created_at    DateTime @default(now())
+  recipient     User     @relation(fields: [recipient_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
