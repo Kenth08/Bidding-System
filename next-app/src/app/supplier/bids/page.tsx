@@ -21,6 +21,12 @@ export default function SupplierBids() {
     return "Submitted";
   };
 
+  const getEvaluationRemarks = (bid: Bid) => {
+    const remarks = bid.evaluation_remarks?.trim();
+    if (!remarks) return "No evaluation remarks yet.";
+    return remarks;
+  };
+
   useEffect(() => {
     bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -37,6 +43,7 @@ export default function SupplierBids() {
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Amount</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Rank</th>
+            <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Evaluation Remarks</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
@@ -51,6 +58,9 @@ export default function SupplierBids() {
               <td className="px-5 py-3.5 text-slate-600">₱{Number(b.bid_amount).toLocaleString()}</td>
               <td className="px-5 py-3.5"><StatusBadge status={b.status} /></td>
               <td className="px-5 py-3.5 text-slate-600">{b.rank ?? "—"}</td>
+              <td className="px-5 py-3.5 text-slate-600">
+                <p className="max-w-[28rem] whitespace-pre-wrap text-sm leading-6 text-slate-600">{getEvaluationRemarks(b)}</p>
+              </td>
             </tr>
           ))}
         </tbody>

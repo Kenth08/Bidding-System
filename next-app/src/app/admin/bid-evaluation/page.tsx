@@ -117,7 +117,14 @@ function AdminBidEvaluationContent() {
   async function handleSaveRemarks() {
     if (!expandedBid) return;
     setIsEvalSaving(true);
-    try { await bidsAPI.saveRemarks(expandedBid.id, { technical_compliance: evalForm.technical_compliance, evaluation_remarks: evalForm.evaluation_remarks }); setToast({ message: "Evaluation saved", type: "success" }); refreshBids(); } catch { setToast({ message: "Failed to save", type: "error" }); }
+    try {
+      await bidsAPI.saveRemarks(expandedBid.id, { technical_compliance: evalForm.technical_compliance, evaluation_remarks: evalForm.evaluation_remarks });
+      setToast({ message: "Evaluation saved", type: "success" });
+      setExpandedBidId(null);
+      refreshBids();
+    } catch {
+      setToast({ message: "Failed to save", type: "error" });
+    }
     finally { setIsEvalSaving(false); }
   }
 

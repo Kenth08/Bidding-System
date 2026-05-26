@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { requireRole, json } from "@/lib/api-utils";
-import { logAudit, notifyUser } from "@/lib/actions";
+import { logAudit, notifySuppliers, notifyUser } from "@/lib/actions";
 import hashlib from "crypto";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -78,6 +78,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   for (const lb of losingBids) {
     await notifyUser(lb.supplier_id, "bid_lost", "Bid Result", `Your bid for ${bid.project.title} was not selected. Thank you for participating.`, "/supplier/bids", lb.id);
   }
+
+  await notifySuppliers(
+    "bid_result_finalized",
+    "Bid Result Released",
+    `Bid results for ${bid.project.title} are now finalized. Winner: ${bid.supplier.full_name}.`,
+    "/supplier/results",
+    id
+  );
 
   const updated = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } } });
   return json(updated);

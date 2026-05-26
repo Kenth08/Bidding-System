@@ -126,6 +126,7 @@ export default function SupplierResults() {
               <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Your Bid</th>
               <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Result</th>
               <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Winner</th>
+              <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Evaluation Remarks</th>
               <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Updated</th>
             </tr>
           </thead>
@@ -162,6 +163,11 @@ export default function SupplierResults() {
                     ) : (
                       <span className="text-slate-400">Not available yet</span>
                     )}
+                  </td>
+                  <td className="px-5 py-4 text-slate-600">
+                    <p className="max-w-[26rem] whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                      {bid.evaluation_remarks?.trim() || "No evaluation remarks yet."}
+                    </p>
                   </td>
                   <td className="px-5 py-4 text-slate-500">{new Date(bid.updated_at || bid.submitted_at).toLocaleString()}</td>
                 </tr>
