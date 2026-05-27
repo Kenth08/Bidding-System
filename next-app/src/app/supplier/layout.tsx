@@ -61,8 +61,8 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     company_address: user.company_address,
     phone: user.phone,
     business_type: user.business_type,
-    representative_name: user.representative_name,
-    tin: user.tin,
+    representative_name: user.representative_name ?? undefined,
+    tin: user.tin ?? undefined,
     status: user.status,
   } : null;
 

@@ -369,7 +369,7 @@ function DocumentChecklistRow({
           {hasFile && !doc.fileValue?.includes("DECLARED") && (
             <div className="mt-2 flex items-center gap-1">
               <FileCheck className="h-4 w-4 text-slate-400" />
-              <a href={doc.fileValue} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
+              <a href={doc.fileValue!} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
                 View Document
               </a>
             </div>
@@ -388,7 +388,7 @@ function DocumentChecklistRow({
               Approve
             </button>
             <button
-              onClick={() => setExpanded(!expanded)}
+              onClick={onExpand}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-medium transition"
               title="Flag this document for revision"
             >
