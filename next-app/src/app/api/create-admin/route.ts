@@ -3,20 +3,27 @@ import bcrypt from "bcryptjs";
 import { dbDirect } from "@/lib/db-direct";
 import { v4 as uuid } from "uuid";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // Check if admin exists
     const admin = await dbDirect.user.findUnique({ email: "admin@gmail.com" });
-    
-    if (admin) {
+    const url = new URL(request.url);
+    const reset = url.searchParams.get('reset') === 'true';
+
+    if (admin && !reset) {
       return NextResponse.json({ 
         message: "Admin already exists",
         admin: { email: admin.email, role: admin.role, status: admin.status }
       });
     }
     
-    // Create admin
+    // Create or reset admin
     const password_hash = await bcrypt.hash("admin123", 12);
+    if (admin && reset) {
+      const updated = await dbDirect.user.update({ where: { id: admin.id }, data: { password_hash } });
+      return NextResponse.json({ message: "Admin password reset", admin: { email: updated.email, role: updated.role } });
+    }
+
     const newAdmin = await dbDirect.user.create({
       id: uuid(),
       full_name: "System Administrator",
@@ -29,11 +36,8 @@ export async function GET() {
       is_staff: true,
       is_superuser: true
     });
-    
-    return NextResponse.json({ 
-      message: "Admin created successfully",
-      admin: { email: newAdmin.email, role: newAdmin.role }
-    });
+
+    return NextResponse.json({ message: "Admin created successfully", admin: { email: newAdmin.email, role: newAdmin.role } });
   } catch (error: any) {
     return NextResponse.json({ 
       error: error.message,

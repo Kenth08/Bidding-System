@@ -19,7 +19,8 @@ async function saveFile(file: File, folder: string): Promise<string> {
 }
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
+  try {
+    const formData = await request.formData();
   const full_name = String(formData.get("full_name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "").trim();
@@ -260,5 +261,9 @@ export async function POST(request: Request) {
     code: verification.code,
   });
 
-  return NextResponse.json({ message: "Registration submitted. Check your email for the verification code.", verification_required: true, email }, { status: 201 });
+    return NextResponse.json({ message: "Registration submitted. Check your email for the verification code.", verification_required: true, email }, { status: 201 });
+  } catch (e: any) {
+    console.error('[register] uncaught error', e);
+    return NextResponse.json({ error: e?.message || String(e), stack: e?.stack || null }, { status: 500 });
+  }
 }
