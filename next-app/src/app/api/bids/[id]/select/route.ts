@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifySuppliers, notifyUser } from "@/lib/actions";
+import { publishEvent } from "@/lib/sse";
 import hashlib from "crypto";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -88,6 +89,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     id
   );
 
-  const updated = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } } });
-  return json(updated);
+  // Publish SSE updates for winner and losers so clients update in real-time
+  try {
+    const updated = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } } });
+    if (updated) publishEvent("bid_updated", { id: updated.id, project_id: updated.project_id, supplier_id: updated.supplier_id, status: updated.status, technical_compliance: Boolean(updated.technical_compliance) });
+    for (const lb of losingBids) {
+      publishEvent("bid_updated", { id: lb.id, project_id: lb.project_id, supplier_id: lb.supplier_id, status: lb.status, technical_compliance: Boolean(lb.technical_compliance) });
+    }
+  } catch (e) {
+    // non-fatal
+  }
+
+  const updatedFinal = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } } });
+  return json(updatedFinal);
 }

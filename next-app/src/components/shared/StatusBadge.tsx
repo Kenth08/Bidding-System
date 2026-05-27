@@ -18,6 +18,7 @@ const STATUS_CLASS_MAP: Record<string, string> = {
   Lost: "border border-red-100 bg-red-50 text-red-500",
   "Recorded ✓": "border border-emerald-100 bg-emerald-50 text-emerald-700",
   Archived: "border border-slate-200 bg-slate-100 text-slate-500",
+  Qualified: "border border-emerald-100 bg-emerald-50 text-emerald-700",
   admin: "border border-blue-100 bg-blue-50 text-blue-600",
   supplier: "border border-emerald-100 bg-emerald-50 text-emerald-700",
   viewer: "border border-slate-200 bg-slate-100 text-slate-500",

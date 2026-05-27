@@ -1,9 +1,11 @@
 "use client";
 
 import { Check, Clock3, Trophy, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 type SupplierBidProgressProps = {
   status?: string | null;
+  technical_compliance?: boolean | null;
 };
 
 type Step = {
@@ -12,29 +14,84 @@ type Step = {
   state: "done" | "current" | "upcoming";
 };
 
-function buildSteps(status?: string | null): Step[] {
+function buildSteps(status?: string | null, technical_compliance?: boolean | null): Step[] {
   const normalized = String(status || "").trim().toLowerCase();
-
-  const stepStates = [
-    "done",
-    normalized === "submitted" ? "current" : ["under_evaluation", "won", "lost"].includes(normalized) ? "done" : "upcoming",
-    ["won", "lost"].includes(normalized) ? "done" : normalized === "under_evaluation" ? "current" : "upcoming",
-    normalized === "won" || normalized === "lost" ? "done" : "upcoming",
-  ] as const;
-
-  return [
-    { key: "submitted", label: "Submitted", state: stepStates[0] },
-    { key: "review", label: "Under Evaluation", state: stepStates[1] },
-    { key: "result", label: normalized === "won" ? "Won" : normalized === "lost" ? "Lost" : "Final Result", state: stepStates[2] },
-    { key: "outcome", label: normalized === "won" ? "Awarded" : normalized === "lost" ? "Not Selected" : "Pending Result", state: stepStates[3] },
-  ];
-}
-
-export default function SupplierBidProgress({ status }: SupplierBidProgressProps) {
-  const normalized = String(status || "").trim().toLowerCase();
-  const steps = buildSteps(status);
+  const isSubmitted = normalized === "submitted";
+  const isUnderEval = normalized === "under_evaluation";
   const isWon = normalized === "won";
   const isLost = normalized === "lost";
+  const isQualified = Boolean(technical_compliance);
+  // Determine step states so that when a bid is qualified we show
+  // the Qualified step as completed and advance the current step
+  // to the final "Pending Result / Select Winner" stage.
+  let step1State: Step["state"] = "done";
+  let step2State: Step["state"] = "upcoming";
+  let step3State: Step["state"] = "upcoming";
+  let step4State: Step["state"] = "upcoming";
+
+  if (isWon || isLost) {
+    step1State = "done";
+    step2State = "done";
+    step3State = "done";
+    step4State = "done";
+  } else if (isQualified) {
+    step1State = "done";
+    step2State = "done";
+    step3State = "done";
+    step4State = "current"; // waiting for winner selection
+  } else if (isUnderEval) {
+    step1State = "done";
+    step2State = "current";
+    step3State = "upcoming";
+    step4State = "upcoming";
+  } else if (isSubmitted) {
+    step1State = "current";
+  }
+
+  const step1: Step = { key: "submitted", label: "Submitted", state: step1State };
+  const step2: Step = { key: "review", label: "Under Evaluation", state: step2State };
+  const step3Label = isQualified ? "Qualified" : "Evaluated";
+  const step3: Step = { key: "evaluated", label: step3Label, state: step3State };
+  const step4: Step = { key: "outcome", label: isWon ? "Awarded" : isLost ? "Not Selected" : "Pending Result", state: step4State };
+
+  return [step1, step2, step3, step4];
+}
+
+export default function SupplierBidProgress({ status, technical_compliance }: SupplierBidProgressProps) {
+  const normalized = String(status || "").trim().toLowerCase();
+  const steps = buildSteps(status, technical_compliance);
+  const isWon = normalized === "won";
+  const isLost = normalized === "lost";
+  const [flashStep, setFlashStep] = useState<string | null>(null);
+  const prevStatus = useRef<string | null>(null);
+  const prevQualified = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    // detect significant changes and flash the affected step
+    const prevS = prevStatus.current;
+    const prevQ = prevQualified.current;
+    const currS = normalized;
+    const currQ = Boolean(technical_compliance);
+
+    if (prevS && prevS !== currS) {
+      if (prevS === "submitted" && currS === "under_evaluation") setFlashStep("review");
+      else if ((currS === "won" || currS === "lost")) setFlashStep("outcome");
+    }
+
+    if (prevQ !== null && !prevQ && currQ) {
+      // became qualified
+      setFlashStep("evaluated");
+    }
+
+    prevStatus.current = currS;
+    prevQualified.current = currQ;
+  }, [normalized, technical_compliance]);
+
+  useEffect(() => {
+    if (!flashStep) return;
+    const t = setTimeout(() => setFlashStep(null), 800);
+    return () => clearTimeout(t);
+  }, [flashStep]);
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
@@ -47,16 +104,17 @@ export default function SupplierBidProgress({ status }: SupplierBidProgressProps
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        {steps.map((step, index) => {
+          {steps.map((step, index) => {
           const isDone = step.state === "done";
           const isCurrent = step.state === "current";
           const isFinal = index === steps.length - 1;
+            const isFlashing = flashStep === (step.key === 'evaluated' ? 'evaluated' : step.key === 'result' || step.key === 'evaluated' ? (step.key === 'outcome' ? 'outcome' : flashStep) : flashStep) || flashStep === step.key;
 
           return (
             <div key={step.key} className="relative rounded-xl border border-slate-100 bg-white p-3">
               {index < steps.length - 1 ? <span className={`pointer-events-none absolute right-[-10px] top-5 hidden h-[2px] w-5 md:block ${isDone ? "bg-gradient-to-r from-emerald-300 to-slate-200" : "bg-slate-200"}`} /> : null}
 
-              <div className="flex flex-col items-center gap-2 text-center">
+              <div className={`flex flex-col items-center gap-2 text-center ${isFlashing ? "animate-pulse" : ""}`}>
                 <span className="relative inline-flex h-7 w-7 items-center justify-center">
                   {isCurrent ? <span className="absolute inset-[-6px] rounded-full border border-amber-400/50 animate-pulse" /> : null}
                   <span
@@ -68,7 +126,7 @@ export default function SupplierBidProgress({ status }: SupplierBidProgressProps
                           : "bg-emerald-500 text-white"
                       : isCurrent
                         ? "bg-amber-500 text-white"
-                        : "border border-dashed border-slate-300 bg-slate-50 text-slate-400"}`}
+                        : "border border-dashed border-slate-300 bg-slate-50 text-slate-400"} ${isFlashing && !isDone ? "ring-2 ring-amber-300/40" : ""}`}
                   >
                     {isDone ? (isFinal ? (isWon ? <Trophy className="h-4 w-4" /> : <X className="h-4 w-4" />) : <Check className="h-4 w-4" />) : index + 1}
                   </span>

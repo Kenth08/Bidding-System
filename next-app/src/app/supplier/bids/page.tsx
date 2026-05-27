@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { bidsAPI } from "@/services/api";
 import StatusBadge from "@/components/shared/StatusBadge";
 import EmptyState from "@/components/shared/EmptyState";
+import Toast from "@/components/shared/Toast";
 import { Bid } from "@/types/bid";
 import SupplierBidProgress from "@/components/shared/SupplierBidProgress";
 import Modal from "@/components/shared/Modal";
@@ -11,16 +12,19 @@ export default function SupplierBids() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
 
   const getProjectTitle = (project: Bid["project"]) => {
     if (typeof project === "string") return project;
     return project?.title || project?.project_title || "—";
   };
 
-  const getBidStatusNote = (bid: Bid) => {
-    if (bid.status === "won") return "Awarded";
-    if (bid.status === "lost") return "Not selected";
-    if (bid.status === "under_evaluation") return "Under evaluation";
+  const getDisplayStatus = (bid: Bid) => {
+    // Prefer showing 'Qualified' when technical compliance has been set
+    if (bid.technical_compliance && bid.status !== "won" && bid.status !== "lost") return "Qualified";
+    if (bid.status === "won") return "Won";
+    if (bid.status === "lost") return "Lost";
+    if (bid.status === "under_evaluation") return "Under Evaluation";
     return "Submitted";
   };
 
@@ -40,22 +44,58 @@ export default function SupplierBids() {
     });
     if (typeof window !== "undefined") {
       const es = new EventSource("/api/updates/stream");
-      es.addEventListener("bid_created", (e: any) => {
+      const handleEvent = (e: any) => {
         try {
           const payload = JSON.parse(e.data);
           if (!userId) {
-            // fallback: refresh — typically the event is recent and client likely the submitter
             bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
             return;
           }
+
           if (String(payload.supplier_id) === String(userId)) {
-            bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
+            // capture previous state to compare changes for toast messages
+            const prevBid = bids.find((b) => b.id === payload.id);
+
+            bidsAPI.getAll().then((r) => {
+              setBids(r.data);
+              const updated = (r.data || []).find((x: any) => x.id === payload.id);
+              if (selectedBid) {
+                const sel = (r.data || []).find((x: any) => x.id === selectedBid.id);
+                if (sel) setSelectedBid(sel as any);
+              }
+
+              try {
+                if (prevBid && updated) {
+                  // became qualified
+                  if (!prevBid.technical_compliance && updated.technical_compliance) {
+                    setToast({ message: `Your bid for ${getProjectTitle(updated.project)} is now Qualified.`, type: "success" });
+                  }
+                  // result released
+                  if (prevBid.status !== updated.status) {
+                    if (updated.status === "won") setToast({ message: `Congratulations — your bid for ${getProjectTitle(updated.project)} was selected!`, type: "success" });
+                    else if (updated.status === "lost") setToast({ message: `Result released — your bid for ${getProjectTitle(updated.project)} was not selected.`, type: "warning" });
+                  }
+                }
+              } catch (e) {
+                /* ignore toast errors */
+              }
+            }).catch(() => {});
           }
         } catch (err) {}
-      });
+      };
+
+      es.addEventListener("bid_created", handleEvent);
+      es.addEventListener("bid_updated", handleEvent);
       return () => es.close();
     }
   }, []);
+
+  // render toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-16 rounded-2xl bg-slate-100" /><div className="h-16 rounded-2xl bg-slate-100" /></div>;
   if (!bids.length) return <EmptyState title="No bids yet" subtitle="Submit a bid on an active project to get started." />;
@@ -78,11 +118,11 @@ export default function SupplierBids() {
               <td className="px-5 py-3.5 font-medium text-slate-900">
                 <div className="space-y-1">
                   <p>{getProjectTitle(b.project)}</p>
-                  <p className="text-xs font-normal text-slate-400">{getBidStatusNote(b)}</p>
+                  <p className="text-xs font-normal text-slate-400">{getDisplayStatus(b)}</p>
                 </div>
               </td>
               <td className="px-5 py-3.5 text-slate-600">₱{Number(b.bid_amount).toLocaleString()}</td>
-              <td className="px-5 py-3.5"><StatusBadge status={b.status} /></td>
+              <td className="px-5 py-3.5"><StatusBadge status={getDisplayStatus(b)} /></td>
               <td className="px-5 py-3.5 text-slate-600">{b.rank ?? "—"}</td>
               <td className="px-5 py-3.5 text-slate-600">
                 <p className="max-w-[28rem] whitespace-pre-wrap text-sm leading-6 text-slate-600">{getEvaluationRemarks(b)}</p>
@@ -96,7 +136,7 @@ export default function SupplierBids() {
         isOpen={Boolean(selectedBid)}
         onClose={() => setSelectedBid(null)}
         title={selectedBid ? getProjectTitle(selectedBid.project) : "Bid Details"}
-        subtitle={selectedBid ? getBidStatusNote(selectedBid) : undefined}
+        subtitle={selectedBid ? getDisplayStatus(selectedBid) : undefined}
         size="xl"
       >
         {selectedBid ? (
@@ -108,7 +148,7 @@ export default function SupplierBids() {
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</p>
-                <div className="mt-2"><StatusBadge status={selectedBid.status} /></div>
+                <div className="mt-2"><StatusBadge status={getDisplayStatus(selectedBid)} /></div>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Rank</p>
@@ -116,11 +156,11 @@ export default function SupplierBids() {
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Result</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">{getBidStatusNote(selectedBid)}</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{getDisplayStatus(selectedBid)}</p>
               </div>
             </div>
 
-            <SupplierBidProgress status={selectedBid.status} />
+            <SupplierBidProgress status={selectedBid.status} technical_compliance={selectedBid.technical_compliance} />
 
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evaluation Remarks</p>
@@ -129,6 +169,7 @@ export default function SupplierBids() {
           </div>
         ) : null}
       </Modal>
+      {toast ? <Toast message={toast.message} type={toast.type} isVisible={Boolean(toast)} onClose={() => setToast(null)} /> : null}
     </div>
   );
 }

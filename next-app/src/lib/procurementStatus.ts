@@ -11,6 +11,7 @@ export const STATUS = {
   BID_UNDER_EVALUATION: 9,
   BID_WON: 10,
   BID_LOST: 11,
+  BID_QUALIFIED: 12,
 } as const;
 
 export const STATUS_TEXT: Record<number, string> = {
@@ -26,6 +27,7 @@ export const STATUS_TEXT: Record<number, string> = {
   [STATUS.BID_UNDER_EVALUATION]: "Under Evaluation",
   [STATUS.BID_WON]: "Won",
   [STATUS.BID_LOST]: "Lost",
+  [STATUS.BID_QUALIFIED]: "Qualified",
 };
 
 export function normalizeStatusCode(value: unknown): number {
@@ -44,6 +46,7 @@ export function normalizeStatusCode(value: unknown): number {
   if (text === "under evaluation" || text === "under_evaluation" || text === "under review") return STATUS.BID_UNDER_EVALUATION;
   if (text === "won") return STATUS.BID_WON;
   if (text === "lost") return STATUS.BID_LOST;
+  if (text === "qualified" || text === "compliant") return STATUS.BID_QUALIFIED;
   return STATUS.DRAFT;
 }
 

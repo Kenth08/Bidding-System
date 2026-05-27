@@ -309,13 +309,17 @@ function AdminBidEvaluationContent() {
                           <div className="flex flex-wrap gap-1.5">
                             <button onClick={() => setBidDetail(b)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">View Info</button>
                             {b.status === "submitted" && <button onClick={() => setReviewConfirm(b)} className="rounded-lg border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">Review</button>}
-                            <button onClick={() => {
-                              setExpandedBidId(isExpanded ? null : b.id);
-                              setEvalForm({ technical_compliance: Boolean(b.technical_compliance), evaluation_remarks: b.evaluation_remarks || "" });
-                            }} className="rounded-lg border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50">
-                              {isExpanded ? "Close" : "Evaluate"}
-                            </button>
-                            {(b.technical_compliance || b.supplier?.verification_status === "verified") && b.status !== "won" && b.status !== "lost" && (
+                            {b.technical_compliance ? (
+                              <span className="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-600">Qualified</span>
+                            ) : (
+                              <button onClick={() => {
+                                setExpandedBidId(isExpanded ? null : b.id);
+                                setEvalForm({ technical_compliance: Boolean(b.technical_compliance), evaluation_remarks: b.evaluation_remarks || "" });
+                              }} className="rounded-lg border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50">
+                                {isExpanded ? "Close" : "Evaluate"}
+                              </button>
+                            )}
+                            {b.technical_compliance && b.status !== "won" && b.status !== "lost" && (
                               <button onClick={() => setWinnerConfirm(b)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100">Select Winner</button>
                             )}
                           </div>
@@ -444,8 +448,14 @@ function AdminBidEvaluationContent() {
             {bidDetail.evaluation_remarks && <div className="rounded-xl border border-amber-100 bg-amber-50 p-3"><p className="text-xs font-semibold text-amber-600 mb-1">Evaluation Remarks</p><p className="text-sm text-amber-800">{bidDetail.evaluation_remarks}</p></div>}
             <div className="flex flex-wrap gap-2 pt-2">
               {bidDetail.status === "submitted" && <button onClick={() => { setBidDetail(null); setReviewConfirm(bidDetail); }} className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">Review Bid</button>}
-              <button onClick={() => { setBidDetail(null); setExpandedBidId(bidDetail.id); setEvalForm({ technical_compliance: bidDetail.technical_compliance || false, evaluation_remarks: bidDetail.evaluation_remarks || "" }); }} className="rounded-xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-600 hover:bg-amber-50">Evaluate Bid</button>
-              {(bidDetail.technical_compliance || bidDetail.supplier?.verification_status === "verified") && bidDetail.status !== "won" && bidDetail.status !== "lost" && <button onClick={() => { setBidDetail(null); setWinnerConfirm(bidDetail); }} className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-100"><Trophy className="h-4 w-4" />Select Winner</button>}
+              {!bidDetail.technical_compliance ? (
+                <button onClick={() => { setBidDetail(null); setExpandedBidId(bidDetail.id); setEvalForm({ technical_compliance: bidDetail.technical_compliance || false, evaluation_remarks: bidDetail.evaluation_remarks || "" }); }} className="rounded-xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-600 hover:bg-amber-50">Evaluate Bid</button>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600">Qualified</span>
+              )}
+              {bidDetail.technical_compliance && bidDetail.status !== "won" && bidDetail.status !== "lost" && (
+                <button onClick={() => { setBidDetail(null); setWinnerConfirm(bidDetail); }} className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-100"><Trophy className="h-4 w-4" />Select Winner</button>
+              )}
             </div>
           </div>
         )}
