@@ -61,6 +61,7 @@ export const projectsAPI = {
 
 export const dashboardAPI = {
   getStats: () => api.get("/dashboard/stats"),
+  getExpiringDocs: () => api.get("/dashboard/expiring-docs"),
 };
 
 export const bidsAPI = {
@@ -126,6 +127,7 @@ export const reportsAPI = {
 export const documentAPI = {
   getAll: () => api.get("/projects/documents"),
   upload: (data: FormData) => api.post("/projects/documents", data, { headers: { "Content-Type": "multipart/form-data" } }),
+  update: (id: string, data: object) => api.patch(`/projects/documents/${id}`, data),
 };
 
 export default api;

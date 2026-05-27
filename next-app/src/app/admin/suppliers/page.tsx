@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { suppliersAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
+import SupplierVerificationChecklist from "@/components/admin/SupplierVerificationChecklist";
 import SearchBar from "@/components/shared/SearchBar";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Toast from "@/components/shared/Toast";
@@ -123,34 +124,44 @@ export default function AdminSuppliers() {
             </div>
             <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Qualification Documents</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { label: "Business Permit", key: "business_permit_document" },
-                  { label: "PhilGEPS Registration", key: "philgeps_registration" },
-                  { label: "Tax Clearance", key: "tax_clearance" },
-                  { label: "Valid ID", key: "valid_id" },
-                ].map(({ label, key }) => {
-                  const url = viewing[key];
-                  return (
-                    <div key={key} className={`flex items-center justify-between rounded-lg border p-3 ${url ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-slate-50"}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${url ? "bg-emerald-100 text-emerald-600" : "bg-slate-200 text-slate-400"}`}>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        </div>
-                        <span className="text-xs font-medium text-slate-700 truncate">{label}</span>
-                      </div>
-                      {url ? (
-                        <div className="flex gap-1.5 shrink-0">
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200 transition-colors">View</a>
-                          <a href={url} download className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200 transition-colors">Download</a>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">Not uploaded</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <SupplierVerificationChecklist
+                supplier={viewing}
+                isEditing={true}
+                onDocumentApprove={async (field, approve, reason) => {
+                  try {
+                    const docsRes = await (await import("@/services/api")).documentAPI.getAll();
+                    const docs = Array.isArray(docsRes.data) ? docsRes.data : docsRes.data?.data || [];
+                    const doc = docs.find((d: any) => d.user_id === viewing.id && d.document_type === field);
+                    if (!doc) {
+                      setToast({ message: "No uploaded document found for this field.", type: "error" });
+                      return;
+                    }
+                    const payload: any = { verification_status: approve ? "Approved" : "Rejected" };
+                    if (reason) payload.verification_notes = reason;
+                    await (await import("@/services/api")).documentAPI.update(doc.id, payload);
+                    setToast({ message: `Document ${approve ? "approved" : "flagged"}`, type: "success" });
+                    fetchData();
+                  } catch (e) {
+                    setToast({ message: "Failed to update document", type: "error" });
+                  }
+                }}
+                onDocumentFlagChange={async (field, reason) => {
+                  try {
+                    const docsRes = await (await import("@/services/api")).documentAPI.getAll();
+                    const docs = Array.isArray(docsRes.data) ? docsRes.data : docsRes.data?.data || [];
+                    const doc = docs.find((d: any) => d.user_id === viewing.id && d.document_type === field);
+                    if (!doc) {
+                      setToast({ message: "No uploaded document found to flag.", type: "error" });
+                      return;
+                    }
+                    await (await import("@/services/api")).documentAPI.update(doc.id, { verification_notes: reason, verification_status: "Needs Revision" });
+                    setToast({ message: "Flagged document for revision", type: "success" });
+                    fetchData();
+                  } catch (e) {
+                    setToast({ message: "Failed to flag document", type: "error" });
+                  }
+                }}
+              />
             </div>
             <div className="flex gap-3 pt-2">
               {viewing.status === "pending" && (

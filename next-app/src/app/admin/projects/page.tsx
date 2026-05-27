@@ -10,13 +10,16 @@ import Toast from "@/components/shared/Toast";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import StrictNumberInput from "@/components/shared/StrictNumberInput";
+import DropdownWithMore from "@/components/shared/DropdownWithMore";
 
 const TABS = ["All", "draft", "active", "closed", "awarded"];
 const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
-const EMPTY_FORM = { title: "", budget: "", deadline: "", procurement_type: "Services", technical_specifications: "", delivery_period: "", procurement_schedule: "", public_result_expiry_date: "" };
+const EMPTY_FORM = { title: "", budget: "", deadline: "", procurement_type: "Services", procurement_type_custom: "", technical_specifications: "", delivery_period: "", procurement_schedule: "", public_result_expiry_date: "" };
 const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20";
 
 function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Number(v || 0)); }
+function resolveProcurementType(form: typeof EMPTY_FORM) { return form.procurement_type === "__more__" ? form.procurement_type_custom.trim() : form.procurement_type; }
 
 export default function AdminProjects() {
   const router = useRouter();
@@ -44,16 +47,22 @@ export default function AdminProjects() {
   }), [projects, filter, search]);
 
   function openEdit(p: any) {
+    const procurementType = PROCUREMENT_TYPES.includes(p.procurement_type) ? p.procurement_type : "__more__";
     setEditing(p);
-    setForm({ title: p.title || "", budget: String(p.budget || ""), deadline: String(p.deadline || "").slice(0, 10), procurement_type: p.procurement_type || "Services", technical_specifications: p.technical_specifications || "", delivery_period: String(p.delivery_period || ""), procurement_schedule: String(p.procurement_schedule || "").slice(0, 10), public_result_expiry_date: String(p.public_result_expiry_date || "").slice(0, 10) });
+    setForm({ title: p.title || "", budget: String(p.budget || ""), deadline: String(p.deadline || "").slice(0, 10), procurement_type: procurementType, procurement_type_custom: procurementType === "__more__" ? String(p.procurement_type || "") : "", technical_specifications: p.technical_specifications || "", delivery_period: String(p.delivery_period || ""), procurement_schedule: String(p.procurement_schedule || "").slice(0, 10), public_result_expiry_date: String(p.public_result_expiry_date || "").slice(0, 10) });
     setShowModal(true);
   }
 
   async function handleSave() {
     if (!form.title.trim() || !form.budget) return;
+    if (form.procurement_type === "__more__" && !form.procurement_type_custom.trim()) {
+      setToast({ message: "Please type a custom procurement type or choose a preset option.", type: "error" });
+      return;
+    }
     setIsSaving(true);
     try {
-      const payload = { title: form.title.trim(), budget: form.budget, deadline: form.deadline, procurement_type: form.procurement_type, technical_specifications: form.technical_specifications, delivery_period: Number(form.delivery_period) || 0, procurement_schedule: form.procurement_schedule || null, public_result_expiry_date: form.public_result_expiry_date || null };
+      const procurementType = resolveProcurementType(form);
+      const payload = { title: form.title.trim(), budget: form.budget, deadline: form.deadline, procurement_type: procurementType, technical_specifications: form.technical_specifications, delivery_period: Number(form.delivery_period) || 0, procurement_schedule: form.procurement_schedule || null, public_result_expiry_date: form.public_result_expiry_date || null };
       if (editing) await projectsAPI.update(editing.id, payload);
       else await projectsAPI.create(payload);
       setToast({ message: editing ? "Project updated" : "Project created", type: "success" });
@@ -154,13 +163,13 @@ export default function AdminProjects() {
         <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
           <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Project Title</span><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputClass} placeholder="Enter project title" /></label>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Budget ({"\u20B1"})</span><input type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className={inputClass} min="0" step="1000" /></label>
+            <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Approved Budget ({"\u20B1"})</span><StrictNumberInput value={form.budget} onChange={(value) => setForm({ ...form, budget: value })} className={inputClass} min="0" required placeholder="Enter approved budget" helperText="Numbers only. Enter the approved budget amount in pesos." /></label>
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Deadline</span><input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={inputClass} /></label>
           </div>
-          <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span><select value={form.procurement_type} onChange={(e) => setForm({ ...form, procurement_type: e.target.value })} className={inputClass}>{PROCUREMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span><DropdownWithMore value={form.procurement_type} customValue={form.procurement_type_custom} onChange={(value) => setForm({ ...form, procurement_type: value, procurement_type_custom: value === "__more__" ? form.procurement_type_custom : "" })} onCustomValueChange={(value) => setForm({ ...form, procurement_type_custom: value })} options={PROCUREMENT_TYPES} className={inputClass} selectPlaceholder="Select procurement type" customPlaceholder="Type a custom procurement type" helperText="Choose More... to add a custom procurement type." /></label>
           <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span><textarea value={form.technical_specifications} onChange={(e) => setForm({ ...form, technical_specifications: e.target.value })} className={inputClass} rows={3} placeholder="Describe requirements" /></label>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period (days)</span><input type="number" value={form.delivery_period} onChange={(e) => setForm({ ...form, delivery_period: e.target.value })} className={inputClass} min="0" /></label>
+            <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period (days)</span><StrictNumberInput value={form.delivery_period} onChange={(value) => setForm({ ...form, delivery_period: value })} className={inputClass} min="0" required placeholder="Enter number of days" helperText="Numbers only. Use digits for the delivery period." /></label>
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Schedule</span><input type="date" value={form.procurement_schedule} onChange={(e) => setForm({ ...form, procurement_schedule: e.target.value })} className={inputClass} /></label>
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Public Result Expiry</span><input type="date" value={form.public_result_expiry_date} onChange={(e) => setForm({ ...form, public_result_expiry_date: e.target.value })} className={inputClass} /></label>
           </div>

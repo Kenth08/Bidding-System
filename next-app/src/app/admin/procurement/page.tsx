@@ -9,9 +9,11 @@ import Toast from '@/components/shared/Toast';
 import SearchBar from '@/components/shared/SearchBar';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { SkeletonTable } from '@/components/ui/Skeleton';
+import StrictNumberInput from '@/components/shared/StrictNumberInput';
+import DropdownWithMore from '@/components/shared/DropdownWithMore';
 
 const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
-const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: 'Services', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
+const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: 'Services', procurementTypeCustom: '', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
 
 export default function AdminProcurement() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -32,16 +34,22 @@ export default function AdminProcurement() {
 
   const openCreate = () => { setEditingRequest(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = (r: any) => {
+    const procurementType = PROCUREMENT_TYPES.includes(r.procurement_type) ? r.procurement_type : '__more__';
     setEditingRequest(r);
-    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType: r.procurement_type || 'Services', technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
+    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType, procurementTypeCustom: procurementType === '__more__' ? String(r.procurement_type || '') : '', technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
     setShowModal(true);
   };
 
   const saveRequest = async () => {
     if (!form.projectTitle.trim() || !form.budget) return;
+    if (form.procurementType === '__more__' && !form.procurementTypeCustom.trim()) {
+      setToast({ message: 'Please type a custom procurement type or choose a preset option.', type: 'error' });
+      return;
+    }
     setIsSaving(true);
     try {
-      const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: form.procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
+      const procurementType = form.procurementType === '__more__' ? form.procurementTypeCustom.trim() : form.procurementType;
+      const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
       if (editingRequest) await procurementAPI.update(editingRequest.id, payload);
       else await procurementAPI.create(payload);
       setToast({ message: editingRequest ? 'Request updated' : 'Draft saved', type: 'success' });
@@ -121,8 +129,8 @@ export default function AdminProcurement() {
           </label>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Budget ({'\u20B1'})</span>
-              <input type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className={inputClass} placeholder="Enter budget" min="0" step="1000" />
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Approved Budget ({'\u20B1'})</span>
+              <StrictNumberInput value={form.budget} onChange={(value) => setForm({ ...form, budget: value })} className={inputClass} placeholder="Enter approved budget" min="0" required helperText="Numbers only. Enter the approved budget amount in pesos." />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Bidding Closes On</span>
@@ -140,9 +148,7 @@ export default function AdminProcurement() {
           </div>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span>
-            <select value={form.procurementType} onChange={(e) => setForm({ ...form, procurementType: e.target.value })} className={inputClass}>
-              {PROCUREMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <DropdownWithMore value={form.procurementType} customValue={form.procurementTypeCustom} onChange={(value) => setForm({ ...form, procurementType: value, procurementTypeCustom: value === '__more__' ? form.procurementTypeCustom : '' })} onCustomValueChange={(value) => setForm({ ...form, procurementTypeCustom: value })} options={PROCUREMENT_TYPES} className={inputClass} selectPlaceholder="Select procurement type" customPlaceholder="Type a custom procurement type" helperText="Choose More... to add a custom procurement type." />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span>

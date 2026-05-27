@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle, FolderOpen, Trophy, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, FolderOpen, FileText, ShieldCheck, Signature, Trophy, XCircle } from "lucide-react";
 import { bidsAPI, projectsAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import BiddingLifecycleProgress from "@/components/shared/BiddingLifecycleProgress";
@@ -24,11 +24,22 @@ function getCompanyName(bid: any) {
 
 function getBidDocuments(bid: any) {
   return [
-    { label: "Quotation Document", url: bid?.quotation_document || bid?.quotation_file },
-    { label: "Quotation File", url: bid?.quotation_file },
+    { label: "Quotation / Price Proposal", url: bid?.quotation_document || bid?.quotation_file },
+    { label: "Technical Proposal / Specifications", url: bid?.technical_proposal || bid?.technical_document },
     { label: "Supporting Documents", url: bid?.supporting_documents },
-    { label: "Technical Document", url: bid?.technical_document },
   ].filter((item) => Boolean(item.url));
+}
+
+function getConflictLabel(bid: any) {
+  if (bid?.no_conflict_of_interest === true) return "No Conflict";
+  if (bid?.no_conflict_of_interest === false) return "Conflict Declared";
+  return "Not Declared";
+}
+
+function getSupplierDeclarationLabel(bid: any) {
+  if (bid?.no_past_scm_issues === true) return "Confirmed";
+  if (bid?.no_past_scm_issues === false) return "Not Confirmed";
+  return "Pending";
 }
 
 function getRankTone(rank: number) {
@@ -235,7 +246,7 @@ function AdminBidEvaluationContent() {
             <div>
               <p className="text-2xl font-semibold text-slate-900">{selectedProjectData.title}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                <span>Budget: {formatPeso(selectedProjectData.budget)}</span>
+                <span>Approved Budget: {formatPeso(selectedProjectData.budget)}</span>
                 <span>&middot;</span>
                 <span>Deadline: {selectedProjectData.deadline ? new Date(selectedProjectData.deadline).toLocaleDateString() : "\u2014"}</span>
                 <span>&middot;</span>
@@ -254,6 +265,12 @@ function AdminBidEvaluationContent() {
               hasWinner={currentBids.some((b) => b.status === "won")}
             />
           </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <DetailBadge label="Lowest Offered Price" value={currentBids.length ? formatPeso(currentBids[0]?.bid_amount) : "—"} />
+            <DetailBadge label="Qualified Bids" value={String(summaryStats.compliant)} />
+            <DetailBadge label="Under Review" value={String(summaryStats.underReview)} />
+            <DetailBadge label="Winner Selected" value={String(summaryStats.selected)} />
+          </div>
         </div>
       )}
 
@@ -264,8 +281,8 @@ function AdminBidEvaluationContent() {
               <tr className="border-b border-slate-100 bg-slate-50/50">
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Rank</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Supplier</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Bid Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Qualification Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Offered Price</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Bid Compliance</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Submission Status</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Actions</th>
               </tr>
@@ -332,26 +349,28 @@ function AdminBidEvaluationContent() {
                         <td colSpan={7} className="px-6 py-5">
                           <div className="grid gap-5 lg:grid-cols-2">
                             <div className="rounded-2xl border border-slate-100 bg-white p-5">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Bid Details</p>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Bid Summary</p>
                               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <DetailBadge label="Supplier" value={getSupplierName(b)} />
                                 <DetailBadge label="Company" value={getCompanyName(b)} />
-                                <DetailBadge label="Amount" value={formatPeso(b.bid_amount)} />
-                                <DetailBadge label="Qualification Status" value={getQualificationStatus(b)} />
+                                <DetailBadge label="Offered Price" value={formatPeso(b.bid_amount)} />
+                                <DetailBadge label="Conflict Declaration" value={getConflictLabel(b)} />
+                                <DetailBadge label="Supplier Declaration" value={getSupplierDeclarationLabel(b)} />
+                                <DetailBadge label="Bid Compliance" value={getQualificationStatus(b)} />
                                 <DetailBadge label="Submission Status" value={b.status === "won" ? "Winner Selected" : b.status === "lost" ? "Lost" : b.status === "under_evaluation" ? "Under Review" : "Submitted"} />
                                 <DetailBadge label="Rank" value={`#${i + 1}`} />
                               </div>
 
                               {b.proposal ? (
                                 <div className="mt-4 rounded-xl border border-slate-100 p-4">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Proposal</p>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Additional Remarks</p>
                                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{b.proposal}</p>
                                 </div>
                               ) : null}
 
                               {docs.length > 0 ? (
                                 <div className="mt-4 rounded-xl border border-slate-100 p-4">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Uploaded Documents</p>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Bid Documents</p>
                                   <div className="mt-3 space-y-2">
                                     {docs.map((doc) => (
                                       <a key={doc.label} href={String(doc.url)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
@@ -362,6 +381,11 @@ function AdminBidEvaluationContent() {
                                   </div>
                                 </div>
                               ) : null}
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                <DetailBadge label="Signature Name" value={bidDetail.signature_name || "—"} />
+                                <DetailBadge label="Signature State" value={bidDetail.digital_signature ? "Saved" : "Not Uploaded"} />
+                              </div>
                             </div>
 
                             <div className="rounded-2xl border border-slate-100 bg-white p-5">
@@ -375,6 +399,16 @@ function AdminBidEvaluationContent() {
                                       className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${evalForm.technical_compliance ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-white"}`}
                                   >
                                     Qualified
+
+                                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                  <div className="flex items-start gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><ShieldCheck className="h-4 w-4" /></div>
+                                    <div>
+                                      <p className="text-sm font-semibold text-slate-900">Supplier Declaration</p>
+                                      <p className="mt-1 text-xs leading-5 text-slate-500">The supplier confirmed it is not blacklisted, restricted, or penalized in procurement activities.</p>
+                                    </div>
+                                  </div>
+                                </div>
                                   </button>
                                   <button
                                     type="button"
@@ -423,18 +457,20 @@ function AdminBidEvaluationContent() {
               {[
                 { label: "Supplier", value: getSupplierName(bidDetail) },
                 { label: "Company", value: getCompanyName(bidDetail) },
-                { label: "Bid Amount", value: formatPeso(bidDetail.bid_amount) },
-                { label: "Qualification Status", value: getQualificationStatus(bidDetail) },
+                { label: "Offered Price", value: formatPeso(bidDetail.bid_amount) },
+                { label: "Bid Compliance", value: getQualificationStatus(bidDetail) },
+                { label: "Conflict Declaration", value: getConflictLabel(bidDetail) },
+                { label: "Supplier Declaration", value: getSupplierDeclarationLabel(bidDetail) },
                 { label: "Submission Status", value: bidDetail.status === "won" ? "Winner Selected" : bidDetail.status === "lost" ? "Lost" : bidDetail.status === "under_evaluation" ? "Under Review" : "Submitted" },
                 { label: "Rank", value: bidDetail.rank || "\u2014" }
               ].map(({ label, value }) => (
                 <DetailBadge key={label} label={label} value={String(value)} />
               ))}
             </div>
-            {bidDetail.proposal && <div className="rounded-xl border border-slate-100 p-3"><p className="text-xs font-semibold text-slate-500 mb-1">Proposal</p><p className="text-sm text-slate-700">{bidDetail.proposal}</p></div>}
+            {bidDetail.proposal && <div className="rounded-xl border border-slate-100 p-3"><p className="text-xs font-semibold text-slate-500 mb-1">Additional Remarks</p><p className="text-sm text-slate-700">{bidDetail.proposal}</p></div>}
             {getBidDocuments(bidDetail).length > 0 && (
               <div className="rounded-xl border border-slate-100 p-3">
-                <p className="text-xs font-semibold text-slate-500 mb-2">Uploaded Documents</p>
+                <p className="text-xs font-semibold text-slate-500 mb-2">Required Bid Documents</p>
                 <div className="space-y-2">
                   {getBidDocuments(bidDetail).map((doc) => (
                     <a key={doc.label} href={String(doc.url)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
@@ -445,6 +481,11 @@ function AdminBidEvaluationContent() {
                 </div>
               </div>
             )}
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+              <p className="text-xs font-semibold text-emerald-700 mb-1">Supplier Signature</p>
+              <p className="text-sm text-emerald-800">{bidDetail.signature_name || "No signatory name provided"}</p>
+              {bidDetail.digital_signature ? <p className="text-xs text-emerald-700 mt-1">Digital signature image saved.</p> : null}
+            </div>
             {bidDetail.evaluation_remarks && <div className="rounded-xl border border-amber-100 bg-amber-50 p-3"><p className="text-xs font-semibold text-amber-600 mb-1">Evaluation Remarks</p><p className="text-sm text-amber-800">{bidDetail.evaluation_remarks}</p></div>}
             <div className="flex flex-wrap gap-2 pt-2">
               {bidDetail.status === "submitted" && <button onClick={() => { setBidDetail(null); setReviewConfirm(bidDetail); }} className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">Review Bid</button>}

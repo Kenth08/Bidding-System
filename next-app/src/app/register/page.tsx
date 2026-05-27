@@ -4,8 +4,10 @@ import LoadingButton from "@/components/ui/LoadingButton";
 import { Suspense, useState, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
+import StrictNumberInput from "@/components/shared/StrictNumberInput";
+import DropdownWithMore from "@/components/shared/DropdownWithMore";
 
-const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting", "Other"];
+const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const REQUIRED_DOCUMENTS_SECTIONS = {
@@ -88,6 +90,7 @@ function RegisterPageContent() {
     companyAddress: "",
     phone: "",
     businessType: "",
+    businessTypeCustom: "",
     representativeName: "",
     tin: "",
     companyProfile: "",
@@ -221,6 +224,11 @@ function RegisterPageContent() {
       }
     }
 
+    if (form.businessType === "__more__" && !String(form.businessTypeCustom || "").trim()) {
+      setError("Please type a custom business type or choose a preset option.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const payload = new FormData();
@@ -230,7 +238,7 @@ function RegisterPageContent() {
       payload.append("company_name", form.companyName as string);
       payload.append("company_address", form.companyAddress as string);
       payload.append("phone", form.phone as string);
-      payload.append("business_type", form.businessType as string);
+      payload.append("business_type", (form.businessType === "__more__" ? form.businessTypeCustom : form.businessType) as string);
       payload.append("representative_name", form.representativeName as string);
       payload.append("tin", form.tin as string);
       payload.append("company_profile", form.companyProfile as string);
@@ -439,18 +447,17 @@ function RegisterPageContent() {
                       {label}
                     </span>
                     {select ? (
-                      <select
+                      <DropdownWithMore
                         value={form[key] as string}
-                        onChange={(e) => updateForm(key, e.target.value)}
+                        customValue={form.businessTypeCustom as string}
+                        onChange={(value) => updateForm(key, value)}
+                        onCustomValueChange={(value) => updateForm("businessTypeCustom", value)}
+                        options={options || []}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                      >
-                        <option value="">Select {label.toLowerCase()}</option>
-                        {(options || []).map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                        selectPlaceholder={`Select ${label.toLowerCase()}`}
+                        customPlaceholder={`Type a custom ${label.toLowerCase()}`}
+                        helperText="Choose More... to type a custom value."
+                      />
                     ) : (
                       <input
                         type="text"
@@ -547,14 +554,14 @@ function RegisterPageContent() {
                     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Financial Statement Year
                     </span>
-                    <input
-                      type="number"
+                    <StrictNumberInput
                       min="2020"
                       max={new Date().getFullYear()}
                       value={form.financialStatementYear as string}
-                      onChange={(e) => updateForm("financialStatementYear", e.target.value)}
+                      onChange={(value) => updateForm("financialStatementYear", value)}
                       placeholder={`e.g. ${new Date().getFullYear()}`}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                      helperText="Numbers only. Enter the year as digits."
                     />
                   </label>
                 </div>

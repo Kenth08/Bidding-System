@@ -6,6 +6,8 @@ import { publishEvent } from "@/lib/sse";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
+const ALLOWED_BID_DOCUMENT_EXTENSIONS = new Set([".pdf", ".docx"]);
+
 function recalculateRanks(bids: { id: string; bid_amount: unknown; submitted_at: Date }[]) {
   const sorted = [...bids].sort((a, b) => Number(a.bid_amount) - Number(b.bid_amount) || a.submitted_at.getTime() - b.submitted_at.getTime());
   return sorted.map((b, i) => ({ id: b.id, rank: i + 1 }));
@@ -19,6 +21,10 @@ async function saveFile(file: File, folder: string): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(dir, filename), buffer);
   return `/uploads/${folder}/${filename}`;
+}
+
+function isAllowedBidDocument(file: File) {
+  return ALLOWED_BID_DOCUMENT_EXTENSIONS.has(path.extname(file.name).toLowerCase());
 }
 
 function parseBoolean(value: unknown) {
@@ -66,27 +72,48 @@ export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") || "";
   let body: Record<string, any> = {};
   let quotationDocument: string | null = null;
+  let technicalProposalDocument: string | null = null;
+  let supportingDocuments: string | null = null;
+  let digitalSignaturePath: string | null = null;
 
   if (contentType.includes("multipart/form-data")) {
     const formData = await request.formData();
     body = Object.fromEntries(formData.entries()) as Record<string, any>;
     const file = formData.get("quotation_document");
     if (file instanceof File && file.size > 0) {
+      if (!isAllowedBidDocument(file)) return json({ quotation_document: "Only PDF and DOCX files are allowed." }, 400);
       quotationDocument = await saveFile(file, "bids");
-    } else if (typeof body.quotation_document === "string") {
+    }
+    const technicalFile = formData.get("technical_proposal_document");
+    if (technicalFile instanceof File && technicalFile.size > 0) {
+      if (!isAllowedBidDocument(technicalFile)) return json({ technical_proposal_document: "Only PDF and DOCX files are allowed." }, 400);
+      technicalProposalDocument = await saveFile(technicalFile, "bids");
+    }
+    const supportingFile = formData.get("supporting_documents");
+    if (supportingFile instanceof File && supportingFile.size > 0) {
+      if (!isAllowedBidDocument(supportingFile)) return json({ supporting_documents: "Only PDF and DOCX files are allowed." }, 400);
+      supportingDocuments = await saveFile(supportingFile, "bids");
+    }
+    const sigFile = formData.get("digital_signature");
+    if (sigFile instanceof File && sigFile.size > 0) {
+      digitalSignaturePath = await saveFile(sigFile, "bids");
+    }
+    if (typeof body.quotation_document === "string") {
       quotationDocument = body.quotation_document;
     }
   } else {
     body = await request.json();
     quotationDocument = body.quotation_document || body.quotation_file || null;
+    technicalProposalDocument = body.technical_proposal_document || body.technical_proposal || null;
+    supportingDocuments = body.supporting_documents || null;
+    digitalSignaturePath = body.digital_signature || null;
   }
 
   const projectId = String(body.project || body.project_id || "").trim();
   const bidAmount = Number(body.bid_amount);
-  const proposal = String(body.proposal || "").trim();
+  const additionalRemarks = String(body.additional_remarks || body.proposal || "").trim();
   const noConflictOfInterest = parseBoolean(body.no_conflict_of_interest);
-  const conflictOfInterestPerson = String(body.conflict_of_interest_person || "").trim();
-  const noPastScmIssues = parseBoolean(body.no_past_scm_issues);
+  const supplierDeclaration = parseBoolean(body.supplier_declaration || body.no_past_scm_issues);
 
   if (!projectId) return json({ project: "Project is required." }, 400);
 
@@ -103,17 +130,15 @@ export async function POST(request: Request) {
   }
 
   if (!Number.isFinite(bidAmount) || bidAmount <= 0) return json({ bid_amount: "Enter a valid bid amount." }, 400);
-  if (!proposal) return json({ proposal: "Proposal is required." }, 400);
-  if (!quotationDocument) return json({ quotation_document: "Quotation document is required." }, 400);
+  if (bidAmount > Number(project.budget || 0)) return json({ bid_amount: "Offered price cannot exceed the approved budget." }, 400);
+  if (!quotationDocument) return json({ quotation_document: "Quotation / Price Proposal is required." }, 400);
+  if (!technicalProposalDocument) return json({ technical_proposal_document: "Technical Proposal / Specifications is required." }, 400);
+  if (!supplierDeclaration) return json({ supplier_declaration: "Supplier declaration is required." }, 400);
 
-  if (!noConflictOfInterest) {
-    if (!conflictOfInterestPerson) {
-      return json({ conflict_of_interest_person: "Name the person if you have a relationship with the committee or school administration." }, 400);
-    }
-  }
-
-  if (!noPastScmIssues) {
-    return json({ past_scm_practices: "Bids cannot be submitted if you have past SCM blacklisting or penalty issues." }, 403);
+  // Require signature presence for RA 9184 compliance
+  const signatureName = String(body.signature_name || "").trim();
+  if (!signatureName && !digitalSignaturePath) {
+    return json({ signature: "Signature is required (name and signature image)." }, 400);
   }
 
   const existing = await db.bid.findUnique({ where: { project_id_supplier_id: { project_id: projectId, supplier_id: user!.id } } });
@@ -126,14 +151,18 @@ export async function POST(request: Request) {
       supplier_id: user!.id,
       company_name: user!.company_name || "",
       bid_amount: bidAmount,
-      proposal,
+      proposal: additionalRemarks || "",
       quotation_file: quotationDocument,
       quotation_document: quotationDocument,
-      technical_proposal: body.technical_proposal || null,
-      supporting_documents: body.supporting_documents || null,
+      technical_proposal: technicalProposalDocument,
+      supporting_documents: supportingDocuments,
       no_conflict_of_interest: noConflictOfInterest,
-      conflict_of_interest_person: noConflictOfInterest ? null : conflictOfInterestPerson,
-      no_past_scm_issues: noPastScmIssues,
+      conflict_of_interest_person: null,
+      no_past_scm_issues: supplierDeclaration,
+      past_scm_issues_details: null,
+      digital_signature: digitalSignaturePath,
+      signature_name: signatureName || null,
+      signature_signed_at: body.signature_signed_at ? new Date(String(body.signature_signed_at)) : (digitalSignaturePath ? new Date() : null),
       status: "submitted",
     },
   });
@@ -146,7 +175,7 @@ export async function POST(request: Request) {
   }
 
   await logAudit("SUBMIT_BID", user!.id, `Submitted bid for ${project.title}`, "bid", project.id);
-  await notifyAdmins("new_bid", "New Bid Submitted", `${user!.company_name || user!.full_name} submitted a bid of ₱${bidAmount.toLocaleString()} on ${project.title}.`, `/admin/bid-evaluation?project=${project.id}`, bid.id);
+  await notifyAdmins("new_bid", "New Bid Submitted", `${user!.company_name || user!.full_name} submitted an offered price of ₱${bidAmount.toLocaleString()} on ${project.title}.`, `/admin/bid-evaluation?project=${project.id}`, bid.id);
 
   // publish SSE for real-time clients
   try {

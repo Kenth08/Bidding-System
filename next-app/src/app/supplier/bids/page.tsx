@@ -8,6 +8,14 @@ import { Bid } from "@/types/bid";
 import SupplierBidProgress from "@/components/shared/SupplierBidProgress";
 import Modal from "@/components/shared/Modal";
 
+function getBidDocuments(bid: Bid) {
+  return [
+    { label: "Quotation / Price Proposal", url: bid?.quotation_document || bid?.quotation_file },
+    { label: "Technical Proposal / Specifications", url: bid?.technical_proposal || bid?.technical_document },
+    { label: "Supporting Documents", url: bid?.supporting_documents },
+  ].filter((item) => Boolean(item.url));
+}
+
 export default function SupplierBids() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,7 +114,7 @@ export default function SupplierBids() {
         <thead className="border-b border-slate-100 bg-slate-50/60">
           <tr>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Project</th>
-            <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Amount</th>
+            <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Offered Price</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Rank</th>
             <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Evaluation Remarks</th>
@@ -143,7 +151,7 @@ export default function SupplierBids() {
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-4">
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Amount</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Offered Price</p>
                 <p className="mt-1 text-base font-semibold text-slate-900">₱{Number(selectedBid.bid_amount).toLocaleString()}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
@@ -157,6 +165,30 @@ export default function SupplierBids() {
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Result</p>
                 <p className="mt-1 text-base font-semibold text-slate-900">{getDisplayStatus(selectedBid)}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Required Bid Documents</p>
+              <div className="mt-3 space-y-2">
+                {getBidDocuments(selectedBid).map((doc) => (
+                  <a key={doc.label} href={String(doc.url)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50">
+                    <span>{doc.label}</span>
+                    <span className="text-xs font-medium text-emerald-600">Open</span>
+                  </a>
+                ))}
+                {!getBidDocuments(selectedBid).length ? <p className="text-sm text-slate-500">No bid documents uploaded.</p> : null}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Conflict of Interest</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{selectedBid.no_conflict_of_interest ? "No Conflict of Interest" : "Conflict Declared"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Supplier Declaration</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{selectedBid.no_past_scm_issues ? "Confirmed" : "Not Confirmed"}</p>
               </div>
             </div>
 

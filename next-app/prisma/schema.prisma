@@ -39,6 +39,17 @@ model User {
   
   // Existing fields
   philgeps_registration    String?
+  philgeps_registration_expiry DateTime?
+  bir_form_2303            String?
+  valid_id_type            String?
+  valid_id_number          String?
+  representative_job_title String?
+  iso_certificate_type    String?
+  iso_certificate         String?
+  iso_certificate_expiry  DateTime?
+  bank_name               String?
+  bank_account_name       String?
+  bank_account_number     String?
   tax_clearance            String?
   valid_id                 String?
   supporting_documents     String?
@@ -133,6 +144,11 @@ model Bid {
   no_conflict_of_interest Boolean          @default(false)
   conflict_of_interest_person String?
   no_past_scm_issues   Boolean            @default(false)
+  past_scm_issues_details String?
+  signed_bid_form      String?
+  digital_signature    String?
+  signature_name       String?
+  signature_signed_at  DateTime?
   technical_document   String?
   status               String             @default("submitted") @db.VarChar(50)
   technical_compliance Boolean?           @default(false)
@@ -186,6 +202,9 @@ model DocumentUpload {
   file                String?
   file_size           Int      @default(0)
   verification_status String   @default("Pending") @db.VarChar(20)
+  verification_notes   String?
+  verified_by_id      String?  @db.Uuid
+  verified_at         DateTime?
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
   user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)

@@ -13,11 +13,13 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expiringDocs, setExpiringDocs] = useState<any[]>([]);
 
   useEffect(() => {
     Promise.all([
       dashboardAPI.getStats().then((r) => setStats(r.data)).catch(() => setStats(null)),
       projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setProjects([])),
+      dashboardAPI.getExpiringDocs().then((r) => setExpiringDocs(r.data?.items || [])).catch(() => setExpiringDocs([])),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -65,6 +67,22 @@ export default function AdminDashboard() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Expiring Documents (30 days)</h3>
+          {expiringDocs.length === 0 ? <p className="text-xs text-slate-400">No documents expiring within 30 days</p> : (
+            <ul className="space-y-2">
+              {expiringDocs.slice(0, 6).map((d: any) => (
+                <li key={`${d.user_id}-${d.document}`} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{d.name}</p>
+                    <p className="text-xs text-slate-400">{d.document}</p>
+                  </div>
+                  <div className="text-xs text-slate-500">{new Date(d.expiry).toLocaleDateString()}</div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>
