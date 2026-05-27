@@ -25,6 +25,85 @@ function parseBoolean(value: unknown) {
   return value === true || value === "true" || value === "1" || value === "on";
 }
 
+interface VerificationCheckResult {
+  isValid: boolean;
+  missingFields: Array<{ field: string; label: string }>;
+  expiredFields: Array<{ field: string; label: string; expiryDate: string }>;
+}
+
+function checkSupplierVerification(user: any): VerificationCheckResult {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const missingFields: Array<{ field: string; label: string }> = [];
+  const expiredFields: Array<{ field: string; label: string; expiryDate: string }> = [];
+
+  // Check verification status
+  if (user.verification_status !== "approved") {
+    missingFields.push({ field: "verification_status", label: "Account not fully verified" });
+  }
+
+  // Check required legal documents
+  if (!user.sec_dti_certificate) {
+    missingFields.push({ field: "sec_dti_certificate", label: "SEC or DTI Certificate" });
+  }
+  if (!user.mayors_permit) {
+    missingFields.push({ field: "mayors_permit", label: "Mayor's Permit" });
+  }
+  if (user.mayors_permit_expiry && new Date(user.mayors_permit_expiry) < today) {
+    expiredFields.push({
+      field: "mayors_permit_expiry",
+      label: "Mayor's Permit",
+      expiryDate: new Date(user.mayors_permit_expiry).toLocaleDateString(),
+    });
+  }
+  if (!user.philgeps_registration) {
+    missingFields.push({ field: "philgeps_registration", label: "PhilGEPS Registration" });
+  }
+  if (!user.valid_id) {
+    missingFields.push({ field: "valid_id", label: "Valid ID" });
+  }
+
+  // Check required financial documents
+  if (!user.tax_clearance) {
+    missingFields.push({ field: "tax_clearance", label: "Tax Clearance" });
+  }
+  if (user.tax_clearance_expiry && new Date(user.tax_clearance_expiry) < today) {
+    expiredFields.push({
+      field: "tax_clearance_expiry",
+      label: "Tax Clearance",
+      expiryDate: new Date(user.tax_clearance_expiry).toLocaleDateString(),
+    });
+  }
+  if (!user.audited_financial_statements) {
+    missingFields.push({ field: "audited_financial_statements", label: "Audited Financial Statements" });
+  }
+  if (!user.bank_reference_document) {
+    missingFields.push({ field: "bank_reference_document", label: "Bank Reference Document" });
+  }
+
+  // Check blacklisting declaration
+  if (!user.not_blacklisted_declaration) {
+    missingFields.push({ field: "not_blacklisted_declaration", label: "Good Standing Declaration" });
+  }
+
+  // Check representative authorization
+  if (!user.representative_authorization_document) {
+    missingFields.push({
+      field: "representative_authorization_document",
+      label: "Representative Authorization / SPA",
+    });
+  }
+
+  const isValid = missingFields.length === 0 && expiredFields.length === 0;
+
+  return {
+    isValid,
+    missingFields,
+    expiredFields,
+  };
+}
+
 export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -61,6 +140,32 @@ export async function POST(request: Request) {
 
   if (user!.role !== "supplier" || !["approved", "active"].includes(user!.status)) {
     return json({ error: "Only approved suppliers can submit bids." }, 403);
+  }
+
+  // Perform comprehensive supplier verification check
+  const verificationCheck = checkSupplierVerification(user!);
+  if (!verificationCheck.isValid) {
+    const missingList = verificationCheck.missingFields
+      .map((f) => `• ${f.label}`)
+      .join("\n");
+    const expiredList = verificationCheck.expiredFields
+      .map((f) => `• ${f.label} (expired on ${f.expiryDate})`)
+      .join("\n");
+
+    let errorMessage =
+      "Your registration is incomplete. You cannot submit bids until the following are resolved:\n\n";
+    if (missingList) errorMessage += `Missing or Incomplete:\n${missingList}\n`;
+    if (expiredList) errorMessage += `\nExpired Documents:\n${expiredList}\n`;
+    errorMessage += "\n\nPlease update your profile to complete the verification process.";
+
+    return json(
+      {
+        error: errorMessage,
+        missingFields: verificationCheck.missingFields,
+        expiredFields: verificationCheck.expiredFields,
+      },
+      403
+    );
   }
 
   const contentType = request.headers.get("content-type") || "";
