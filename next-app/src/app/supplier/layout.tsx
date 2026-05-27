@@ -6,6 +6,7 @@ import SupplierSidebar from "@/components/supplier/SupplierSidebar";
 import SupplierProfileModal from "@/components/supplier/SupplierProfileModal";
 import SupplierSettingsModal from "@/components/supplier/SupplierSettingsModal";
 import { useAuthStore } from "@/stores/auth";
+import { notificationsAPI } from "@/services/api";
 
 const PATH_TO_PAGE: Record<string, string> = { "": "dashboard", "projects": "available-projects", "bids": "my-bids", "results": "results", "profile": "profile" };
 const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "available-projects": "projects", "my-bids": "bids", "results": "results", "profile": "profile" };
@@ -19,6 +20,40 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   useEffect(() => { restoreSession(); }, [restoreSession]);
+
+  // auto-clear notifications when user navigates to a page matching a notification
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    (async () => {
+      try {
+        const res = await notificationsAPI.getAll();
+        const items = res.data.results || res.data || [];
+        const currUrl = new URL(window.location.href);
+        const currPath = currUrl.pathname;
+        const currProject = currUrl.searchParams.get("project");
+        const toMark: string[] = [];
+        for (const it of items) {
+          if (it.is_read) continue;
+          const link = String(it.link || "").trim();
+          if (!link) continue;
+          try {
+            const parsed = new URL(link, window.location.origin);
+            if (parsed.pathname === currPath) {
+              // if project query present, require match (if notification has project)
+              const p = parsed.searchParams.get("project");
+              if (!p || p === currProject) toMark.push(it.id);
+            }
+          } catch {
+            const [path] = link.split("?");
+            if (path === currPath) toMark.push(it.id);
+          }
+        }
+        if (toMark.length) await Promise.all(toMark.map((id) => notificationsAPI.markOneRead(id).catch(() => {})));
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, [pathname]);
 
   useEffect(() => {
     if (!user) return;
