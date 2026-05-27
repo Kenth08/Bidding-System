@@ -20,11 +20,16 @@ function LoginPageContent() {
 
   useEffect(() => {
     const err = searchParams.get("error");
+    const verified = searchParams.get("verified");
+    const emailFromQuery = searchParams.get("email");
     if (err === "pending") setError("Your account is pending admin approval. Please wait for verification.");
     else if (err === "rejected") setError("Your registration has been rejected. Please contact the administrator.");
     else if (err === "inactive") setError("Your account is inactive.");
     else if (err === "auth_failed") setError("Google authentication failed. Please try again.");
     else if (err === "missing_code") setError("Google sign-in was interrupted. Please try again.");
+    else if (verified === "1") setError("Email verified successfully. You can now sign in.");
+
+    if (emailFromQuery) setEmail(emailFromQuery);
   }, [searchParams]);
 
   async function handleGoogleLogin() {
@@ -62,6 +67,10 @@ function LoginPageContent() {
       const response = (err as { response?: { data?: { error?: string; incomplete?: boolean; user?: { email?: string } } } })?.response?.data;
       if (response?.incomplete && response?.user?.email) {
         router.push(`/register?email=${encodeURIComponent(response.user.email)}&from=google`);
+        return;
+      }
+      if ((response as any)?.email_verification_required && (response as any)?.email) {
+        router.push(`/verify-email?email=${encodeURIComponent((response as any).email)}`);
         return;
       }
       const msg = response?.error || "Login failed. Please try again.";

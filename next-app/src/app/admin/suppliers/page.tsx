@@ -71,6 +71,7 @@ export default function AdminSuppliers() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Business Type</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Qualification Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Email Verified</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Registered</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
             </tr></thead>
@@ -84,6 +85,11 @@ export default function AdminSuppliers() {
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${s.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : s.verification_status === "verification_rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
                       {s.verification_status || "pending"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${s.email_verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                      {s.email_verified ? "Verified" : "Not Verified"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{s.created_at ? new Date(s.created_at).toLocaleDateString() : "\u2014"}</td>
@@ -116,7 +122,9 @@ export default function AdminSuppliers() {
                 { label: "Business Type", value: viewing.business_type || "\u2014" },
                 { label: "Status", value: viewing.status },
                 { label: "Qualification Status", value: viewing.verification_status || "pending" },
+                { label: "Email Verified", value: viewing.email_verified ? "Verified" : "Not Verified" },
                 { label: "Registered", value: viewing.created_at ? new Date(viewing.created_at).toLocaleDateString() : "\u2014" },
+                { label: "Email Verified At", value: viewing.email_verified_at ? new Date(viewing.email_verified_at).toLocaleDateString() : "\u2014" },
                 { label: "Verified At", value: viewing.verified_at ? new Date(viewing.verified_at).toLocaleDateString() : "\u2014" },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>

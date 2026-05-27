@@ -24,6 +24,10 @@ export async function POST(request: Request) {
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return NextResponse.json({ error: "Wrong password." }, { status: 401 });
 
+  if (user.role === "supplier" && !user.email_verified) {
+    return NextResponse.json({ error: "Please verify your email before signing in.", email_verification_required: true, email: user.email }, { status: 403 });
+  }
+
   if (user.role === "supplier" && user.status === "pending") {
     return NextResponse.json({ error: "Your account is pending admin approval." }, { status: 403 });
   }

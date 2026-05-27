@@ -1,0 +1,90 @@
+import crypto from "crypto";
+import nodemailer from "nodemailer";
+
+const CODE_LENGTH = 6;
+const CODE_EXPIRY_MINUTES = 10;
+const RESEND_COOLDOWN_SECONDS = 60;
+const MAX_VERIFICATION_ATTEMPTS = 5;
+
+export function generateVerificationCode() {
+  const min = 10 ** (CODE_LENGTH - 1);
+  const max = 10 ** CODE_LENGTH - 1;
+  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
+
+export function hashVerificationCode(email: string, code: string) {
+  const secret = process.env.EMAIL_VERIFICATION_SECRET || process.env.JWT_SECRET || "default-verification-secret";
+  return crypto.createHash("sha256").update(`${email.toLowerCase()}:${code}:${secret}`).digest("hex");
+}
+
+export function buildVerificationCodePayload(email: string) {
+  const code = generateVerificationCode();
+  const codeHash = hashVerificationCode(email, code);
+  const expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000);
+  return { code, codeHash, expiresAt };
+}
+
+function getSmtpTransport() {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.");
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+}
+
+export async function sendVerificationCodeEmail(params: { to: string; fullName?: string; code: string }) {
+  const fromEmail = process.env.SMTP_FROM_EMAIL;
+  const fromName = process.env.SMTP_FROM_NAME || "Blockchain E-Procurement";
+  if (!fromEmail) {
+    throw new Error("SMTP_FROM_EMAIL is not configured.");
+  }
+
+  const transporter = getSmtpTransport();
+  const recipientName = params.fullName?.trim() || "Supplier";
+  const subject = "Email Verification Code - Blockchain E-Procurement";
+  const text = [
+    `Hello ${recipientName},`,
+    "",
+    "Use this verification code to verify your email address:",
+    `${params.code}`,
+    "",
+    `This code expires in ${CODE_EXPIRY_MINUTES} minutes.`,
+    "If you did not request this, you can ignore this email.",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a;max-width:560px;margin:0 auto;padding:20px;">
+      <h2 style="margin:0 0 8px;">Email Verification</h2>
+      <p style="margin:0 0 16px;">Hello ${recipientName},</p>
+      <p style="margin:0 0 12px;">Use this verification code to complete your supplier registration:</p>
+      <div style="font-size:28px;font-weight:700;letter-spacing:6px;background:#f1f5f9;padding:14px 16px;border-radius:10px;display:inline-block;">${params.code}</div>
+      <p style="margin:14px 0 0;font-size:13px;color:#475569;">This code expires in ${CODE_EXPIRY_MINUTES} minutes.</p>
+      <p style="margin:10px 0 0;font-size:13px;color:#64748b;">If you did not request this, you can ignore this email.</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `${fromName} <${fromEmail}>`,
+    to: params.to,
+    subject,
+    text,
+    html,
+  });
+}
+
+export const emailVerificationRules = {
+  codeLength: CODE_LENGTH,
+  codeExpiryMinutes: CODE_EXPIRY_MINUTES,
+  resendCooldownSeconds: RESEND_COOLDOWN_SECONDS,
+  maxAttempts: MAX_VERIFICATION_ATTEMPTS,
+};

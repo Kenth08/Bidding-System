@@ -334,20 +334,29 @@ function RegisterPageContent() {
               </div>
               <h1 className="mt-4 text-2xl font-bold text-emerald-700">Registration Submitted!</h1>
               <p className="mt-2 text-sm text-slate-500">
-                Your account is pending admin verification.
+                Your account is pending admin approval.
                 <br />
-                Once all documents are verified, you'll be able to submit bids.
+                Verify your email first using the code sent to your inbox.
               </p>
               <p className="mt-3 text-sm text-slate-500">
                 Registered Email: <span className="font-semibold text-slate-700">{form.email as string}</span>
               </p>
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="mt-6 rounded-xl border border-emerald-100 px-4 py-2.5 text-sm font-semibold text-emerald-600 transition-all duration-150 hover:bg-emerald-50"
-              >
-                Back to Login
-              </button>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/verify-email?email=${encodeURIComponent(String(form.email || ""))}`)}
+                  className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600"
+                >
+                  Verify Email Now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/login")}
+                  className="rounded-xl border border-emerald-100 px-4 py-2.5 text-sm font-semibold text-emerald-600 transition-all duration-150 hover:bg-emerald-50"
+                >
+                  Back to Login
+                </button>
+              </div>
             </div>
           ) : (
             <>

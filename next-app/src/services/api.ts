@@ -41,6 +41,8 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (email: string, password: string) => api.post("/auth/login", { email, password }),
   register: (data: FormData | object) => api.post("/auth/register", data, data instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined),
+  verifyEmail: (email: string, code: string) => api.post("/auth/verify-email", { email, code }),
+  resendVerificationCode: (email: string) => api.post("/auth/resend-verification-code", { email }),
   me: () => api.get("/auth/me"),
   updateProfile: (data: object) => api.patch("/auth/me", data),
   refreshToken: (refresh: string) => api.post("/auth/token/refresh", { refresh }),

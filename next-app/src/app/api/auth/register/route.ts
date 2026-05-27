@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
 import { dbDirect } from "@/lib/db-direct";
 import { logAudit, notifyAdmins } from "@/lib/actions";
+import { buildVerificationCodePayload, sendVerificationCodeEmail } from "@/lib/email-verification";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -124,6 +125,17 @@ export async function POST(request: Request) {
       },
     });
 
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        email_verified: true,
+        email_verified_at: new Date(),
+        email_verification_code_hash: null,
+        email_verification_expires_at: null,
+        email_verification_attempts: 0,
+      },
+    });
+
     await logAudit("CREATE", user.id, `Supplier registration completed for ${company_name}`, "supplier", user.id).catch(() => {});
     await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", user.id).catch(() => {});
 
@@ -155,6 +167,8 @@ export async function POST(request: Request) {
   }
 
   const password_hash = await bcrypt.hash(password, 12);
+  const verification = buildVerificationCodePayload(email);
+
   const user = await db.user.create({
     data: {
       id: uuid(),
@@ -195,6 +209,18 @@ export async function POST(request: Request) {
     },
   });
 
+  await db.user.update({
+    where: { id: user.id },
+    data: {
+      email_verified: false,
+      email_verified_at: null,
+      email_verification_code_hash: verification.codeHash,
+      email_verification_expires_at: verification.expiresAt,
+      email_verification_attempts: 0,
+      email_verification_sent_at: new Date(),
+    },
+  });
+
   // Save document uploads
   for (const key of docFields) {
     if (docPaths[key]) {
@@ -207,5 +233,11 @@ export async function POST(request: Request) {
   await logAudit("CREATE", user.id, `Supplier registration submitted for ${company_name}`, "supplier", user.id).catch(() => {});
   await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", user.id).catch(() => {});
 
-  return NextResponse.json({ message: "Registration submitted. Pending admin approval." }, { status: 201 });
+  await sendVerificationCodeEmail({
+    to: email,
+    fullName: full_name,
+    code: verification.code,
+  });
+
+  return NextResponse.json({ message: "Registration submitted. Check your email for the verification code.", verification_required: true, email }, { status: 201 });
 }

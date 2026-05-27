@@ -54,6 +54,12 @@ model User {
   valid_id                 String?
   supporting_documents     String?
   verification_status      String             @default("pending") @db.VarChar(20)
+  email_verified           Boolean            @default(false)
+  email_verified_at        DateTime?
+  email_verification_code_hash String?
+  email_verification_expires_at DateTime?
+  email_verification_attempts Int             @default(0)
+  email_verification_sent_at DateTime?
   verified_at              DateTime?
   verified_by_id           String?            @db.Uuid
   verification_notes       String?

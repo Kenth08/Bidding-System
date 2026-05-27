@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ redirect: "/login?error=pending" }, { status: 403 });
   }
 
+  if (existingUser.role === "supplier" && !existingUser.email_verified) {
+    return NextResponse.json({ redirect: `/verify-email?email=${encodeURIComponent(existingUser.email)}` }, { status: 403 });
+  }
+
   if (existingUser.status === "rejected") {
     return NextResponse.json({ redirect: "/login?error=rejected" }, { status: 403 });
   }

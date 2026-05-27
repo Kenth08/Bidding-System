@@ -3,19 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "db:generate": "echo 'Prisma disabled - using Supabase instead'",
-    "db:pull": "echo 'Prisma disabled - using Supabase instead'",
-    "db:push": "echo 'Prisma disabled - using Supabase instead'",
-    "db:migrate": "echo 'Prisma disabled - using Supabase instead'",
-    "db:studio": "echo 'Prisma disabled - using Supabase instead'",
-    "db:seed": "echo 'Prisma disabled - using Supabase instead'"
-  },
-
-  "scripts": {
     "migrate:run": "node prisma/run-migrations.js"
   },
   "dependencies": {
@@ -28,6 +15,7 @@
     "jose": "^6.2.3",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
+    "nodemailer": "^8.0.9",
     "pg": "^8.21.0",
     "prisma": "^7.8.0",
     "react": "19.2.4",
