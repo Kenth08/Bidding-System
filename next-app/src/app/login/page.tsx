@@ -62,7 +62,7 @@ function LoginPageContent() {
       if (role === "admin") router.push("/admin");
       else if (role === "school_head") router.push("/school-head");
       else if (role === "supplier") router.push("/supplier");
-      else router.push("/");
+      else router.push("/supplier");
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { error?: string; incomplete?: boolean; user?: { email?: string } } } })?.response?.data;
       if (response?.incomplete && response?.user?.email) {

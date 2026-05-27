@@ -61,10 +61,20 @@ export async function POST(request: Request) {
 
   const existing = await dbDirect.user.findUnique({ where: { email } });
 
+  const hasRealAccount = Boolean(
+    existing && (
+      existing.password_hash ||
+      existing.role !== "viewer" ||
+      existing.company_name ||
+      existing.company_profile ||
+      existing.business_permit_document ||
+      existing.philgeps_registration ||
+      existing.supporting_documents
+    )
+  );
+
   // Google flow: create new user without password
   if (fromGoogle) {
-    if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
-
     const docFields = [
       "business_permit_document",
       "philgeps_registration",
@@ -85,45 +95,51 @@ export async function POST(request: Request) {
       docPaths[key] = file && file.size > 0 ? await saveFile(file, "documents") : null;
     }
 
-    const user = await dbDirect.user.create({
-      data: {
-        id: uuid(),
-        full_name,
-        email,
-        password_hash: "",
-        role: "supplier",
-        status: "pending",
-        company_name,
-        company_address,
-        phone,
-        business_type,
-        representative_name,
-        tin,
-        company_profile,
-        business_permit_document: docPaths.business_permit_document,
-        philgeps_registration: docPaths.philgeps_registration,
-        philgeps_registration_expiry: philgeps_registration_expiry,
-        bir_form_2303: docPaths.bir_form_2303,
-        valid_id: docPaths.valid_id,
-        valid_id_type,
-        valid_id_number,
-        supporting_documents: docPaths.supporting_documents,
-        representative_job_title,
-        iso_certificate_type,
-        iso_certificate: docPaths.iso_certificate,
-        iso_certificate_expiry,
-        bank_name,
-        bank_account_name,
-        bank_account_number,
-        not_blacklisted_declaration,
-        blacklisting_declaration_document: docPaths.blacklisting_declaration_document,
-        audited_financial_statements: docPaths.audited_financial_statements,
-        financial_statement_year,
-        bank_reference_document: docPaths.bank_reference_document,
-        performance_certificates: docPaths.performance_certificates,
-        representative_authorization_document: docPaths.representative_authorization_document,
-      },
-    });
+    const profileData = {
+      full_name,
+      email,
+      password_hash: existing?.password_hash || "",
+      role: existing?.role || "supplier",
+      status: "pending",
+      company_name,
+      company_address,
+      phone,
+      business_type,
+      representative_name,
+      tin,
+      company_profile,
+      business_permit_document: docPaths.business_permit_document,
+      philgeps_registration: docPaths.philgeps_registration,
+      philgeps_registration_expiry: philgeps_registration_expiry,
+      bir_form_2303: docPaths.bir_form_2303,
+      valid_id: docPaths.valid_id,
+      valid_id_type,
+      valid_id_number,
+      supporting_documents: docPaths.supporting_documents,
+      representative_job_title,
+      iso_certificate_type,
+      iso_certificate: docPaths.iso_certificate,
+      iso_certificate_expiry,
+      bank_name,
+      bank_account_name,
+      bank_account_number,
+      not_blacklisted_declaration,
+      blacklisting_declaration_document: docPaths.blacklisting_declaration_document,
+      audited_financial_statements: docPaths.audited_financial_statements,
+      financial_statement_year,
+      bank_reference_document: docPaths.bank_reference_document,
+      performance_certificates: docPaths.performance_certificates,
+      representative_authorization_document: docPaths.representative_authorization_document,
+    };
+
+    const user = existing
+      ? await dbDirect.user.update({ where: { id: existing.id }, data: profileData })
+      : await dbDirect.user.create({
+          data: {
+            id: uuid(),
+            ...profileData,
+          },
+        });
 
     await db.user.update({
       where: { id: user.id },
@@ -143,7 +159,12 @@ export async function POST(request: Request) {
   }
 
   // Normal email/password flow
-  if (existing) return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
+  if (existing) {
+    if (hasRealAccount) {
+      return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
+    }
+    return NextResponse.json({ error: "This email already has a pending Google registration. Please continue with Google." }, { status: 409 });
+  }
 
   // Save uploaded documents
   const docFields = [

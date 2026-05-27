@@ -7,6 +7,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const USERS_TABLE = 'public.users';
+
 type UserQueryParams = {
   where?: Record<string, any>;
   orderBy?: Record<string, "asc" | "desc"> | Array<Record<string, "asc" | "desc">>;
@@ -141,11 +143,11 @@ export const dbDirect = {
       const client = await pool.connect();
       try {
         if (filter.email) {
-          const result = await client.query('SELECT * FROM users WHERE email = $1', [filter.email]);
+          const result = await client.query(`SELECT * FROM ${USERS_TABLE} WHERE email = $1`, [filter.email]);
           return result.rows[0] || null;
         }
         if (filter.id) {
-          const result = await client.query('SELECT * FROM users WHERE id = $1', [filter.id]);
+          const result = await client.query(`SELECT * FROM ${USERS_TABLE} WHERE id = $1`, [filter.id]);
           return result.rows[0] || null;
         }
         return null;
@@ -157,7 +159,7 @@ export const dbDirect = {
     findFirst: async (params: UserQueryParams = {}) => {
       const client = await pool.connect();
       try {
-        const result = await client.query('SELECT * FROM users');
+        const result = await client.query(`SELECT * FROM ${USERS_TABLE}`);
         const rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
         const sorted = sortRows(rows, params.orderBy);
         const row = applyTake(sorted, { take: 1 })[0] || null;
@@ -176,7 +178,7 @@ export const dbDirect = {
     findMany: async (params: UserQueryParams = {}) => {
       const client = await pool.connect();
       try {
-        const result = await client.query('SELECT * FROM users');
+        const result = await client.query(`SELECT * FROM ${USERS_TABLE}`);
         const filtered = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
         const sorted = sortRows(filtered, params.orderBy);
         const limited = applyTake(sorted, params);
@@ -200,7 +202,7 @@ export const dbDirect = {
     count: async (params: UserQueryParams = {}) => {
       const client = await pool.connect();
       try {
-        const result = await client.query('SELECT * FROM users');
+        const result = await client.query(`SELECT * FROM ${USERS_TABLE}`);
         return result.rows.filter((row) => matchesWhere(row, params.where ?? params)).length;
       } finally {
         client.release();
@@ -213,7 +215,7 @@ export const dbDirect = {
       const client = await pool.connect();
       try {
         const result = await client.query(
-          `INSERT INTO users (
+          `INSERT INTO ${USERS_TABLE} (
               id, full_name, email, password_hash, role, status,
               company_name, company_address, phone, business_type,
               representative_name, tin, company_profile, supporting_documents,
@@ -288,7 +290,7 @@ export const dbDirect = {
         const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
         const values = entries.map(([, value]) => value);
         const result = await client.query(
-          `UPDATE users SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`,
+          `UPDATE ${USERS_TABLE} SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`,
           [id, ...values]
         );
         return result.rows[0] || null;
@@ -305,7 +307,7 @@ export const dbDirect = {
 
       const client = await pool.connect();
       try {
-        const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
+        const result = await client.query(`DELETE FROM ${USERS_TABLE} WHERE id = $1 RETURNING *`, [id]);
         return result.rows[0] || null;
       } finally {
         client.release();

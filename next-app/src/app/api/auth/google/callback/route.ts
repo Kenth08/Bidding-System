@@ -11,7 +11,19 @@ export async function POST(request: Request) {
   // Check if user exists in our DB
   const existingUser = await dbDirect.user.findUnique({ email });
 
-  if (!existingUser) {
+  const hasRealAccount = Boolean(
+    existingUser && (
+      existingUser.password_hash ||
+      existingUser.role !== "viewer" ||
+      existingUser.company_name ||
+      existingUser.company_profile ||
+      existingUser.business_permit_document ||
+      existingUser.philgeps_registration ||
+      existingUser.supporting_documents
+    )
+  );
+
+  if (!hasRealAccount) {
     return NextResponse.json({ redirect: `/register?email=${encodeURIComponent(email)}&from=google&message=no_account` }, { status: 404 });
   }
 
