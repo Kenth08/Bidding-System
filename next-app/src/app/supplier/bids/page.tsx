@@ -4,10 +4,13 @@ import { bidsAPI } from "@/services/api";
 import StatusBadge from "@/components/shared/StatusBadge";
 import EmptyState from "@/components/shared/EmptyState";
 import { Bid } from "@/types/bid";
+import SupplierBidProgress from "@/components/shared/SupplierBidProgress";
+import Modal from "@/components/shared/Modal";
 
 export default function SupplierBids() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
 
   const getProjectTitle = (project: Bid["project"]) => {
     if (typeof project === "string") return project;
@@ -71,7 +74,7 @@ export default function SupplierBids() {
         </thead>
         <tbody className="divide-y divide-slate-50">
           {bids.map((b) => (
-            <tr key={b.id} className="transition hover:bg-slate-50/50">
+                <tr key={b.id} onClick={() => setSelectedBid(b)} className="cursor-pointer transition hover:bg-slate-50/50">
               <td className="px-5 py-3.5 font-medium text-slate-900">
                 <div className="space-y-1">
                   <p>{getProjectTitle(b.project)}</p>
@@ -84,10 +87,48 @@ export default function SupplierBids() {
               <td className="px-5 py-3.5 text-slate-600">
                 <p className="max-w-[28rem] whitespace-pre-wrap text-sm leading-6 text-slate-600">{getEvaluationRemarks(b)}</p>
               </td>
-            </tr>
+                </tr>
           ))}
         </tbody>
       </table>
+
+      <Modal
+        isOpen={Boolean(selectedBid)}
+        onClose={() => setSelectedBid(null)}
+        title={selectedBid ? getProjectTitle(selectedBid.project) : "Bid Details"}
+        subtitle={selectedBid ? getBidStatusNote(selectedBid) : undefined}
+        size="xl"
+      >
+        {selectedBid ? (
+          <div className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Amount</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">₱{Number(selectedBid.bid_amount).toLocaleString()}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</p>
+                <div className="mt-2"><StatusBadge status={selectedBid.status} /></div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Rank</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{selectedBid.rank ?? "—"}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Result</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{getBidStatusNote(selectedBid)}</p>
+              </div>
+            </div>
+
+            <SupplierBidProgress status={selectedBid.status} />
+
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evaluation Remarks</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{getEvaluationRemarks(selectedBid)}</p>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

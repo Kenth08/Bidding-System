@@ -11,6 +11,7 @@ import { Project } from "@/types/project";
 
 export default function SupplierProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [bids, setBids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Project | null>(null);
   const [bidAmount, setBidAmount] = useState("");
@@ -25,8 +26,27 @@ export default function SupplierProjects() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
-    projectsAPI.getAll("active").then((r) => setProjects(r.data)).catch(() => {}).finally(() => setLoading(false));
+    async function load() {
+      try {
+        const [projectsRes, bidsRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll()]);
+        setProjects(projectsRes.data);
+        setBids(bidsRes.data);
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
   }, []);
+
+  const submittedProjectIds = new Set(
+    bids.map((bid) => {
+      if (typeof bid.project === "string") return bid.project;
+      return bid.project?.id || "";
+    }).filter(Boolean)
+  );
 
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -102,8 +122,19 @@ export default function SupplierProjects() {
                 <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{new Date(p.deadline).toLocaleDateString()}</span>
               </div>
             </div>
-            <button onClick={() => setSelected(p)} className="shrink-0 rounded-full bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100">Submit Bid</button>
+            <button
+              onClick={() => {
+                if (submittedProjectIds.has(p.id)) return;
+                setSelected(p);
+              }}
+              disabled={submittedProjectIds.has(p.id)}
+              aria-disabled={submittedProjectIds.has(p.id)}
+              className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${submittedProjectIds.has(p.id) ? "bg-slate-100 text-slate-400" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
+            >
+              {submittedProjectIds.has(p.id) ? "Bid Submitted" : "Submit Bid"}
+            </button>
           </div>
+          {submittedProjectIds.has(p.id) ? <p className="mt-3 text-xs font-medium text-emerald-600">You already submitted a bid for this project.</p> : null}
         </div>
       ))}
 

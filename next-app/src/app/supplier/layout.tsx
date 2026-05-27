@@ -53,18 +53,32 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     if (link.startsWith("/supplier")) router.push(link);
   }
 
-  const currentUser = user ? {
-    fullName: user.full_name,
-    email: user.email,
-    full_name: user.full_name,
-    company_name: user.company_name,
-    company_address: user.company_address,
-    phone: user.phone,
-    business_type: user.business_type,
-    representative_name: user.representative_name ?? undefined,
-    tin: user.tin ?? undefined,
-    status: user.status,
-  } : null;
+  function titleCase(value = "") {
+    return value
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ")
+      .trim();
+  }
+
+  const currentUser = user
+    ? (() => {
+        const raw = user.full_name || user.company_name || (user.email || "").split("@")[0] || "Supplier User";
+        const fullName = titleCase(String(raw));
+        return {
+          fullName,
+          email: user.email,
+          full_name: user.full_name,
+          company_name: user.company_name,
+          company_address: user.company_address,
+          phone: user.phone,
+          business_type: user.business_type,
+          representative_name: user.representative_name ?? undefined,
+          tin: user.tin ?? undefined,
+          status: user.status,
+        };
+      })()
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
