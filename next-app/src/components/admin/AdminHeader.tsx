@@ -14,7 +14,7 @@ function AdminProfileDropdown({ currentUser, onLogout }: { currentUser?: { fullN
     <div className="relative" ref={dropdownRef}>
       <button type="button" onClick={() => setIsOpen((p) => !p)} className="flex items-center gap-2.5 rounded-2xl px-2 py-1.5 transition-colors hover:bg-slate-50">
         <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-500 text-xs font-bold text-white">{(currentUser?.fullName || "A").charAt(0).toUpperCase()}</div>
-        <div className="text-left"><p className="text-xs font-semibold leading-none text-slate-700">{currentUser?.fullName || "Admin"}</p><p className="mt-0.5 text-xs text-slate-400">{currentUser?.email || "admin@eprocurement.gov"}</p></div>
+        <div className="text-left"><p className="text-xs font-semibold leading-none text-slate-700">{currentUser?.fullName || "Admin"}</p></div>
         <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
       </button>
       {isOpen ? (
@@ -22,7 +22,7 @@ function AdminProfileDropdown({ currentUser, onLogout }: { currentUser?: { fullN
           <div className="border-b border-slate-100 bg-slate-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-white">{(currentUser?.fullName || "A").charAt(0).toUpperCase()}</div>
-              <div><p className="text-sm font-semibold text-slate-800">{currentUser?.fullName || "Administrator"}</p><p className="text-xs text-slate-400">{currentUser?.email || "admin@eprocurement.gov"}</p></div>
+              <div><p className="text-sm font-semibold text-slate-800">{currentUser?.fullName || "Administrator"}</p></div>
             </div>
           </div>
           <div className="border-t border-slate-100 p-1.5">

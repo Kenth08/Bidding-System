@@ -1,5 +1,7 @@
 "use client";
 
+import { Check, Trophy } from "lucide-react";
+
 type LifecycleInput = {
   projectStatus?: string | null;
   procurementStatus?: string | null;
@@ -60,19 +62,29 @@ export default function BiddingLifecycleProgress(input: LifecycleInput) {
         {stages.map((stage, idx) => {
           const isDone = stage.state === "done";
           const isCurrent = stage.state === "current";
+          const isFinalStage = idx === stages.length - 1;
+          const nextStage = stages[idx + 1];
+          const connectorClass = nextStage
+            ? nextStage.state === "current"
+              ? "bg-gradient-to-r from-emerald-300 via-amber-300 to-slate-200"
+              : "bg-gradient-to-r from-emerald-300 to-slate-200"
+            : "";
 
           return (
             <div key={stage.key} className="relative rounded-xl border border-slate-100 bg-white p-3">
-              {!compact && idx < stages.length - 1 ? <span className="pointer-events-none absolute right-[-10px] top-5 hidden h-[2px] w-5 bg-slate-200 md:block" /> : null}
+              {!compact && idx < stages.length - 1 ? <span className={`pointer-events-none absolute right-[-10px] top-5 hidden h-[2px] w-5 md:block ${connectorClass}`} /> : null}
               <div className="flex flex-col items-center justify-center gap-2 text-center">
-                <span
-                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${isDone
-                    ? "bg-emerald-500 text-white"
-                    : isCurrent
-                      ? "bg-amber-500 text-white"
-                      : "bg-slate-200 text-slate-500"}`}
-                >
-                  {idx + 1}
+                <span className="relative inline-flex h-6 w-6 items-center justify-center">
+                  {isCurrent ? <span className="absolute inset-[-6px] rounded-full border border-amber-400/50 animate-pulse" /> : null}
+                  <span
+                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${isDone
+                      ? "bg-emerald-500 text-white"
+                      : isCurrent
+                        ? "bg-amber-500 text-white"
+                        : "border border-dashed border-slate-300 bg-slate-50 text-slate-400"}`}
+                  >
+                    {isDone ? (isFinalStage ? <Trophy className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />) : idx + 1}
+                  </span>
                 </span>
                 <p className={`text-xs font-semibold ${isDone ? "text-emerald-700" : isCurrent ? "text-amber-700" : "text-slate-500"}`}>{stage.label}</p>
               </div>
