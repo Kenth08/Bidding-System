@@ -25,6 +25,7 @@ export default function AdminSuppliers() {
   const [isDebugLoading, setIsDebugLoading] = useState(false);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   const [debugPayload, setDebugPayload] = useState<any>(null);
+  const [debugFetchedAt, setDebugFetchedAt] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
@@ -52,21 +53,28 @@ export default function AdminSuppliers() {
     }
   }
 
-  async function openWorkflowDebug() {
-    if (!viewing?.id) return;
+  async function fetchWorkflowDebugData(supplierId: string) {
     setIsDebugLoading(true);
     try {
-      const response = await suppliersAPI.getWorkflowDebug(viewing.id);
+      const response = await suppliersAPI.getWorkflowDebug(supplierId);
       setDebugPayload(response.data ?? null);
-      setIsDebugOpen(true);
+      setDebugFetchedAt(new Date().toISOString());
+      return true;
     } catch (error: any) {
       const message = error?.response?.data?.error || "Failed to load debug payload.";
       setDebugPayload({ error: message });
-      setIsDebugOpen(true);
+      setDebugFetchedAt(new Date().toISOString());
       setToast({ message, type: "error" });
+      return false;
     } finally {
       setIsDebugLoading(false);
     }
+  }
+
+  async function openWorkflowDebug() {
+    if (!viewing?.id) return;
+    await fetchWorkflowDebugData(viewing.id);
+    setIsDebugOpen(true);
   }
 
   const filtered = useMemo(() => suppliers.filter((s) => {
@@ -262,7 +270,22 @@ export default function AdminSuppliers() {
 
       <Modal isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} title="Workflow Debug Payload" size="xl">
         <div className="space-y-3">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Last fetched: {debugFetchedAt ? new Date(debugFetchedAt).toLocaleString() : "Not yet fetched"}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!viewing?.id) return;
+                  await fetchWorkflowDebugData(viewing.id);
+                }}
+                disabled={isDebugLoading || !viewing?.id}
+                className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDebugLoading ? "Refreshing..." : "Refresh"}
+              </button>
             <button
               type="button"
               onClick={async () => {
@@ -277,6 +300,7 @@ export default function AdminSuppliers() {
             >
               Copy JSON
             </button>
+            </div>
           </div>
           <pre className="max-h-[60vh] overflow-auto rounded-xl bg-slate-900 p-4 text-xs text-slate-100">
             {JSON.stringify(debugPayload ?? {}, null, 2)}
