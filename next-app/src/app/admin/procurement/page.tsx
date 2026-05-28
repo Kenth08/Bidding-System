@@ -10,13 +10,12 @@ import SearchBar from '@/components/shared/SearchBar';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { SkeletonTable } from '@/components/ui/Skeleton';
 import StrictNumberInput from '@/components/shared/StrictNumberInput';
-import DropdownWithMore from '@/components/shared/DropdownWithMore';
-
-const PROCUREMENT_TYPES = ["Goods", "Services", "Infrastructure"];
+const FALLBACK_PROCUREMENT_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
 const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: 'Services', procurementTypeCustom: '', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
 
 export default function AdminProcurement() {
   const [requests, setRequests] = useState<any[]>([]);
+  const [procurementTypes, setProcurementTypes] = useState<string[]>(FALLBACK_PROCUREMENT_TYPES);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -30,26 +29,34 @@ export default function AdminProcurement() {
     procurementAPI.getAll().then((res) => { setRequests(Array.isArray(res.data) ? res.data : res.data.results || []); setLoading(false); }).catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchRequests(); }, []);
+  useEffect(() => { 
+    fetchRequests(); 
+    fetch('/api/public/business-types')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const names = Array.isArray(data) ? data.map((item: any) => item.name).filter(Boolean) : [];
+        if (names.length) setProcurementTypes(names);
+      })
+      .catch(() => setProcurementTypes(FALLBACK_PROCUREMENT_TYPES));
+  }, []);
 
   const openCreate = () => { setEditingRequest(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = (r: any) => {
-    const procurementType = PROCUREMENT_TYPES.includes(r.procurement_type) ? r.procurement_type : '__more__';
+    const procurementType = procurementTypes.includes(r.procurement_type) ? r.procurement_type : procurementTypes[0] || '';
     setEditingRequest(r);
-    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType, procurementTypeCustom: procurementType === '__more__' ? String(r.procurement_type || '') : '', technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
+    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType, procurementTypeCustom: '', technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
     setShowModal(true);
   };
 
   const saveRequest = async () => {
     if (!form.projectTitle.trim() || !form.budget) return;
-    if (form.procurementType === '__more__' && !form.procurementTypeCustom.trim()) {
-      setToast({ message: 'Please type a custom procurement type or choose a preset option.', type: 'error' });
+    if (!form.procurementType.trim()) {
+      setToast({ message: 'Please choose a procurement type.', type: 'error' });
       return;
     }
     setIsSaving(true);
     try {
-      const procurementType = form.procurementType === '__more__' ? form.procurementTypeCustom.trim() : form.procurementType;
-      const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
+      const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: form.procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
       if (editingRequest) await procurementAPI.update(editingRequest.id, payload);
       else await procurementAPI.create(payload);
       setToast({ message: editingRequest ? 'Request updated' : 'Draft saved', type: 'success' });
@@ -148,7 +155,11 @@ export default function AdminProcurement() {
           </div>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span>
-            <DropdownWithMore value={form.procurementType} customValue={form.procurementTypeCustom} onChange={(value) => setForm({ ...form, procurementType: value, procurementTypeCustom: value === '__more__' ? form.procurementTypeCustom : '' })} onCustomValueChange={(value) => setForm({ ...form, procurementTypeCustom: value })} options={PROCUREMENT_TYPES} className={inputClass} selectPlaceholder="Select procurement type" customPlaceholder="Type a custom procurement type" helperText="Choose More... to add a custom procurement type." />
+            <select value={form.procurementType} onChange={(e) => setForm({ ...form, procurementType: e.target.value, procurementTypeCustom: '' })} className={inputClass}>
+              <option value="">Select category</option>
+              {procurementTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-slate-400">Choose the exact category name used in supplier registration.</p>
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span>
