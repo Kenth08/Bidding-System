@@ -79,6 +79,21 @@ function matchesWhere(row: any, where?: Record<string, any>) {
   });
 }
 
+function matchesBusinessTypeWhere(row: any, where?: Record<string, any>) {
+  if (!where) return true;
+  return Object.entries(where).every(([key, expected]) => {
+    if (expected === undefined) return true;
+    if (key === "name" && isPlainObject(expected)) {
+      const equals = expected.equals;
+      const mode = expected.mode;
+      if (typeof equals === "string" && mode === "insensitive") {
+        return String(row?.name || "").toLowerCase() === equals.toLowerCase();
+      }
+    }
+    return row?.[key] === expected;
+  });
+}
+
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
 }
@@ -378,6 +393,128 @@ export const dbDirect = {
       }
     },
 
+
+  businessType: {
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM business_types');
+        let rows = result.rows.filter((row) => matchesBusinessTypeWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+        return rows;
+      } finally {
+        client.release();
+      }
+    },
+
+    findUnique: async (where: { id?: string; where?: { id?: string } }) => {
+      const filter = where.where ?? where;
+      const client = await pool.connect();
+      try {
+        if (filter.id) {
+          const res = await client.query('SELECT * FROM business_types WHERE id = $1', [filter.id]);
+          return res.rows[0] || null;
+        }
+        return null;
+      } finally {
+        client.release();
+      }
+    },
+
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: any } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM business_types');
+        const filtered = result.rows.filter((row) => matchesBusinessTypeWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        return (applyTake(sorted, { take: 1 })[0]) || null;
+      } finally {
+        client.release();
+      }
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const id = data.id || uuid();
+        const result = await client.query(
+          `INSERT INTO business_types (id, name, description, is_active, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
+          [id, data.name, data.description ?? null, data.is_active ?? true]
+        );
+        return result.rows[0];
+      } finally {
+        client.release();
+      }
+    },
+  },
+
+  supplierBusinessType: {
+    findMany: async (params: { where?: Record<string, any>; include?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM supplier_business_types');
+        let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+
+        if (params.include?.business_type) {
+          const includeSelect = params.include.business_type.select;
+          const mapped = [] as any[];
+          for (const row of rows) {
+            const bt = row.business_type_id ? await client.query('SELECT * FROM business_types WHERE id = $1', [row.business_type_id]) : { rows: [] };
+            const business_type = bt.rows[0] || null;
+            const includedBusinessType = business_type && includeSelect ? Object.fromEntries(Object.entries(includeSelect).filter(([, enabled]) => enabled).map(([key]) => [key, business_type[key]])) : business_type;
+            mapped.push({ ...row, business_type: includedBusinessType });
+          }
+          return mapped;
+        }
+
+        return rows;
+      } finally {
+        client.release();
+      }
+    },
+
+    createMany: async (params: { data?: any[]; skipDuplicates?: boolean } = {}) => {
+      const data = params.data || [];
+      const client = await pool.connect();
+      try {
+        let count = 0;
+        for (const item of data) {
+          try {
+            await client.query(
+              `INSERT INTO supplier_business_types (supplier_id, business_type_id, created_at) VALUES ($1, $2, NOW())`,
+              [item.supplier_id, item.business_type_id]
+            );
+            count += 1;
+          } catch (err: any) {
+            if (!params.skipDuplicates) throw err;
+          }
+        }
+        return { count };
+      } finally {
+        client.release();
+      }
+    },
+
+    deleteMany: async (params: { where?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM supplier_business_types');
+        const rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        let count = 0;
+        for (const row of rows) {
+          await client.query('DELETE FROM supplier_business_types WHERE supplier_id = $1 AND business_type_id = $2', [row.supplier_id, row.business_type_id]);
+          count += 1;
+        }
+        return { count };
+      } finally {
+        client.release();
+      }
+    },
+  },
     findFirst: async (params: { where?: Record<string, any>; orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>; take?: number; limit?: number; select?: Record<string, any> } = {}) => {
       const client = await pool.connect();
       try {
@@ -490,6 +627,128 @@ export const dbDirect = {
           }
         }
         return { count: matches.length };
+      } finally {
+        client.release();
+      }
+    },
+  },
+
+  businessType: {
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM business_types');
+        let rows = result.rows.filter((row) => matchesBusinessTypeWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+        return rows;
+      } finally {
+        client.release();
+      }
+    },
+
+    findUnique: async (where: { id?: string; where?: { id?: string } }) => {
+      const filter = where.where ?? where;
+      const client = await pool.connect();
+      try {
+        if (filter.id) {
+          const res = await client.query('SELECT * FROM business_types WHERE id = $1', [filter.id]);
+          return res.rows[0] || null;
+        }
+        return null;
+      } finally {
+        client.release();
+      }
+    },
+
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: any } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM business_types');
+        const filtered = result.rows.filter((row) => matchesBusinessTypeWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        return (applyTake(sorted, { take: 1 })[0]) || null;
+      } finally {
+        client.release();
+      }
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const id = data.id || uuid();
+        const result = await client.query(
+          `INSERT INTO business_types (id, name, description, is_active, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
+          [id, data.name, data.description ?? null, data.is_active ?? true]
+        );
+        return result.rows[0];
+      } finally {
+        client.release();
+      }
+    },
+  },
+
+  supplierBusinessType: {
+    findMany: async (params: { where?: Record<string, any>; include?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM supplier_business_types');
+        let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+
+        if (params.include?.business_type) {
+          const includeSelect = params.include.business_type.select;
+          const mapped = [] as any[];
+          for (const row of rows) {
+            const bt = row.business_type_id ? await client.query('SELECT * FROM business_types WHERE id = $1', [row.business_type_id]) : { rows: [] };
+            const business_type = bt.rows[0] || null;
+            const includedBusinessType = business_type && includeSelect ? Object.fromEntries(Object.entries(includeSelect).filter(([, enabled]) => enabled).map(([key]) => [key, business_type[key]])) : business_type;
+            mapped.push({ ...row, business_type: includedBusinessType });
+          }
+          return mapped;
+        }
+
+        return rows;
+      } finally {
+        client.release();
+      }
+    },
+
+    createMany: async (params: { data?: any[]; skipDuplicates?: boolean } = {}) => {
+      const data = params.data || [];
+      const client = await pool.connect();
+      try {
+        let count = 0;
+        for (const item of data) {
+          try {
+            await client.query(
+              `INSERT INTO supplier_business_types (supplier_id, business_type_id, created_at) VALUES ($1, $2, NOW())`,
+              [item.supplier_id, item.business_type_id]
+            );
+            count += 1;
+          } catch (err: any) {
+            if (!params.skipDuplicates) throw err;
+          }
+        }
+        return { count };
+      } finally {
+        client.release();
+      }
+    },
+
+    deleteMany: async (params: { where?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM supplier_business_types');
+        const rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        let count = 0;
+        for (const row of rows) {
+          await client.query('DELETE FROM supplier_business_types WHERE supplier_id = $1 AND business_type_id = $2', [row.supplier_id, row.business_type_id]);
+          count += 1;
+        }
+        return { count };
       } finally {
         client.release();
       }
@@ -623,9 +882,37 @@ export const dbDirect = {
       const client = await pool.connect();
       try {
         const id = data.id || uuid();
+        const updatedAt = data.updated_at ?? new Date().toISOString();
         const result = await client.query(
-          `INSERT INTO bids_bid (id, project_id, supplier_id, bid_amount, status, submitted_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *`,
-          [id, data.project_id, data.supplier_id, data.bid_amount ?? null, data.status ?? 'submitted', data.submitted_at ?? null]
+          `INSERT INTO bids_bid (
+            id, project_id, supplier_id, company_name, bid_amount, proposal,
+            quotation_file, quotation_document, technical_proposal, supporting_documents,
+            technical_document, no_conflict_of_interest, conflict_of_interest_person,
+            no_past_scm_issues, status, technical_compliance, evaluation_remarks, rank,
+            recorded, updated_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+          [
+            id,
+            data.project_id,
+            data.supplier_id,
+            data.company_name ?? "",
+            data.bid_amount ?? null,
+            data.proposal ?? "",
+            data.quotation_file ?? null,
+            data.quotation_document ?? data.quotation_file ?? null,
+            data.technical_proposal ?? null,
+            data.supporting_documents ?? null,
+            data.technical_document ?? null,
+            data.no_conflict_of_interest ?? false,
+            data.conflict_of_interest_person ?? null,
+            data.no_past_scm_issues ?? false,
+            data.status ?? 'submitted',
+            data.technical_compliance ?? false,
+            data.evaluation_remarks ?? "",
+            data.rank ?? null,
+            data.recorded ?? false,
+            updatedAt,
+          ]
         );
         return result.rows[0];
       } finally {
@@ -710,8 +997,32 @@ export const dbDirect = {
       try {
         const id = data.id || uuid();
         const result = await client.query(
-          `INSERT INTO projects_project (id, title, description, status, created_by_id, start_date, end_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
-          [id, data.title || null, data.description || null, data.status || 'draft', data.created_by_id || null, data.start_date || null, data.end_date || null]
+          `INSERT INTO projects_project (
+            id, procurement_request_id, title, budget, deadline, procurement_schedule,
+            public_result_expiry_date, requirements, procurement_type, delivery_period,
+            technical_specifications, status, is_archived, archived_at, archived_reason,
+            published_at, awarded_at, created_by_id, updated_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, NOW()) RETURNING *`,
+          [
+            id,
+            data.procurement_request_id ?? null,
+            data.title ?? null,
+            data.budget ?? null,
+            data.deadline ?? null,
+            data.procurement_schedule ?? null,
+            data.public_result_expiry_date ?? null,
+            data.requirements ?? null,
+            data.procurement_type ?? null,
+            data.delivery_period ?? null,
+            data.technical_specifications ?? null,
+            data.status ?? 'draft',
+            data.is_archived ?? false,
+            data.archived_at ?? null,
+            data.archived_reason ?? null,
+            data.published_at ?? null,
+            data.awarded_at ?? null,
+            data.created_by_id ?? null,
+          ]
         );
         return result.rows[0];
       } finally {

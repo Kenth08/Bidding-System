@@ -9,6 +9,8 @@ const NOTIFICATIONS_TABLE = "notifications";
 const AUDIT_LOGS_TABLE = "audit_logs";
 const DOCUMENT_UPLOADS_TABLE = "document_uploads";
 const PROCUREMENTS_TABLE = "procurements";
+const BUSINESS_TYPES_TABLE = "business_types";
+const SUPPLIER_BUSINESS_TYPES_TABLE = "supplier_business_types";
 
 type OrderBy = Record<string, "asc" | "desc"> | Array<Record<string, "asc" | "desc">>;
 
@@ -138,6 +140,22 @@ function matchesWhere(row: any, where?: Record<string, any>): boolean {
   });
 }
 
+function matchesBusinessTypeWhere(row: any, where?: Record<string, any>): boolean {
+  if (!where) return true;
+
+  return Object.entries(where).every(([key, expected]) => {
+    if (expected === undefined) return true;
+    if (key === "name" && isPlainObject(expected)) {
+      const equals = expected.equals;
+      const mode = expected.mode;
+      if (typeof equals === "string" && mode === "insensitive") {
+        return String(row?.name || "").toLowerCase() === equals.toLowerCase();
+      }
+    }
+    return matchesValue(row?.[key], expected);
+  });
+}
+
 function normalizeUpdateArgs(whereOrParams: any, dataArg?: any) {
   if (dataArg !== undefined) {
     return { id: whereOrParams?.id, data: dataArg };
@@ -210,6 +228,20 @@ async function fetchProjectById(id: string) {
 
 async function fetchProcurementById(id: string) {
   return hydrateProcurement(await fetchRowById(PROCUREMENTS_TABLE, id));
+}
+
+async function fetchBusinessTypeById(id: string) {
+  return fetchRowById(BUSINESS_TYPES_TABLE, id);
+}
+
+async function fetchBusinessTypesByWhere(where?: Record<string, any>) {
+  const rows = await fetchRows(BUSINESS_TYPES_TABLE);
+  return rows.filter((row: any) => matchesWhere(row, where));
+}
+
+async function fetchSupplierBusinessTypesByWhere(where?: Record<string, any>) {
+  const rows = await fetchRows(SUPPLIER_BUSINESS_TYPES_TABLE);
+  return rows.filter((row: any) => matchesWhere(row, where));
 }
 
 async function fetchBidById(id: string) {
@@ -642,6 +674,87 @@ export const db = {
         return hydrateProcurement(data);
       }
       return db.procurement.create({ data: { id: where.id, ...(params.create || {}) } });
+    },
+  },
+
+  businessType: {
+    findUnique: async (params: any) => {
+      const where = params?.where || params;
+      if (where?.id) return fetchBusinessTypeById(where.id);
+      return null;
+    },
+
+    findFirst: async (params: any = {}) => {
+      const rows = await fetchBusinessTypesByWhere(params.where);
+      const row = rows.find((item: any) => matchesBusinessTypeWhere(item, params.where));
+      return row || null;
+    },
+
+    findMany: async (params: any = {}) => {
+      const rows = await fetchBusinessTypesByWhere(params.where).then((items) => items.filter((item: any) => matchesBusinessTypeWhere(item, params.where)));
+      const sorted = sortRows(rows, params.orderBy);
+      return applyTake(sorted, params);
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const payload = {
+        id: data.id || uuid(),
+        name: data.name,
+        description: data.description ?? null,
+        is_active: data.is_active ?? true,
+        created_at: data.created_at ?? new Date().toISOString(),
+        updated_at: data.updated_at ?? new Date().toISOString(),
+      };
+      const { data: result, error } = await supabaseServer.from(BUSINESS_TYPES_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      return result;
+    },
+  },
+
+  supplierBusinessType: {
+    findMany: async (params: any = {}) => {
+      const rows = await fetchSupplierBusinessTypesByWhere(params.where);
+      const sorted = sortRows(rows, params.orderBy);
+      const limited = applyTake(sorted, params);
+
+      if (!params.include?.business_type) return limited;
+
+      const selected = params.include.business_type.select;
+      return Promise.all(limited.map(async (row: any) => {
+        const businessType = row.business_type_id ? await fetchBusinessTypeById(row.business_type_id) : null;
+        return {
+          ...row,
+          business_type: businessType && selected ? pick(businessType, selected) : businessType,
+        };
+      }));
+    },
+
+    createMany: async (params: any = {}) => {
+      const data = params.data || [];
+      let count = 0;
+      for (const item of data) {
+        const { error } = await supabaseServer.from(SUPPLIER_BUSINESS_TYPES_TABLE).insert({
+          supplier_id: item.supplier_id,
+          business_type_id: item.business_type_id,
+          created_at: new Date().toISOString(),
+        });
+        if (error) {
+          if (!params.skipDuplicates) throw error;
+          continue;
+        }
+        count += 1;
+      }
+      return { count };
+    },
+
+    deleteMany: async (params: any = {}) => {
+      const rows = await fetchSupplierBusinessTypesByWhere(params.where);
+      for (const row of rows) {
+        const { error } = await supabaseServer.from(SUPPLIER_BUSINESS_TYPES_TABLE).delete().eq("supplier_id", row.supplier_id).eq("business_type_id", row.business_type_id);
+        if (error) throw error;
+      }
+      return { count: rows.length };
     },
   },
 

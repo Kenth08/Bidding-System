@@ -38,7 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (status === "approved") updateData.is_active = true;
       await logAudit("UPDATE", user.id, `Supplier ${supplier.full_name} status changed to ${status}`, "supplier", id);
       if (status === "approved") {
-        await notifyUser(id, "supplier_approved", "Account Approved", "Your supplier account has been approved. You can now view and bid on projects.", "/supplier/projects");
+          await notifyUser(id, "supplier_approved", "Account Approved", "Your supplier account has been approved. You can now view and bid on projects.", "/supplier/projects");
       } else if (status === "rejected") {
         await notifyUser(id, "supplier_rejected", "Account Rejected", "Your supplier account was not approved. Please contact the administrator.", "/supplier/profile");
       }

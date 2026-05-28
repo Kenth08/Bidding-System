@@ -41,14 +41,14 @@ const REQUIRED_DOCUMENTS_SECTIONS = {
   ],
 };
 
-function FileUploadField({ label, file, error, onChange, onClear, optional = false }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; onClear?: () => void; optional?: boolean }) {
+function FileUploadField({ label, file, error, onChange, onClear, optional = false, invalid = false }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; onClear?: () => void; optional?: boolean; invalid?: boolean }) {
   const inputId = label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   return (
     <label htmlFor={inputId} className="block">
       <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label} {optional && <span className="text-slate-400 font-normal">(Optional)</span>}
       </span>
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-white">
+      <div className={`rounded-xl border bg-slate-50 px-4 py-3 transition-colors hover:bg-white ${invalid ? 'border-red-300 hover:border-red-400' : 'border-slate-200 hover:border-emerald-300'}`}>
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><Upload className="h-4 w-4" /></div>
           <div className="min-w-0 flex-1">
@@ -188,6 +188,7 @@ function RegisterPageContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
@@ -209,80 +210,88 @@ function RegisterPageContent() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    setValidationErrors({});
+
+    const nextErrors: Record<string, string> = {};
+    const nextFileErrors: Record<string, string> = {};
+
+    const requireField = (key: string, message: string) => {
+      if (!String(form[key] || "").trim()) nextErrors[key] = message;
+    };
+
+    const requireFile = (key: string, message: string) => {
+      if (!form[key]) {
+        nextErrors[key] = message;
+        nextFileErrors[key] = message;
+      }
+    };
 
     // Validate basic fields
-    if (!form.fullName || !form.email || !form.companyName || !String(form.representativeName || "").trim() || !String(form.tin || "").trim() || !String(form.companyProfile || "").trim()) {
-      setError("Please fill in all required basic information fields.");
-      return;
-    }
+    requireField("fullName", "Please enter your full name.");
+    requireField("email", "Please enter your email address.");
+    requireField("companyName", "Please enter your company name.");
+    requireField("companyAddress", "Please enter your company address.");
+    requireField("phone", "Please enter your phone number.");
+    requireField("representativeName", "Please enter your representative name.");
+    requireField("tin", "Please enter your TIN.");
+    requireField("companyProfile", "Please enter your company profile and capabilities.");
+    if (!(form.businessTypeIds as unknown as string[]).length) nextErrors.businessTypeIds = "Please select at least one business type.";
 
     // Validate passwords
-    if (!isFromGoogle && (!form.password || !form.confirmPassword)) {
-      setError("Please fill in all required fields.");
-      return;
+    if (!isFromGoogle) {
+      if (!String(form.password || "").trim()) nextErrors.password = "Please enter a password.";
+      if (!String(form.confirmPassword || "").trim()) nextErrors.confirmPassword = "Please confirm your password.";
     }
 
     // Validate required legal documents
-    const legalRequired = ["secDtiCertificate", "mayorsPm", "philGepsRegistration", "validId"];
-    const missingLegal = legalRequired.find((key) => !form[key]);
-    if (missingLegal) {
-      const labels: Record<string, string> = {
-        secDtiCertificate: "SEC or DTI Certificate",
-        mayorsPm: "Mayor's Permit",
-        philGepsRegistration: "PhilGEPS Registration",
-        validId: "Valid ID",
-      };
-      setError(`Please upload ${labels[missingLegal] || "required legal documents"}.`);
-      return;
-    }
+    requireFile("secDtiCertificate", "Please upload your SEC or DTI Certificate.");
+    requireFile("mayorsPm", "Please upload your Mayor's Permit / Business Permit.");
+    requireFile("philgepsRegistration", "Please upload your PhilGEPS Registration.");
+    requireFile("validId", "Please upload your valid ID.");
 
     // Validate required financial documents
-    const financialRequired = ["taxClearance", "auditedFinancialStatements", "bankReferenceDocument"];
-    const missingFinancial = financialRequired.find((key) => !form[key]);
-    if (missingFinancial) {
-      const labels: Record<string, string> = {
-        taxClearance: "Tax Clearance",
-        auditedFinancialStatements: "Audited Financial Statements",
-        bankReferenceDocument: "Bank Reference",
-      };
-      setError(`Please upload ${labels[missingFinancial] || "required financial documents"}.`);
-      return;
-    }
+    requireFile("taxClearance", "Please upload your Tax Clearance Certificate.");
+    requireFile("auditedFinancialStatements", "Please upload your Audited Financial Statements.");
+    requireFile("bankReferenceDocument", "Please upload your Bank Reference Letter or Credit Report.");
 
     // Validate blacklisting declaration
     if (!form.notBlacklistedDeclaration) {
-      setError("You must declare that your company is not blacklisted.");
-      return;
+      nextErrors.notBlacklistedDeclaration = "Please confirm the blacklisting declaration.";
     }
 
     // Validate representative authorization
     if (!form.representativeAuthorizationDocument) {
-      setError("Please upload your representative authorization document (SPA).");
-      return;
+      nextErrors.representativeAuthorizationDocument = "Please upload your representative authorization document (SPA).";
+      nextFileErrors.representativeAuthorizationDocument = "Please upload your representative authorization document (SPA).";
     }
 
     // Validate mayor's permit expiry
     if (form.mayorsPmExpiry && new Date(form.mayorsPmExpiry as string) < new Date()) {
-      setError("Mayor's Permit has expired. Please upload a valid permit.");
-      return;
+      nextErrors.mayorsPmExpiry = "Mayor's Permit has expired. Please upload a valid permit.";
     }
 
     // Validate tax clearance expiry
     if (form.taxClearanceExpiry && new Date(form.taxClearanceExpiry as string) < new Date()) {
-      setError("Tax Clearance has expired. Please upload a valid certificate.");
-      return;
+      nextErrors.taxClearanceExpiry = "Tax Clearance has expired. Please upload a valid certificate.";
     }
 
     if (!isFromGoogle) {
       if (form.password !== form.confirmPassword) {
-        setError("Passwords do not match.");
-        return;
+        nextErrors.confirmPassword = "Passwords do not match.";
       }
       if (String(form.password).length < 6) {
-        setError("Password must be at least 6 characters.");
-        return;
+        nextErrors.password = "Password must be at least 6 characters.";
       }
     }
+
+    if (Object.keys(nextErrors).length) {
+      setValidationErrors(nextErrors);
+      setFileErrors((current) => ({ ...current, ...nextFileErrors }));
+      setError("Please fix the highlighted fields below.");
+      return;
+    }
+
+    setFileErrors((current) => ({ ...current, ...nextFileErrors }));
 
     // No custom business types allowed during registration — only select from provided list
 
@@ -437,6 +446,17 @@ function RegisterPageContent() {
                 </div>
               )}
 
+              {Object.keys(validationErrors).length > 0 ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <p className="font-semibold">Please fix these fields:</p>
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {Object.entries(validationErrors).map(([key, message]) => (
+                      <li key={key}>• {message}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Basic Information */}
                 <SectionTitle title="Basic Information" />
@@ -454,10 +474,11 @@ function RegisterPageContent() {
                       value={form[key] as string}
                       onChange={(e) => updateForm(key, e.target.value)}
                       readOnly={readOnly}
-                      className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20 ${
+                      className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 focus:ring-emerald-400/20 ${validationErrors[key] ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"} ${
                         readOnly ? "cursor-not-allowed opacity-60" : ""
                       }`}
                     />
+                    {validationErrors[key] ? <p className="mt-1 text-xs text-red-600">{validationErrors[key]}</p> : null}
                   </label>
                 ))}
 
@@ -472,7 +493,7 @@ function RegisterPageContent() {
                           type={showPassword ? "text" : "password"}
                           value={form.password as string}
                           onChange={(e) => updateForm("password", e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.password ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"}`}
                         />
                         <button
                           type="button"
@@ -482,6 +503,7 @@ function RegisterPageContent() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
+                      {validationErrors.password ? <p className="mt-1 text-xs text-red-600">{validationErrors.password}</p> : null}
                     </label>
                     <label>
                       <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -492,7 +514,7 @@ function RegisterPageContent() {
                           type={showConfirmPassword ? "text" : "password"}
                           value={form.confirmPassword as string}
                           onChange={(e) => updateForm("confirmPassword", e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.confirmPassword ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"}`}
                         />
                         <button
                           type="button"
@@ -502,6 +524,7 @@ function RegisterPageContent() {
                           {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
+                      {validationErrors.confirmPassword ? <p className="mt-1 text-xs text-red-600">{validationErrors.confirmPassword}</p> : null}
                     </label>
                   </>
                 )}
@@ -525,7 +548,7 @@ function RegisterPageContent() {
                     </span>
                     {select ? (
                       // Multi-select checkboxes sourced from the server
-                      <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                      <div className={`w-full rounded-xl border bg-slate-50 px-4 py-3 text-sm ${validationErrors.businessTypeIds ? 'border-red-300' : 'border-slate-200'}`}>
                         <div className="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto">
                           {availableBusinessTypes.map((bt) => (
                             <label key={bt.id} className="flex items-center gap-2">
@@ -543,14 +566,18 @@ function RegisterPageContent() {
                             </label>
                           ))}
                         </div>
+                        {validationErrors.businessTypeIds ? <p className="mt-2 text-xs text-red-600">{validationErrors.businessTypeIds}</p> : null}
                       </div>
                     ) : (
-                      <input
-                        type="text"
-                        value={form[key] as string}
-                        onChange={(e) => updateForm(key, e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          value={form[key] as string}
+                          onChange={(e) => updateForm(key, e.target.value)}
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors[key] ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
+                        />
+                        {validationErrors[key] ? <p className="mt-1 text-xs text-red-600">{validationErrors[key]}</p> : null}
+                      </>
                     )}
                   </label>
                 ))}
@@ -563,22 +590,24 @@ function RegisterPageContent() {
                     rows={4}
                     value={form.companyProfile as string}
                     onChange={(e) => updateForm("companyProfile", e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
+                    className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.companyProfile ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
                     placeholder="Brief company background and capability statement"
                   />
+                  {validationErrors.companyProfile ? <p className="mt-1 text-xs text-red-600">{validationErrors.companyProfile}</p> : null}
                 </label>
 
                 {/* Legal Documents */}
                 <CollapsibleSection title="Legal Documents" description="Required for company registration and compliance">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-4">
-                      <FileUploadField label="SEC or DTI Certificate" file={form.secDtiCertificate as File | null} error={fileErrors["secDtiCertificate"]} onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])} onClear={() => updateFile("secDtiCertificate", undefined)} />
-                      <FileUploadField label="PhilGEPS Registration Certificate" file={form.philgepsRegistration as File | null} error={fileErrors["philgepsRegistration"]} onChange={(e) => updateFile("philgepsRegistration", e.target.files?.[0])} onClear={() => updateFile("philgepsRegistration", undefined)} />
+                      <FileUploadField label="SEC or DTI Certificate" file={form.secDtiCertificate as File | null} error={fileErrors["secDtiCertificate"]} invalid={Boolean(validationErrors.secDtiCertificate || fileErrors.secDtiCertificate)} onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])} onClear={() => updateFile("secDtiCertificate", undefined)} />
+                      <FileUploadField label="PhilGEPS Registration Certificate" file={form.philgepsRegistration as File | null} error={fileErrors["philgepsRegistration"]} invalid={Boolean(validationErrors.philgepsRegistration || fileErrors.philgepsRegistration)} onChange={(e) => updateFile("philgepsRegistration", e.target.files?.[0])} onClear={() => updateFile("philgepsRegistration", undefined)} />
                     </div>
                     <div className="space-y-4">
-                      <FileUploadField label="Mayor's Permit / Business Permit" file={form.mayorsPm as File | null} error={fileErrors["mayorsPm"]} onChange={(e) => updateFile("mayorsPm", e.target.files?.[0])} onClear={() => updateFile("mayorsPm", undefined)} />
+                      <FileUploadField label="Mayor's Permit / Business Permit" file={form.mayorsPm as File | null} error={fileErrors["mayorsPm"]} invalid={Boolean(validationErrors.mayorsPm || fileErrors.mayorsPm)} onChange={(e) => updateFile("mayorsPm", e.target.files?.[0])} onClear={() => updateFile("mayorsPm", undefined)} />
                       <DateInputField label="Mayor's Permit Expiry Date" value={form.mayorsPmExpiry as string} onChange={(e) => updateForm("mayorsPmExpiry", e.target.value)} />
-                      <FileUploadField label="Valid ID (Government-Issued)" file={form.validId as File | null} error={fileErrors["validId"]} onChange={(e) => updateFile("validId", e.target.files?.[0])} onClear={() => updateFile("validId", undefined)} />
+                      {validationErrors.mayorsPmExpiry ? <p className="text-xs text-red-600">{validationErrors.mayorsPmExpiry}</p> : null}
+                      <FileUploadField label="Valid ID (Government-Issued)" file={form.validId as File | null} error={fileErrors["validId"]} invalid={Boolean(validationErrors.validId || fileErrors.validId)} onChange={(e) => updateFile("validId", e.target.files?.[0])} onClear={() => updateFile("validId", undefined)} />
                     </div>
                   </div>
                 </CollapsibleSection>
@@ -587,11 +616,12 @@ function RegisterPageContent() {
                 <CollapsibleSection title="Financial Documents" description="Required to verify financial capacity and stability">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-4">
-                      <FileUploadField label="Tax Clearance Certificate" file={form.taxClearance as File | null} error={fileErrors["taxClearance"]} onChange={(e) => updateFile("taxClearance", e.target.files?.[0])} onClear={() => updateFile("taxClearance", undefined)} />
-                      <FileUploadField label="Audited Financial Statements (Latest 1-2 years)" file={form.auditedFinancialStatements as File | null} error={fileErrors["auditedFinancialStatements"]} onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])} onClear={() => updateFile("auditedFinancialStatements", undefined)} />
+                      <FileUploadField label="Tax Clearance Certificate" file={form.taxClearance as File | null} error={fileErrors["taxClearance"]} invalid={Boolean(validationErrors.taxClearance || fileErrors.taxClearance)} onChange={(e) => updateFile("taxClearance", e.target.files?.[0])} onClear={() => updateFile("taxClearance", undefined)} />
+                      <FileUploadField label="Audited Financial Statements (Latest 1-2 years)" file={form.auditedFinancialStatements as File | null} error={fileErrors["auditedFinancialStatements"]} invalid={Boolean(validationErrors.auditedFinancialStatements || fileErrors.auditedFinancialStatements)} onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])} onClear={() => updateFile("auditedFinancialStatements", undefined)} />
                     </div>
                     <div className="space-y-4">
                       <DateInputField label="Tax Clearance Expiry" value={form.taxClearanceExpiry as string} onChange={(e) => updateForm("taxClearanceExpiry", e.target.value)} />
+                      {validationErrors.taxClearanceExpiry ? <p className="text-xs text-red-600">{validationErrors.taxClearanceExpiry}</p> : null}
                       <label>
                         <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Financial Statement Year</span>
                         <StrictNumberInput min="2020" max={new Date().getFullYear()} value={form.financialStatementYear as string} onChange={(value) => updateForm("financialStatementYear", value)} placeholder={`e.g. ${new Date().getFullYear()}`} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" helperText="Numbers only. Enter the year as digits." />
@@ -599,15 +629,15 @@ function RegisterPageContent() {
                     </div>
                   </div>
                   <div className="mt-4">
-                    <FileUploadField label="Bank Reference Letter or Credit Report" file={form.bankReferenceDocument as File | null} error={fileErrors["bankReferenceDocument"]} onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])} onClear={() => updateFile("bankReferenceDocument", undefined)} />
+                    <FileUploadField label="Bank Reference Letter or Credit Report" file={form.bankReferenceDocument as File | null} error={fileErrors["bankReferenceDocument"]} invalid={Boolean(validationErrors.bankReferenceDocument || fileErrors.bankReferenceDocument)} onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])} onClear={() => updateFile("bankReferenceDocument", undefined)} />
                   </div>
                 </CollapsibleSection>
 
                 {/* Qualifications & Track Record */}
                 <CollapsibleSection title="Qualifications & Track Record" description="Demonstrate your company's experience and capabilities">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FileUploadField label="Performance Certificates / ISO Certifications" file={form.performanceCertificates as File | null} error={fileErrors["performanceCertificates"]} onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])} onClear={() => updateFile("performanceCertificates", undefined)} optional={true} />
-                    <FileUploadField label="Similar Past Contracts or Purchase Orders" file={form.pastContractsDocument as File | null} error={fileErrors["pastContractsDocument"]} onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])} onClear={() => updateFile("pastContractsDocument", undefined)} optional={true} />
+                    <FileUploadField label="Performance Certificates / ISO Certifications" file={form.performanceCertificates as File | null} error={fileErrors["performanceCertificates"]} invalid={Boolean(validationErrors.performanceCertificates || fileErrors.performanceCertificates)} onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])} onClear={() => updateFile("performanceCertificates", undefined)} optional={true} />
+                    <FileUploadField label="Similar Past Contracts or Purchase Orders" file={form.pastContractsDocument as File | null} error={fileErrors["pastContractsDocument"]} invalid={Boolean(validationErrors.pastContractsDocument || fileErrors.pastContractsDocument)} onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])} onClear={() => updateFile("pastContractsDocument", undefined)} optional={true} />
                   </div>
                   <div className="mt-3">
                     <label>
@@ -630,7 +660,7 @@ function RegisterPageContent() {
                 </CollapsibleSection>
 
                 <label className="md:col-span-2">
-                  <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className={`flex items-start gap-3 rounded-xl bg-slate-50 p-4 ${validationErrors.notBlacklistedDeclaration ? 'border border-red-300' : 'border border-slate-200'}`}>
                     <input
                       type="checkbox"
                       checked={form.notBlacklistedDeclaration as boolean}
@@ -644,11 +674,12 @@ function RegisterPageContent() {
                       <p className="mt-1 text-xs text-slate-500">
                         By checking this, you certify that your company has no record of blacklisting or debarment
                       </p>
+                      {validationErrors.notBlacklistedDeclaration ? <p className="mt-2 text-xs text-red-600">{validationErrors.notBlacklistedDeclaration}</p> : null}
                     </div>
                   </div>
                 </label>
 
-                <FileUploadField label="Sworn Statement / Affidavit (Optional)" file={form.blacklistingDeclarationDocument as File | null} error={fileErrors["blacklistingDeclarationDocument"]} onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])} onClear={() => updateFile("blacklistingDeclarationDocument", undefined)} optional={true} />
+                <FileUploadField label="Sworn Statement / Affidavit (Optional)" file={form.blacklistingDeclarationDocument as File | null} error={fileErrors["blacklistingDeclarationDocument"]} invalid={Boolean(validationErrors.blacklistingDeclarationDocument || fileErrors.blacklistingDeclarationDocument)} onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])} onClear={() => updateFile("blacklistingDeclarationDocument", undefined)} optional={true} />
 
                 {/* Other Documents */}
                 <CollapsibleSection title="Additional Documents">
