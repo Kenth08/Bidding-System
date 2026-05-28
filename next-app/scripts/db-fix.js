@@ -72,6 +72,45 @@ const { Client } = require('pg');
     await addIfMissing("ALTER TABLE notifications ADD COLUMN resource_type text NULL;", 'resource_type');
     await addIfMissing("ALTER TABLE notifications ADD COLUMN resource_id text NULL;", 'resource_id');
 
+    console.log('\nprocurements columns:');
+    console.table(await cols('procurements'));
+
+    const procurementCols = await cols('procurements');
+    const addProcurementIfMissing = async (columnSql, columnName) => {
+      if (procurementCols.some(c => c.column_name === columnName)) return;
+      try {
+        console.log(`Adding procurements.${columnName}`);
+        await client.query(columnSql);
+        console.log(`Added ${columnName}`);
+      } catch (e) {
+        console.error(`Failed to add ${columnName}:`, e.message);
+      }
+    };
+
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN project_title text NULL;", 'project_title');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN deadline timestamptz NULL;", 'deadline');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN public_result_expiry_date timestamptz NULL;", 'public_result_expiry_date');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN procurement_type text NULL;", 'procurement_type');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN technical_specifications text NULL;", 'technical_specifications');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN procurement_schedule text NULL;", 'procurement_schedule');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN delivery_period text NULL;", 'delivery_period');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN rejection_reason text NULL;", 'rejection_reason');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN revision_notes text NULL;", 'revision_notes');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN review_remarks text NULL;", 'review_remarks');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN created_by_id uuid NULL;", 'created_by_id');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN reviewed_by_id uuid NULL;", 'reviewed_by_id');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN reviewed_at timestamptz NULL;", 'reviewed_at');
+    await addProcurementIfMissing("ALTER TABLE procurements ADD COLUMN updated_at timestamptz NULL DEFAULT now();", 'updated_at');
+
+    try {
+      console.log('Rebuilding procurements_status_check to match app statuses');
+      await client.query("ALTER TABLE procurements DROP CONSTRAINT IF EXISTS procurements_status_check;");
+      await client.query(`ALTER TABLE procurements ADD CONSTRAINT procurements_status_check CHECK (status = ANY (ARRAY['Draft'::text, 'Pending Review'::text, 'Approved'::text, 'Rejected'::text, 'Revision Required'::text, 'open'::text, 'closed'::text, 'awarded'::text]));`);
+      console.log('Rebuilt procurements_status_check');
+    } catch (e) {
+      console.error('Failed to rebuild procurements_status_check:', e.message);
+    }
+
     console.log('Done');
   } catch (e) {
     console.error(e);

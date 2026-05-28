@@ -584,6 +584,8 @@ export const db = {
       const data = params.data || params;
       const payload = {
         id: data.id || uuid(),
+        title: data.project_title ?? data.title ?? "",
+        description: data.technical_specifications ?? data.description ?? "",
         project_title: data.project_title,
         budget: data.budget,
         deadline: data.deadline ?? null,
@@ -596,6 +598,7 @@ export const db = {
         rejection_reason: data.rejection_reason ?? "",
         revision_notes: data.revision_notes ?? "",
         review_remarks: data.review_remarks ?? null,
+        created_by: data.created_by_id ?? data.created_by ?? null,
         reviewed_by_id: data.reviewed_by_id ?? null,
         reviewed_at: data.reviewed_at ?? null,
         created_by_id: data.created_by_id ?? null,

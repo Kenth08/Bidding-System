@@ -28,7 +28,7 @@ export default function AdminSuppliers() {
   const filtered = useMemo(() => suppliers.filter((s) => {
     const statusMatch = filter === "All" || s.status === filter;
     const q = search.toLowerCase();
-    const searchMatch = !q || (s.company_name || "").toLowerCase().includes(q) || (s.full_name || "").toLowerCase().includes(q) || (s.email || "").toLowerCase().includes(q);
+    const searchMatch = !q || (s.company_name || "").toLowerCase().includes(q) || (s.full_name || "").toLowerCase().includes(q);
     return statusMatch && searchMatch;
   }), [suppliers, filter, search]);
 
@@ -60,7 +60,7 @@ export default function AdminSuppliers() {
         ))}
       </div>
 
-      <SearchBar value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by company, name, or email" className="mb-4" />
+      <SearchBar value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by company or name" className="mb-4" />
 
       {filtered.length === 0 ? <EmptyState title="No suppliers found" /> : (
         <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
@@ -78,7 +78,7 @@ export default function AdminSuppliers() {
             <tbody className="divide-y divide-slate-50">
               {filtered.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/50">
-                  <td className="px-6 py-4"><p className="text-sm font-medium text-slate-800">{s.company_name || "\u2014"}</p><p className="text-xs text-slate-400">{s.email}</p></td>
+                  <td className="px-6 py-4"><p className="text-sm font-medium text-slate-800">{s.company_name || "\u2014"}</p></td>
                   <td className="px-6 py-4 text-sm text-slate-600">{s.full_name}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{s.business_type || "\u2014"}</td>
                   <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
@@ -115,7 +115,6 @@ export default function AdminSuppliers() {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: "Full Name", value: viewing.full_name },
-                { label: "Email", value: viewing.email },
                 { label: "Phone", value: viewing.phone || "\u2014" },
                 { label: "Company Name", value: viewing.company_name || "\u2014" },
                 { label: "Company Address", value: viewing.company_address || "\u2014" },

@@ -383,8 +383,8 @@ function AdminBidEvaluationContent() {
                               ) : null}
 
                               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                <DetailBadge label="Signature Name" value={bidDetail.signature_name || "—"} />
-                                <DetailBadge label="Signature State" value={bidDetail.digital_signature ? "Saved" : "Not Uploaded"} />
+                                <DetailBadge label="Signature Name" value={b.signature_name || "—"} />
+                                <DetailBadge label="Signature State" value={b.digital_signature ? "Saved" : "Not Uploaded"} />
                               </div>
                             </div>
 
@@ -392,28 +392,19 @@ function AdminBidEvaluationContent() {
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Qualification Evaluation</p>
                               <div className="mt-4 flex items-center gap-3">
                                 <span className="text-sm text-slate-700">Qualification Status</span>
-                                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                                <div className="inline-flex items-center rounded-xl border border-slate-200 overflow-hidden">
                                   <button
                                     type="button"
                                     onClick={() => setEvalForm((prev) => ({ ...prev, technical_compliance: true }))}
-                                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${evalForm.technical_compliance ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-white"}`}
+                                    className={`px-3 py-1.5 text-sm font-semibold transition-colors ${evalForm.technical_compliance ? "bg-emerald-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
                                   >
                                     Qualified
-
-                                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
-                                  <div className="flex items-start gap-3">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><ShieldCheck className="h-4 w-4" /></div>
-                                    <div>
-                                      <p className="text-sm font-semibold text-slate-900">Supplier Declaration</p>
-                                      <p className="mt-1 text-xs leading-5 text-slate-500">The supplier confirmed it is not blacklisted, restricted, or penalized in procurement activities.</p>
-                                    </div>
-                                  </div>
-                                </div>
                                   </button>
+
                                   <button
                                     type="button"
                                     onClick={() => setEvalForm((prev) => ({ ...prev, technical_compliance: false }))}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${!evalForm.technical_compliance ? "bg-red-500 text-white" : "text-slate-600 hover:bg-white"}`}
+                                    className={`px-3 py-1.5 text-sm font-semibold transition-colors ${!evalForm.technical_compliance ? "bg-red-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
                                   >
                                     Disqualified
                                   </button>
