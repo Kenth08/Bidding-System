@@ -39,28 +39,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Update project to awarded
   await db.project.update({ where: { id: bid.project_id }, data: { status: "awarded", awarded_at: new Date() } });
 
-  // Create blockchain record if not exists
-  const existingRecord = await db.blockchainRecord.findFirst({ where: { project_id: bid.project_id } });
-  if (!existingRecord) {
-    const raw = `${bid.project_id}${bid.supplier_id}${bid.bid_amount}${Date.now()}`;
-    const hashValue = "0x" + hashlib.createHash("sha256").update(raw).digest("hex");
-    const projectRef = `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`;
+  // Optional blockchain write: disabled by default until blockchain flow is finalized.
+  if (process.env.ENABLE_BLOCKCHAIN === "true") {
+    const existingRecord = await db.blockchainRecord.findFirst({ where: { project_id: bid.project_id } });
+    if (!existingRecord) {
+      const raw = `${bid.project_id}${bid.supplier_id}${bid.bid_amount}${Date.now()}`;
+      const hashValue = "0x" + hashlib.createHash("sha256").update(raw).digest("hex");
+      const projectRef = `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`;
 
-    await db.blockchainRecord.create({
-      data: { id: uuid(), project_id: bid.project_id, bid_id: id, winner_id: bid.supplier_id, bid_amount: bid.bid_amount, hash: hashValue, project_ref_id: projectRef },
-    });
-    await db.bid.update({ where: { id }, data: { recorded: true } });
-  } else {
-    await db.blockchainRecord.update({
-      where: { id: existingRecord.id },
-      data: {
-        bid_id: id,
-        winner_id: bid.supplier_id,
-        bid_amount: bid.bid_amount,
-        project_ref_id: existingRecord.project_ref_id || `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`,
-      },
-    });
-    await db.bid.update({ where: { id }, data: { recorded: true } });
+      await db.blockchainRecord.create({
+        data: { id: uuid(), project_id: bid.project_id, bid_id: id, winner_id: bid.supplier_id, bid_amount: bid.bid_amount, hash: hashValue, project_ref_id: projectRef },
+      });
+      await db.bid.update({ where: { id }, data: { recorded: true } });
+    } else {
+      await db.blockchainRecord.update({
+        where: { id: existingRecord.id },
+        data: {
+          bid_id: id,
+          winner_id: bid.supplier_id,
+          bid_amount: bid.bid_amount,
+          project_ref_id: existingRecord.project_ref_id || `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`,
+        },
+      });
+      await db.bid.update({ where: { id }, data: { recorded: true } });
+    }
   }
 
   // Recalculate ranks
