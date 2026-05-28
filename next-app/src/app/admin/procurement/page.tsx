@@ -10,8 +10,19 @@ import SearchBar from '@/components/shared/SearchBar';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { SkeletonTable } from '@/components/ui/Skeleton';
 import StrictNumberInput from '@/components/shared/StrictNumberInput';
-const FALLBACK_PROCUREMENT_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
-const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: 'Services', procurementTypeCustom: '', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
+const FALLBACK_PROCUREMENT_TYPES = [
+  "IT Equipment",
+  "Office Supplies",
+  "Construction Materials",
+  "Medical Supplies",
+  "ICT Services",
+  "Electrical Supplies",
+  "Agricultural Supplies",
+  "Printing Services",
+  "Transportation",
+  "Consultancy",
+];
+const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: '', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
 
 export default function AdminProcurement() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -44,13 +55,13 @@ export default function AdminProcurement() {
   const openEdit = (r: any) => {
     const procurementType = procurementTypes.includes(r.procurement_type) ? r.procurement_type : procurementTypes[0] || '';
     setEditingRequest(r);
-    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType, procurementTypeCustom: '', technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
+    setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType, technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
     setShowModal(true);
   };
 
   const saveRequest = async () => {
     if (!form.projectTitle.trim() || !form.budget) return;
-    if (!form.procurementType.trim()) {
+    if (!form.procurementType || !String(form.procurementType || '').trim()) {
       setToast({ message: 'Please choose a procurement type.', type: 'error' });
       return;
     }
@@ -155,7 +166,7 @@ export default function AdminProcurement() {
           </div>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span>
-            <select value={form.procurementType} onChange={(e) => setForm({ ...form, procurementType: e.target.value, procurementTypeCustom: '' })} className={inputClass}>
+            <select value={form.procurementType} onChange={(e) => setForm({ ...form, procurementType: e.target.value })} className={inputClass}>
               <option value="">Select category</option>
               {procurementTypes.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>

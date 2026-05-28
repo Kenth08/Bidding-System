@@ -13,7 +13,18 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
 
 const TABS = ["All", "draft", "active", "closed", "awarded"];
-const FALLBACK_PROCUREMENT_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
+const FALLBACK_PROCUREMENT_TYPES = [
+  "IT Equipment",
+  "Office Supplies",
+  "Construction Materials",
+  "Medical Supplies",
+  "ICT Services",
+  "Electrical Supplies",
+  "Agricultural Supplies",
+  "Printing Services",
+  "Transportation",
+  "Consultancy",
+];
 const EMPTY_FORM = { title: "", budget: "", deadline: "", procurement_type: "", technical_specifications: "", delivery_period: "", procurement_schedule: "", public_result_expiry_date: "" };
 const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20";
 
@@ -55,15 +66,24 @@ export default function AdminProjects() {
   }), [projects, filter, search]);
 
   function openEdit(p: any) {
-    const procurementType = procurementTypes.includes(p.procurement_type) ? p.procurement_type : (procurementTypes[0] || "");
+    const procurementType = procurementTypes.includes(p.procurement_type) ? p.procurement_type : "";
     setEditing(p);
-    setForm({ title: p.title || "", budget: String(p.budget || ""), deadline: String(p.deadline || "").slice(0, 10), procurement_type: procurementType, technical_specifications: p.technical_specifications || "", delivery_period: String(p.delivery_period || ""), procurement_schedule: String(p.procurement_schedule || "").slice(0, 10), public_result_expiry_date: String(p.public_result_expiry_date || "").slice(0, 10) });
+    setForm({
+      title: p.title || "",
+      budget: String(p.budget || ""),
+      deadline: String(p.deadline || "").slice(0, 10),
+      procurement_type: procurementType,
+      technical_specifications: p.technical_specifications || "",
+      delivery_period: String(p.delivery_period || ""),
+      procurement_schedule: String(p.procurement_schedule || "").slice(0, 10),
+      public_result_expiry_date: String(p.public_result_expiry_date || "").slice(0, 10),
+    });
     setShowModal(true);
   }
 
   async function handleSave() {
     if (!form.title.trim() || !form.budget) return;
-    if (!form.procurement_type.trim()) {
+    if (!form.procurement_type || !String(form.procurement_type).trim()) {
       setToast({ message: "Please choose a procurement type.", type: "error" });
       return;
     }
@@ -173,7 +193,14 @@ export default function AdminProjects() {
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Approved Budget ({"\u20B1"})</span><StrictNumberInput value={form.budget} onChange={(value) => setForm({ ...form, budget: value })} className={inputClass} min="0" required placeholder="Enter approved budget" helperText="Numbers only. Enter the approved budget amount in pesos." /></label>
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Deadline</span><input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={inputClass} /></label>
           </div>
-          <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span><select value={form.procurement_type} onChange={(e) => setForm({ ...form, procurement_type: e.target.value })} className={inputClass}><option value="">Select category</option>{procurementTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select><p className="mt-1 text-xs text-slate-400">Choose the exact category name used in supplier registration.</p></label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Procurement Type</span>
+            <select value={form.procurement_type} onChange={(e) => setForm({ ...form, procurement_type: e.target.value })} className={inputClass}>
+              <option value="">Select category</option>
+              {procurementTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-slate-400">Choose the exact category name used in supplier registration.</p>
+          </label>
           <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span><textarea value={form.technical_specifications} onChange={(e) => setForm({ ...form, technical_specifications: e.target.value })} className={inputClass} rows={3} placeholder="Describe requirements" /></label>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period (days)</span><StrictNumberInput value={form.delivery_period} onChange={(value) => setForm({ ...form, delivery_period: value })} className={inputClass} min="0" required placeholder="Enter number of days" helperText="Numbers only. Use digits for the delivery period." /></label>

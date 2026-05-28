@@ -5,12 +5,22 @@ import { Suspense, useState, ChangeEvent, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
-import DropdownWithMore from "@/components/shared/DropdownWithMore";
 
 const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
 
 // initial fallback; will be replaced by server list
-const FALLBACK_BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
+const FALLBACK_BUSINESS_TYPES = [
+  "IT Equipment",
+  "Office Supplies",
+  "Construction Materials",
+  "Medical Supplies",
+  "ICT Services",
+  "Electrical Supplies",
+  "Agricultural Supplies",
+  "Printing Services",
+  "Transportation",
+  "Consultancy",
+];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const REQUIRED_DOCUMENTS_SECTIONS = {
@@ -274,10 +284,7 @@ function RegisterPageContent() {
       }
     }
 
-    if (form.businessType === "__more__" && !String(form.businessTypeCustom || "").trim()) {
-      setError("Please type a custom business type or choose a preset option.");
-      return;
-    }
+    // No custom business types allowed during registration — only select from provided list
 
     setIsLoading(true);
     try {
@@ -535,23 +542,6 @@ function RegisterPageContent() {
                               <span className="text-sm text-slate-700">{bt.name}</span>
                             </label>
                           ))}
-                        </div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <input
-                            type="text"
-                            placeholder="Add custom category"
-                            value={form.businessTypeCustom as string}
-                            onChange={(e) => updateForm("businessTypeCustom", e.target.value)}
-                            className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm outline-none"
-                          />
-                          <button type="button" onClick={() => {
-                            const v = String(form.businessTypeCustom || "").trim();
-                            if (!v) return;
-                            const ids = new Set(form.businessTypeIds as unknown as string[]);
-                            ids.add(v);
-                            updateForm("businessTypeIds", Array.from(ids));
-                            updateForm("businessTypeCustom", "");
-                          }} className="rounded-md bg-emerald-500 px-3 py-1 text-sm text-white">Add</button>
                         </div>
                       </div>
                     ) : (
