@@ -30,6 +30,8 @@ npm run migrate:run
 npx prisma db seed
 ```
 
+Note: `npx prisma db seed` runs `prisma/seed.ts` which is idempotent — it will upsert default accounts and the canonical `business_types` list. Run it whenever you reset or re-seed the local database.
+
 4) Start dev server
 
 ```powershell
