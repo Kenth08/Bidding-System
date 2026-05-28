@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { suppliersAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
@@ -26,6 +26,7 @@ export default function AdminSuppliers() {
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   const [debugPayload, setDebugPayload] = useState<any>(null);
   const [debugFetchedAt, setDebugFetchedAt] = useState<string | null>(null);
+  const debugFetchInFlightRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
@@ -54,6 +55,8 @@ export default function AdminSuppliers() {
   }
 
   async function fetchWorkflowDebugData(supplierId: string) {
+    if (debugFetchInFlightRef.current) return false;
+    debugFetchInFlightRef.current = true;
     setIsDebugLoading(true);
     try {
       const response = await suppliersAPI.getWorkflowDebug(supplierId);
@@ -68,6 +71,7 @@ export default function AdminSuppliers() {
       return false;
     } finally {
       setIsDebugLoading(false);
+      debugFetchInFlightRef.current = false;
     }
   }
 
@@ -76,6 +80,14 @@ export default function AdminSuppliers() {
     await fetchWorkflowDebugData(viewing.id);
     setIsDebugOpen(true);
   }
+
+  useEffect(() => {
+    if (!isDebugOpen || !viewing?.id) return;
+    const timer = setInterval(() => {
+      fetchWorkflowDebugData(viewing.id);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [isDebugOpen, viewing?.id]);
 
   const filtered = useMemo(() => suppliers.filter((s) => {
     const statusMatch = filter === "All" || s.status === filter;
@@ -274,6 +286,7 @@ export default function AdminSuppliers() {
             <p className="text-xs text-slate-500">
               Last fetched: {debugFetchedAt ? new Date(debugFetchedAt).toLocaleString() : "Not yet fetched"}
             </p>
+            <p className="text-xs text-slate-400">Auto-refresh: every 15s</p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
