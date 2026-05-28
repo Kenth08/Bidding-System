@@ -68,13 +68,13 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || user.role !== "supplier") return;
-    if (pathname.startsWith("/supplier/profile")) return;
+    if (pathname.startsWith("/supplier/documents/reupload")) return;
 
     (async () => {
       try {
         const response = await suppliersAPI.getMyDocumentWorkflow();
         if (response.data?.accountLocked) {
-          router.replace("/supplier/profile");
+          router.replace("/supplier/documents/reupload");
         }
       } catch {
         // ignore workflow fetch errors in layout guard

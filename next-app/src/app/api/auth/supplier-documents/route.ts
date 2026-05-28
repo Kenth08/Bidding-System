@@ -7,6 +7,15 @@ import {
 } from "@/lib/supplier-documents";
 import { getSupplierWorkflow } from "@/lib/supplier-workflow-db";
 
+function normalizeDocumentFile(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed === "DECLARED") return null;
+  if (/^(https?:\/\/|\/)/i.test(trimmed)) return trimmed;
+  return null;
+}
+
 export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -28,13 +37,15 @@ export async function GET(request: Request) {
     const upload = latestByType.get(definition.id);
     const uploaded = isDocumentUploaded(user as unknown as Record<string, unknown>, definition);
     const state = mapVerificationStatusToState(upload?.verification_status, uploaded);
+    const userFile = normalizeDocumentFile((user as any)[definition.userField]);
+    const uploadFile = normalizeDocumentFile(upload?.file);
 
     return {
       id: definition.id,
       name: definition.name,
       required: definition.required,
       uploaded,
-      file: uploaded ? (user as any)[definition.userField] ?? upload?.file ?? null : null,
+      file: uploaded ? userFile ?? uploadFile : null,
       state,
       reason: state === "flagged" ? upload?.verification_notes || null : null,
       expiryDate: definition.expiryField ? (user as any)[definition.expiryField] || null : null,

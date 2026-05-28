@@ -17,6 +17,15 @@ function normalizeStatus(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeDocumentFile(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed === "DECLARED") return null;
+  if (/^(https?:\/\/|\/)/i.test(trimmed)) return trimmed;
+  return null;
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { error } = await requireRole(request, "admin");
   if (error) return error;
@@ -41,13 +50,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const upload = latestByType.get(definition.id);
     const uploaded = isDocumentUploaded(supplier as unknown as Record<string, unknown>, definition);
     const state = mapVerificationStatusToState(upload?.verification_status, uploaded);
+    const userFile = normalizeDocumentFile((supplier as any)[definition.userField]);
+    const uploadFile = normalizeDocumentFile(upload?.file);
     return {
       id: definition.id,
       name: definition.name,
       category: definition.category,
       required: definition.required,
       uploaded,
-      file: uploaded ? (supplier as any)[definition.userField] ?? upload?.file ?? null : null,
+      file: uploaded ? userFile ?? uploadFile : null,
       state,
       reason: state === "flagged" ? upload?.verification_notes || null : null,
       verification_status: upload?.verification_status || null,
@@ -105,6 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const verificationStatus = action === "approve" ? "Approved" : "Needs Revision";
   const verificationNotes = action === "flag" ? reason : null;
+  const reviewedAt = new Date();
 
   if (existing) {
     await db.documentUpload.update({
@@ -112,7 +124,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       data: {
         verification_status: verificationStatus,
         verification_notes: verificationNotes,
-        verified_at: new Date(),
+        verified_at: reviewedAt,
         verified_by_id: user!.id,
       },
     });
@@ -122,11 +134,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         user_id: id,
         document_type: documentType,
         file_name: definition.name,
-        file: definition.declarationOnly ? "DECLARED" : String((supplier as any)[definition.userField] || ""),
+        file: definition.declarationOnly ? null : normalizeDocumentFile((supplier as any)[definition.userField]),
         file_size: 0,
         verification_status: verificationStatus,
         verification_notes: verificationNotes,
-        verified_at: new Date(),
+        verified_at: reviewedAt,
         verified_by_id: user!.id,
       },
     });

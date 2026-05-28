@@ -1,0 +1,142 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AlertCircle, Clock3, Upload } from "lucide-react";
+import { suppliersAPI } from "@/services/api";
+import Toast from "@/components/shared/Toast";
+import LoadingButton from "@/components/ui/LoadingButton";
+
+interface SupplierDocWorkflowItem {
+  id: string;
+  name: string;
+  required: boolean;
+  uploaded: boolean;
+  file: string | null;
+  state: "missing" | "uploaded" | "flagged" | "revised" | "approved";
+  reason?: string | null;
+}
+
+export default function SupplierDocumentReuploadPage() {
+  const [documents, setDocuments] = useState<SupplierDocWorkflowItem[]>([]);
+  const [accountLocked, setAccountLocked] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
+  const [isResubmitting, setIsResubmitting] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  async function loadDocumentWorkflow() {
+    try {
+      const response = await suppliersAPI.getMyDocumentWorkflow();
+      setDocuments(Array.isArray(response.data?.documents) ? response.data.documents : []);
+      setAccountLocked(Boolean(response.data?.accountLocked));
+    } catch {
+      setDocuments([]);
+      setAccountLocked(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDocumentWorkflow().finally(() => setLoading(false));
+  }, []);
+
+  async function handleResubmit(documentId: string) {
+    const file = selectedFiles[documentId];
+    if (!file) {
+      setToast({ message: "Please choose a file before resubmitting."
+        , type: "error" });
+      return;
+    }
+
+    setIsResubmitting((prev) => ({ ...prev, [documentId]: true }));
+    try {
+      const payload = new FormData();
+      payload.append("file", file);
+      await suppliersAPI.resubmitDocument(documentId, payload);
+      setToast({ message: "Document resubmitted. Please wait for admin re-review.", type: "success" });
+      setSelectedFiles((prev) => ({ ...prev, [documentId]: null }));
+      await loadDocumentWorkflow();
+    } catch (error: any) {
+      setToast({ message: error?.response?.data?.error || "Failed to resubmit document.", type: "error" });
+    } finally {
+      setIsResubmitting((prev) => ({ ...prev, [documentId]: false }));
+    }
+  }
+
+  if (loading) {
+    return <div className="animate-pulse space-y-4"><div className="h-16 rounded-2xl bg-slate-100" /><div className="h-16 rounded-2xl bg-slate-100" /></div>;
+  }
+
+  const flaggedOrRevised = documents.filter((doc) => doc.state === "flagged" || doc.state === "revised");
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="mt-0.5 h-4 w-4 text-amber-700" />
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Your account has flagged verification documents. Please re-upload the required files before participating in bidding.</p>
+            <p className="mt-1 text-xs text-amber-700">After you re-upload, admin will review the documents again automatically.</p>
+          </div>
+        </div>
+      </div>
+
+      {accountLocked ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Supplier access is restricted until the flagged documents are re-reviewed.
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-900">Re-upload flagged documents</h2>
+          <p className="text-xs text-slate-500">Only flagged or revised files appear here</p>
+        </div>
+
+        {flaggedOrRevised.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">No flagged documents need re-upload right now.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {flaggedOrRevised.map((doc) => (
+              <div key={doc.id} className="rounded-xl border border-slate-200 px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900">{doc.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{doc.reason || "Please upload an updated file for review."}</p>
+                  </div>
+                  {doc.state === "revised" ? <Clock3 className="h-4 w-4 text-blue-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>{selectedFiles[doc.id]?.name || "Choose file"}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        setSelectedFiles((prev) => ({ ...prev, [doc.id]: file }));
+                      }}
+                    />
+                  </label>
+                  <LoadingButton
+                    type="button"
+                    isLoading={Boolean(isResubmitting[doc.id])}
+                    disabled={!selectedFiles[doc.id] || Boolean(isResubmitting[doc.id])}
+                    onClick={() => handleResubmit(doc.id)}
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Resubmit
+                  </LoadingButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
+    </div>
+  );
+}

@@ -987,6 +987,11 @@ export const db = {
   },
 
   documentUpload: {
+    findFirst: async (params: any = {}) => {
+      const rows = await db.documentUpload.findMany(params);
+      return rows[0] || null;
+    },
+
     findMany: async (params: any = {}) => {
       const { data, error } = await supabaseServer.from(DOCUMENT_UPLOADS_TABLE).select("*");
       if (error) throw error;
@@ -994,6 +999,25 @@ export const db = {
       const sorted = sortRows(filtered, params.orderBy);
       const limited = applyTake(sorted, params);
       return limited.map(hydrateDocumentUpload);
+    },
+
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error("Update requires an id-based where clause.");
+
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return db.documentUpload.findFirst({ where: { id } });
+      }
+
+      const { data: result, error } = await supabaseServer
+        .from(DOCUMENT_UPLOADS_TABLE)
+        .update({ ...updateData, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return hydrateDocumentUpload(result);
     },
 
     create: async (params: {

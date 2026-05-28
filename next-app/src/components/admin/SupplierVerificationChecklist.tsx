@@ -69,6 +69,10 @@ function stateIcon(state: SupplierDocumentState) {
   return <XCircle className="h-4 w-4 text-amber-600" />;
 }
 
+function isRenderableFileUrl(file: unknown): file is string {
+  return typeof file === "string" && file.trim().length > 0;
+}
+
 function getOverallStatus(documents: SupplierReviewDocument[]) {
   const required = documents.filter((doc) => doc.required);
   const missingRequired = required.some((doc) => !doc.uploaded);
@@ -175,11 +179,13 @@ export default function SupplierVerificationChecklist({
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusPillClass(document.state)}`}>
                         {formatStatus(document)}
                       </span>
-                      {document.file ? (
+                      {isRenderableFileUrl(document.file) ? (
                         <a href={document.file} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-600 hover:underline">
                           View file
                         </a>
-                      ) : null}
+                      ) : (
+                        <span className="text-xs text-slate-400">No file preview available</span>
+                      )}
                     </div>
                     {document.state === "flagged" && document.reason ? (
                       <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">

@@ -23,6 +23,14 @@ async function saveFile(file: File, folder: string): Promise<string> {
   return `/uploads/${folder}/${filename}`;
 }
 
+function normalizeDocumentFile(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^(https?:\/\/|\/)/i.test(trimmed)) return trimmed;
+  return null;
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ documentType: string }> }
@@ -84,7 +92,7 @@ export async function PATCH(
         user_id: user!.id,
         document_type: normalizedType,
         file_name: file.name,
-        file: filePath,
+        file: normalizeDocumentFile(filePath),
         file_size: file.size,
         verification_status: "Revised",
         verification_notes: null,

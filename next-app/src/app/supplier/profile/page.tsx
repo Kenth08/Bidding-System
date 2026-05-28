@@ -105,6 +105,10 @@ export default function SupplierProfile() {
 
   const flaggedOrRevised = documents.filter((doc) => doc.state === "flagged" || doc.state === "revised");
 
+  function isRenderableFileUrl(file: unknown): file is string {
+    return typeof file === "string" && file.trim().length > 0;
+  }
+
   return (
     <div className="space-y-6">
       {accountLocked ? (
@@ -154,11 +158,13 @@ export default function SupplierProfile() {
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${doc.state === "flagged" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
                         {doc.state === "flagged" ? "Flagged" : "Revised - re-review"}
                       </span>
-                      {doc.file ? (
+                      {isRenderableFileUrl(doc.file) ? (
                         <a href={doc.file} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-600 hover:underline">
                           View current file
                         </a>
-                      ) : null}
+                      ) : (
+                        <span className="text-xs text-slate-400">No file preview available</span>
+                      )}
                     </div>
                     {doc.reason ? (
                       <p className="mt-2 text-xs text-red-700">Reason: {doc.reason}</p>

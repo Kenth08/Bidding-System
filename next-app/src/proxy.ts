@@ -34,6 +34,25 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
+    if (role === "supplier" && pathname.startsWith("/supplier") && !pathname.startsWith("/supplier/documents/reupload")) {
+      try {
+        const workflowResponse = await fetch(new URL("/api/auth/supplier-documents", request.url), {
+          headers: {
+            cookie: request.headers.get("cookie") || "",
+          },
+        });
+
+        if (workflowResponse.ok) {
+          const workflow = await workflowResponse.json();
+          if (workflow?.accountLocked) {
+            return NextResponse.redirect(new URL("/supplier/documents/reupload", request.url));
+          }
+        }
+      } catch {
+        // If the workflow check fails, fall through and let the app handle it.
+      }
+    }
+
     return NextResponse.next();
   } catch (err: any) {
     if (err?.code === "ERR_JWT_EXPIRED") {
