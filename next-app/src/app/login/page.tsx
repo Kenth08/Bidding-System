@@ -138,16 +138,11 @@ function LoginPageContent() {
             <LoadingButton type="submit" isLoading={isLoading} loadingText="Signing In..." className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600 active:scale-[0.98]">Sign In</LoadingButton>
             {error ? <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div> : null}
             {isLocalMode ? <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs text-slate-500">Local mode is enabled. Google sign-in is disabled.</p> : null}
-            <div className="mt-4">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <h3 className="text-sm font-semibold text-slate-900">Want to Join Procurement Opportunities?</h3>
-                <p className="mt-2 text-xs text-slate-500">Register as a supplier to submit proposals, participate in bidding, and access procurement opportunities.</p>
-                <div className="mt-3 flex gap-3">
-                  <button type="button" onClick={() => router.push("/register")} className="rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white">Register Supplier</button>
-                  <button type="button" onClick={() => {/* stay on login */}} className="rounded-xl border px-3 py-2 text-sm font-semibold text-emerald-600">Login</button>
-                </div>
-              </div>
-            </div>
+            {/* Keep login focused; show compact register link so users can create supplier accounts */}
+            <p className="mt-4 text-center text-sm text-slate-500">
+              Don&apos;t have an account?{' '}
+              <button type="button" onClick={() => router.push(nextPath ? `/register?next=${encodeURIComponent(nextPath)}` : '/register')} className="font-medium text-emerald-600 hover:text-emerald-700">Register as Supplier</button>
+            </p>
           </form>
         </div>
         <div className="mt-8 flex items-center justify-center gap-1.5 text-xs text-slate-300"><Lock className="h-3.5 w-3.5" /><span>Secured by blockchain technology</span></div>

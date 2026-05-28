@@ -105,6 +105,7 @@ function SectionTitle({ title, description }: { title: string; description?: str
 function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [nextPath, setNextPath] = useState<string | null>(null);
   const googleEmail = searchParams.get("email") || "";
   const isFromGoogle = searchParams.get("from") === "google";
   const noAccountMessage = searchParams.get("message") === "no_account";
@@ -170,6 +171,8 @@ function RegisterPageContent() {
         setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
       }
     })();
+      const next = searchParams.get("next");
+      if (next) setNextPath(next);
   }, []);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -326,6 +329,11 @@ function RegisterPageContent() {
       if (isFromGoogle) payload.append("from_google", "true");
 
       await authAPI.register(payload);
+      // If user came from an open-bid click, forward them to login with next so they can sign in and continue
+      if (nextPath) {
+        router.push(`/login?next=${encodeURIComponent(nextPath)}&message=${encodeURIComponent("Registration successful. Please sign in to participate in bidding.")}`);
+        return;
+      }
       setSubmitted(true);
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Registration failed.");
