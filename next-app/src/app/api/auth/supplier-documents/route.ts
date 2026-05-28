@@ -56,21 +56,47 @@ export async function GET(request: Request) {
       id: definition.id,
       name: definition.name,
       required: definition.required,
+      declarationOnly: Boolean(definition.declarationOnly),
       uploaded,
       file: uploaded ? userFile ?? uploadFile : null,
       state,
+      status: !uploaded ? "not_uploaded" : String(upload?.verification_status || "uploaded").toLowerCase(),
+      adminComment: upload?.verification_notes || null,
+      flagReason: state === "flagged" ? upload?.verification_notes || null : null,
+      reviewedById: upload?.verified_by_id || null,
+      reviewedAt: upload?.verified_at || null,
       reason: state === "flagged" ? upload?.verification_notes || null : null,
       expiryDate: definition.expiryField ? (user as any)[definition.expiryField] || null : null,
     };
   });
 
   const workflow = await getSupplierWorkflow(user!.id);
-  const { verificationState, accessState } = buildVerificationState(documents);
+  const { verificationState: computedState } = buildVerificationState(documents);
+  const accountStatus = String(user!.status || user!.verification_status || "");
+  const accessState =
+    accountStatus === "verified"
+      ? "verified"
+      : accountStatus === "revision_required"
+        ? "revision_required"
+        : "restricted";
+
+  const flaggedRequired = documents.filter((doc) => doc.required && doc.state === "flagged");
+  const hasRequiredPendingReview = documents.some(
+    (doc) => doc.required && (doc.state === "revised" || doc.state === "uploaded")
+  );
+  const canSubmitRevision =
+    accessState === "revision_required" &&
+    flaggedRequired.length === 0 &&
+    hasRequiredPendingReview;
+
   return json({
     accountLocked: workflow.account_locked,
     notifSent: workflow.notif_sent,
-    verificationState,
+    accountStatus,
+    verificationState: accountStatus === "verified" ? "verified" : computedState,
     accessState,
+    canSubmitRevision,
+    flaggedRequiredCount: flaggedRequired.length,
     documents,
   });
 }

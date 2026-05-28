@@ -1,0 +1,13 @@
+﻿1) Admin login
+2) Register supplier
+3) Find supplier
+4) Set password + approve supplier
+5) Open verification (auto-flag)
+6) Notify supplier
+7) Supplier login (revision_required should allow)
+8) Fetch supplier docs and reupload flagged required
+9) Submit revision
+10) Supplier login blocked while waiting_admin_review
+11) Admin approve required docs + final unlock
+12) Supplier login allowed after verified
+E2E workflow PASSED

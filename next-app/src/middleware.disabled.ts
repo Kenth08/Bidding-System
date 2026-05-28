@@ -29,6 +29,7 @@ function clearAuthCookies(response: NextResponse) {
   return response;
 }
 
+/*
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -121,6 +122,14 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+// NOTE: This file must not be named middleware.ts if a separate proxy middleware.ts exists.
+// Next.js throws an error when both middleware and proxy are detected under the same root.
+// We keep this file for reference but disable Next's middleware exports.
 export const config = {
-  matcher: ["/supplier/:path*"],
+  matcher: [] as any,
 };
+
+// Ensure Next does not treat this file as a middleware entrypoint.
+export default null as any;
+
+

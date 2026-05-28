@@ -99,6 +99,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     metadata: { documentType, file: filePath },
   }).catch(() => {});
 
+  // mark supplier account as waiting for admin review and invalidate sessions
+  const supplier = await db.user.findUnique({ where: { id } });
+  const nextSessionVersion = ((supplier?.session_version as number) || 0) + 1;
+  try {
+    await db.user.update({
+      where: { id },
+      data: { status: "waiting_admin_review", session_version: nextSessionVersion },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/session_version/i.test(message) || !/does not exist|undefined/.test(message)) {
+      throw error;
+    }
+
+    await db.user.update({
+      where: { id },
+      data: { status: "waiting_admin_review" },
+    });
+  }
+
+  // send confirmation email to supplier
+  try {
+    const { sendSupplierReuploadConfirmationEmail } = await import("@/lib/email-verification");
+    await sendSupplierReuploadConfirmationEmail(String(supplier?.email || ""));
+  } catch (e) {}
+
   return json({
     success: true,
     documentType,
@@ -106,5 +132,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     state: "pending",
     accountLocked: false,
     notifSent: false,
+    forceLogout: true,
+    message: "Your corrected documents have been submitted successfully. Please wait for admin approval.",
   });
 }

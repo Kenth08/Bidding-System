@@ -7,6 +7,14 @@ export async function getAuthUser(request: Request) {
   const payload = await getUserFromRequest(request);
   if (!payload?.sub) return null;
   const user = await dbDirect.user.findUnique({ id: payload.sub });
+  const tokenSessionVersion = typeof (payload as any).session_version === "number"
+    ? (payload as any).session_version
+    : null;
+
+  if (user && tokenSessionVersion !== null) {
+    const currentSessionVersion = Number((user as any).session_version || 0);
+    if (tokenSessionVersion !== currentSessionVersion) return null;
+  }
   return user;
 }
 

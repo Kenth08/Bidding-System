@@ -120,8 +120,12 @@ export default function SupplierVerificationChecklist({
     () => documents.filter((doc) => doc.state === "flagged"),
     [documents]
   );
+  const flaggedRequiredDocuments = useMemo(
+    () => documents.filter((doc) => doc.required && doc.state === "flagged"),
+    [documents]
+  );
 
-  const canNotifySupplier = flaggedDocuments.length > 0 && !notifSent;
+  const canNotifySupplier = flaggedRequiredDocuments.length > 0 && !notifSent;
   const canApproveAllUnlock = useMemo(() => {
     const required = documents.filter((doc) => doc.required);
     return required.length > 0 && required.every((doc) => doc.state === "approved");
@@ -150,7 +154,7 @@ export default function SupplierVerificationChecklist({
             <div>
               <p className="text-sm font-semibold text-amber-900">Supplier account is locked pending document revisions.</p>
               <p className="mt-1 text-xs text-amber-700">
-                Documents requiring revision: {flaggedDocuments.length ? flaggedDocuments.map((doc) => doc.name).join(", ") : "None"}
+                Documents requiring revision: {flaggedRequiredDocuments.length ? flaggedRequiredDocuments.map((doc) => doc.name).join(", ") : "None"}
               </p>
             </div>
           </div>

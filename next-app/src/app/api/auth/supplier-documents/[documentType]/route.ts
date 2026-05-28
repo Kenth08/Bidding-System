@@ -1,6 +1,3 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
 import { requireAuth, json } from "@/lib/api-utils";
 import { notifyAdmins } from "@/lib/actions";
@@ -12,16 +9,7 @@ import {
   getSupplierWorkflow,
   updateSupplierWorkflow,
 } from "@/lib/supplier-workflow-db";
-
-async function saveFile(file: File, folder: string): Promise<string> {
-  const dir = path.join(process.cwd(), "public", "uploads", folder);
-  await mkdir(dir, { recursive: true });
-  const ext = path.extname(file.name) || ".bin";
-  const filename = `${uuid()}${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buffer);
-  return `/uploads/${folder}/${filename}`;
-}
+import { uploadSupplierDocumentToSupabase } from "@/lib/supabase-upload";
 
 function normalizeDocumentFile(value: unknown) {
   if (typeof value !== "string") return null;
@@ -43,17 +31,50 @@ export async function PATCH(
   const normalizedType = String(documentType || "").trim();
   const definition = SUPPLIER_DOCUMENT_LOOKUP.get(normalizedType);
   if (!definition) return json({ error: "Unknown document type." }, 400);
-  if (definition.declarationOnly) return json({ error: "This declaration cannot be uploaded as a file." }, 400);
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
-  if (!file || file.size <= 0) {
+  if (!definition.declarationOnly && (!file || file.size <= 0)) {
     return json({ error: "Please upload a file before resubmitting." }, 400);
   }
 
-  const filePath = await saveFile(file, "documents");
+  const workflow = await getSupplierWorkflow(user!.id);
+  const latest = await db.documentUpload.findFirst({
+    where: { user_id: user!.id, document_type: normalizedType },
+    orderBy: { updated_at: "desc" },
+  });
+  const latestStatus = String(latest?.verification_status || "").toLowerCase();
+  const isFlagged = Object.prototype.hasOwnProperty.call(workflow.flagged_reasons, normalizedType)
+    || latestStatus === "flagged"
+    || latestStatus === "needs revision"
+    || latestStatus === "rejected"
+    || latestStatus === "invalid";
+
+  if (!isFlagged) {
+    return json({ error: "Only flagged documents can be re-uploaded." }, 400);
+  }
+
+  let filePath: string | null = null;
+  let fileUrl: string | null = null;
+
+  if (!definition.declarationOnly) {
+    let uploadResult;
+    try {
+      uploadResult = await uploadSupplierDocumentToSupabase({
+        supplierId: user!.id,
+        documentType: normalizedType,
+        file: file!,
+      });
+    } catch (e: any) {
+      return json({ error: e?.message || "Failed to upload document." }, 400);
+    }
+
+    filePath = uploadResult.filePath;
+    fileUrl = uploadResult.signedUrl;
+  }
+
   const updateData: Record<string, unknown> = {
-    [definition.userField]: filePath,
+    [definition.userField]: definition.declarationOnly ? true : (fileUrl || filePath),
   };
 
   if (definition.expiryField) {
@@ -68,45 +89,25 @@ export async function PATCH(
     data: updateData,
   });
 
-  const existing = await db.documentUpload.findFirst({
-    where: { user_id: user!.id, document_type: normalizedType },
-    orderBy: { updated_at: "desc" },
+  // Keep upload history by inserting a fresh row for each re-upload cycle.
+  await db.documentUpload.create({
+    data: {
+      user_id: user!.id,
+      document_type: normalizedType,
+      file_name: definition.declarationOnly ? definition.name : file!.name,
+      file: normalizeDocumentFile(fileUrl || filePath),
+      file_size: definition.declarationOnly ? 0 : file!.size,
+      verification_status: "Pending_Review",
+      verification_notes: null,
+    },
   });
 
-  if (existing) {
-    await db.documentUpload.update({
-      where: { id: existing.id },
-      data: {
-        file: filePath,
-        file_name: file.name,
-        file_size: file.size,
-        verification_status: "Revised",
-        verification_notes: null,
-        verified_at: null,
-        verified_by_id: null,
-      },
-    });
-  } else {
-    await db.documentUpload.create({
-      data: {
-        user_id: user!.id,
-        document_type: normalizedType,
-        file_name: file.name,
-        file: normalizeDocumentFile(filePath),
-        file_size: file.size,
-        verification_status: "Revised",
-        verification_notes: null,
-      },
-    });
-  }
-
-  const workflow = await getSupplierWorkflow(user!.id);
   const nextFlaggedReasons = { ...workflow.flagged_reasons };
   delete nextFlaggedReasons[normalizedType];
 
   await updateSupplierWorkflow(user!.id, {
-    accountLocked: false,
-    notifSent: false,
+    accountLocked: true,
+    notifSent: workflow.notif_sent,
     flaggedReasons: nextFlaggedReasons,
   });
 
@@ -124,15 +125,24 @@ export async function PATCH(
     eventType: "SUPPLIER_DOCUMENT_RESUBMITTED",
     message: `Supplier has resubmitted ${definition.name}. Please re-review.`,
     tone: "blue",
-    metadata: { documentType: normalizedType, file: filePath },
+    metadata: { documentType: normalizedType, filePath, fileUrl },
   }).catch(() => {});
 
   return json({
     success: true,
     documentType: normalizedType,
-    file: filePath,
-    state: "revised",
-    accountLocked: false,
-    notifSent: false,
+    filePath,
+    fileUrl,
+    state: "pending_review",
+    accountLocked: true,
+    notifSent: workflow.notif_sent,
+    requiresSubmit: true,
   });
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ documentType: string }> }
+) {
+  return PATCH(request, context);
 }

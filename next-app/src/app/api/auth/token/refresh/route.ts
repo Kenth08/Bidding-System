@@ -31,7 +31,12 @@ export async function POST(request: Request) {
   const user = await dbDirect.user.findUnique({ id: payload.sub });
   if (!user) return NextResponse.json({ error: "User not found." }, { status: 401 });
 
-  const access = await signAccessToken({ id: user.id, email: user.email, role: user.role });
+  const access = await signAccessToken({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    session_version: user.session_version ?? 0,
+  });
   const response = NextResponse.json({ access });
   response.cookies.set("access_token", access, {
     httpOnly: true,

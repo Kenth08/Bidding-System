@@ -2,6 +2,11 @@ export type SupplierDocumentCategory = "legal" | "financial" | "technical";
 
 export type SupplierDocumentState = "missing" | "uploaded" | "flagged" | "revised" | "approved";
 
+const AUTO_FLAG_TRIGGER_STATUSES = new Set(["not_uploaded", "missing", "rejected", "invalid"]);
+
+export const DEFAULT_REQUIRED_DOCUMENT_FLAG_REASON =
+  "Required document is missing or invalid. Please upload a valid file.";
+
 export interface SupplierDocumentDefinition {
   id: string;
   name: string;
@@ -142,10 +147,10 @@ export function mapVerificationStatusToState(
   hasFile: boolean
 ): SupplierDocumentState {
   const status = String(verificationStatus || "").toLowerCase();
+  if (status === "needs revision" || status === "rejected" || status === "flagged" || status === "invalid") return "flagged";
   if (!hasFile) return "missing";
   if (status === "approved") return "approved";
-  if (status === "needs revision" || status === "rejected") return "flagged";
-  if (status === "revised") return "revised";
+  if (status === "revised" || status === "pending" || status === "pending_review") return "revised";
   return "uploaded";
 }
 
@@ -153,4 +158,15 @@ export function isDocumentUploaded(supplier: Record<string, unknown>, definition
   const value = supplier?.[definition.userField];
   if (definition.declarationOnly) return Boolean(value);
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
+}
+
+export function shouldAutoFlagRequiredDocument(params: {
+  required: boolean;
+  hasFile: boolean;
+  verificationStatus?: unknown;
+}) {
+  if (!params.required) return false;
+  if (!params.hasFile) return true;
+  const status = String(params.verificationStatus || "").trim().toLowerCase();
+  return AUTO_FLAG_TRIGGER_STATUSES.has(status);
 }

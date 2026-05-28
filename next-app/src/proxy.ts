@@ -45,15 +45,27 @@ export async function proxy(request: NextRequest) {
         if (workflowResponse.ok) {
           const workflow = await workflowResponse.json();
           const accessState = String(workflow?.accessState || "restricted");
-          const verificationState = String(workflow?.verificationState || "pending");
-          const allowedSupplierPaths = ["/supplier/profile", "/supplier/verification-status", "/supplier/documents/reupload"];
+          const accountStatus = String(workflow?.accountStatus || "");
+          const allowedRevisionPaths = [
+            "/supplier/revision-required",
+            "/supplier/verification",
+            "/supplier/verification-status",
+            "/supplier/profile",
+            "/supplier/notifications",
+            "/supplier/documents",
+          ];
 
-          if (accessState !== "verified") {
-            const isAllowedPath = allowedSupplierPaths.some((path) => pathname.startsWith(path));
+          if (accountStatus === "waiting_admin_approval" || accountStatus === "waiting_admin_review") {
+            return NextResponse.redirect(new URL("/login?error=under_review", request.url));
+          }
+
+          if (accessState === "revision_required") {
+            const isAllowedPath = allowedRevisionPaths.some((path) => pathname.startsWith(path));
             if (!isAllowedPath) {
-              const redirectPath = verificationState === "flagged" ? "/supplier/documents/reupload" : "/supplier/verification-status";
-              return NextResponse.redirect(new URL(redirectPath, request.url));
+              return NextResponse.redirect(new URL("/supplier/revision-required", request.url));
             }
+          } else if (accessState !== "verified") {
+            return NextResponse.redirect(new URL("/supplier/verification-status", request.url));
           }
         }
       } catch {

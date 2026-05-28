@@ -13,6 +13,7 @@ interface SupplierDocWorkflowItem {
   uploaded: boolean;
   file: string | null;
   state: "missing" | "uploaded" | "flagged" | "revised" | "approved";
+  adminComment?: string | null;
   reason?: string | null;
 }
 
@@ -21,6 +22,8 @@ export default function SupplierDocumentReuploadPage() {
   const [accountLocked, setAccountLocked] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
   const [isResubmitting, setIsResubmitting] = useState<Record<string, boolean>>({});
+  const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
+  const [canSubmitRevision, setCanSubmitRevision] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -29,6 +32,7 @@ export default function SupplierDocumentReuploadPage() {
       const response = await suppliersAPI.getMyDocumentWorkflow();
       setDocuments(Array.isArray(response.data?.documents) ? response.data.documents : []);
       setAccountLocked(Boolean(response.data?.accountLocked));
+      setCanSubmitRevision(Boolean(response.data?.canSubmitRevision));
     } catch {
       setDocuments([]);
       setAccountLocked(false);
@@ -51,8 +55,15 @@ export default function SupplierDocumentReuploadPage() {
     try {
       const payload = new FormData();
       payload.append("file", file);
-      await suppliersAPI.resubmitDocument(documentId, payload);
-      setToast({ message: "Document resubmitted. Please wait for admin re-review.", type: "success" });
+      const res = await suppliersAPI.resubmitDocument(documentId, payload);
+      setToast({ message: "Document re-uploaded. Continue until all flagged required documents are corrected, then submit revision.", type: "success" });
+      if (res?.data?.forceLogout) {
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } catch {}
+        window.location.href = "/login?error=submitted_review";
+        return;
+      }
       setSelectedFiles((prev) => ({ ...prev, [documentId]: null }));
       await loadDocumentWorkflow();
     } catch (error: any) {
@@ -62,11 +73,33 @@ export default function SupplierDocumentReuploadPage() {
     }
   }
 
+  async function handleSubmitRevision() {
+    setIsSubmittingRevision(true);
+    try {
+      const res = await suppliersAPI.submitRevision();
+      setToast({ message: res?.data?.message || "Revision submitted.", type: "success" });
+      if (res?.data?.forceLogout) {
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } catch {}
+        window.location.href = "/login?error=submitted_review";
+        return;
+      }
+      await loadDocumentWorkflow();
+    } catch (error: any) {
+      setToast({ message: error?.response?.data?.error || "Failed to submit revision.", type: "error" });
+    } finally {
+      setIsSubmittingRevision(false);
+    }
+  }
+
   if (loading) {
     return <div className="animate-pulse space-y-4"><div className="h-16 rounded-2xl bg-slate-100" /><div className="h-16 rounded-2xl bg-slate-100" /></div>;
   }
 
-  const flaggedOrRevised = documents.filter((doc) => doc.state === "flagged" || doc.state === "revised");
+  const flaggedDocs = documents.filter((doc) => doc.state === "flagged");
+  const pendingReviewDocs = documents.filter((doc) => doc.state === "revised");
+  const approvedDocs = documents.filter((doc) => doc.state === "approved");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -89,21 +122,21 @@ export default function SupplierDocumentReuploadPage() {
       <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-slate-900">Re-upload flagged documents</h2>
-          <p className="text-xs text-slate-500">Only flagged or revised files appear here</p>
+          <p className="text-xs text-slate-500">Only flagged documents can be re-uploaded.</p>
         </div>
 
-        {flaggedOrRevised.length === 0 ? (
+        {flaggedDocs.length === 0 ? (
           <p className="mt-4 text-sm text-slate-500">No flagged documents need re-upload right now.</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {flaggedOrRevised.map((doc) => (
+            {flaggedDocs.map((doc) => (
               <div key={doc.id} className="rounded-xl border border-slate-200 px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-900">{doc.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">{doc.reason || "Please upload an updated file for review."}</p>
+                    <p className="mt-1 text-xs text-slate-500">{doc.reason || doc.adminComment || "Please upload an updated file for review."}</p>
                   </div>
-                  {doc.state === "revised" ? <Clock3 className="h-4 w-4 text-blue-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
+                  <AlertCircle className="h-4 w-4 text-red-600" />
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -134,7 +167,49 @@ export default function SupplierDocumentReuploadPage() {
             ))}
           </div>
         )}
+
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <LoadingButton
+            type="button"
+            isLoading={isSubmittingRevision}
+            disabled={!canSubmitRevision || isSubmittingRevision}
+            onClick={handleSubmitRevision}
+            className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Submit corrected documents
+          </LoadingButton>
+          {!canSubmitRevision ? (
+            <p className="mt-2 text-xs text-slate-500">
+              Submit becomes available after all flagged required documents are re-uploaded.
+            </p>
+          ) : null}
+        </div>
       </div>
+
+      {pendingReviewDocs.length > 0 ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <h3 className="text-sm font-semibold text-blue-900">Pending review</h3>
+          <ul className="mt-2 space-y-1 text-xs text-blue-800">
+            {pendingReviewDocs.map((doc) => (
+              <li key={doc.id} className="flex items-center gap-2">
+                <Clock3 className="h-3.5 w-3.5" />
+                <span>{doc.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {approvedDocs.length > 0 ? (
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+          <h3 className="text-sm font-semibold text-emerald-900">Approved documents</h3>
+          <ul className="mt-2 space-y-1 text-xs text-emerald-800">
+            {approvedDocs.map((doc) => (
+              <li key={doc.id}>{doc.name}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
     </div>

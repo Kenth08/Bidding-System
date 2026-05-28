@@ -12,7 +12,7 @@ model User {
   email                    String             @unique @db.VarChar(255)
   password_hash            String             @map("password_hash") @db.VarChar(128)
   role                     String             @default("supplier") @db.VarChar(20)
-  status                   String             @default("pending") @db.VarChar(20)
+  status                   String             @default("waiting_admin_approval") @db.VarChar(30)
   company_name             String             @default("") @db.VarChar(255)
   company_address          String             @default("") @db.VarChar(255)
   phone                    String             @default("") @db.VarChar(50)
@@ -21,7 +21,8 @@ model User {
   tin                      String?            @db.VarChar(50)
   company_profile          String?            @db.Text
   business_permit_document String?            // @deprecated use sec_dti_certificate and mayors_permit
-  
+  verification_status      String             @default("waiting_admin_approval") @db.VarChar(30)
+  session_version Int @default(0)
   // New document fields
   sec_dti_certificate      String?
   mayors_permit            String?
@@ -208,7 +209,7 @@ model DocumentUpload {
   file_name           String   @db.VarChar(255)
   file                String?
   file_size           Int      @default(0)
-  verification_status String   @default("Pending") @db.VarChar(20)
+  verification_status String @default("pending_review") @db.VarChar(30)
   verification_notes   String?
   verified_by_id      String?  @db.Uuid
   verified_at         DateTime?

@@ -11,6 +11,7 @@ import {
   addSupplierWorkflowActivity,
   updateSupplierWorkflow,
 } from "@/lib/supplier-workflow-db";
+import { sendSupplierApprovedEmail } from "@/lib/email";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireRole(request, "admin");
@@ -58,11 +59,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     where: { id },
     data: {
       verification_status: "verified",
+      status: "verified",
       verified_at: new Date(),
       verified_by_id: user!.id,
     },
   });
 
+  // send in-app notification
   await notifyUser(
     id,
     "supplier_documents_approved",
@@ -71,6 +74,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     "/supplier/projects",
     id
   ).catch(() => {});
+
+  // send approval email
+  try {
+    await sendSupplierApprovedEmail({
+      to: String(supplier.email),
+      supplierName: String(supplier.full_name || "Supplier"),
+    });
+  } catch (e) {
+    // ignore
+  }
 
   await addSupplierWorkflowActivity({
     supplierId: id,

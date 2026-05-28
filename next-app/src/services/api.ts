@@ -93,9 +93,10 @@ export const suppliersAPI = {
   approveAllUnlock: (id: string) => api.post(`/auth/suppliers/${id}/approve-all-unlock`),
   getMyDocumentWorkflow: () => api.get("/auth/supplier-documents"),
   resubmitDocument: (documentType: string, data: FormData) =>
-    api.patch(`/auth/supplier-documents/${encodeURIComponent(documentType)}`, data, {
+    api.post(`/supplier/documents/${encodeURIComponent(documentType)}/reupload`, data, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  submitRevision: () => api.post("/supplier/submit-revision"),
 };
 
 export const usersAPI = {

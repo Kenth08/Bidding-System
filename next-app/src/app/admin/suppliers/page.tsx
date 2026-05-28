@@ -228,6 +228,7 @@ export default function AdminSuppliers() {
                   }
                 }}
                 onNotifySupplier={async () => {
+                  if (!window.confirm("Send revision notification to this supplier now?")) return;
                   setIsWorkflowBusy(true);
                   try {
                     await suppliersAPI.notifyFlagged(viewing.id);

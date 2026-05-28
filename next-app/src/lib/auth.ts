@@ -3,8 +3,11 @@ import { User } from "@/types";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret-change-me");
 
-export async function signAccessToken(user: { id: string; email: string; role: string }) {
-  return new SignJWT({ sub: user.id, email: user.email, role: user.role })
+export async function signAccessToken(user: { id: string; email: string; role: string; session_version?: number }) {
+  const payload: any = { sub: user.id, email: user.email, role: user.role };
+  if (typeof user.session_version === "number") payload.session_version = user.session_version;
+
+  return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(process.env.JWT_ACCESS_EXPIRY || "15m")

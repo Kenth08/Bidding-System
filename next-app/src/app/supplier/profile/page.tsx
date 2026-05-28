@@ -91,8 +91,15 @@ export default function SupplierProfile() {
     try {
       const payload = new FormData();
       payload.append("file", file);
-      await suppliersAPI.resubmitDocument(documentId, payload);
+      const res = await suppliersAPI.resubmitDocument(documentId, payload);
       setToast({ message: "Document resubmitted. Please wait for admin re-review.", type: "success" });
+      if (res?.data?.forceLogout) {
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } catch {}
+        window.location.href = "/login?error=submitted_review";
+        return;
+      }
       setSelectedFiles((prev) => ({ ...prev, [documentId]: null }));
       await loadDocumentWorkflow();
     } catch (error: any) {

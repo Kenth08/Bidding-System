@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import {
+  DEFAULT_REQUIRED_DOCUMENT_FLAG_REASON,
   SUPPLIER_DOCUMENT_DEFINITIONS,
   SUPPLIER_DOCUMENT_LOOKUP,
   isDocumentUploaded,
@@ -12,6 +13,8 @@ import {
   listSupplierWorkflowActivity,
   updateSupplierWorkflow,
 } from "@/lib/supplier-workflow-db";
+import { autoFlagMissingRequiredDocuments } from "@/lib/supplier-verification";
+import { sendDocumentRejectedEmail } from "@/lib/email";
 
 function normalizeStatus(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -27,12 +30,14 @@ function normalizeDocumentFile(value: unknown) {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireRole(request, "admin");
+  const { user, error } = await requireRole(request, "admin");
   if (error) return error;
 
   const { id } = await params;
   const supplier = await db.user.findUnique({ where: { id } });
   if (!supplier) return json({ error: "Supplier not found" }, 404);
+
+  await autoFlagMissingRequiredDocuments(id, user!.id);
 
   const uploads = await db.documentUpload.findMany({
     where: { user_id: id },
@@ -57,9 +62,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       name: definition.name,
       category: definition.category,
       required: definition.required,
+      declarationOnly: Boolean(definition.declarationOnly),
       uploaded,
       file: uploaded ? userFile ?? uploadFile : null,
       state,
+      status: !uploaded ? "not_uploaded" : String(upload?.verification_status || "uploaded").toLowerCase(),
+      adminComment: upload?.verification_notes || null,
+      flagReason: state === "flagged" ? upload?.verification_notes || null : null,
+      reviewedById: upload?.verified_by_id || null,
+      reviewedAt: upload?.verified_at || null,
       reason: state === "flagged" ? upload?.verification_notes || null : null,
       verification_status: upload?.verification_status || null,
     };
@@ -92,12 +103,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const definition = SUPPLIER_DOCUMENT_LOOKUP.get(documentType);
   if (!definition) return json({ error: "Unknown document type." }, 400);
+  if (action === "flag" && !reason) {
+    return json({ error: "A reason/comment is required when flagging a document." }, 400);
+  }
 
   const supplier = await db.user.findUnique({ where: { id } });
   if (!supplier) return json({ error: "Supplier not found." }, 404);
 
   const uploaded = isDocumentUploaded(supplier as unknown as Record<string, unknown>, definition);
-  if (!uploaded) {
+  if (!uploaded && action !== "flag") {
     return json({ error: "Document cannot be reviewed because it has not been uploaded." }, 400);
   }
 
@@ -114,7 +128,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return json({ error: "Approved documents cannot be flagged." }, 400);
   }
 
-  const verificationStatus = action === "approve" ? "Approved" : "Needs Revision";
+  const verificationStatus = action === "approve" ? "Approved" : "Flagged";
   const verificationNotes = action === "flag" ? reason : null;
   const reviewedAt = new Date();
 
@@ -129,30 +143,52 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       },
     });
   } else {
-    await db.documentUpload.create({
+    const created = await db.documentUpload.create({
       data: {
         user_id: id,
         document_type: documentType,
         file_name: definition.name,
         file: definition.declarationOnly ? null : normalizeDocumentFile((supplier as any)[definition.userField]),
         file_size: 0,
+      },
+    });
+
+    if (created && created.id) {
+      await db.documentUpload.update({ where: { id: created.id }, data: {
         verification_status: verificationStatus,
         verification_notes: verificationNotes,
         verified_at: reviewedAt,
         verified_by_id: user!.id,
-      },
-    });
+      } });
+    }
   }
 
   const workflow = await getSupplierWorkflow(id);
   const nextFlaggedReasons = { ...workflow.flagged_reasons };
 
   if (action === "flag") {
-    nextFlaggedReasons[documentType] = reason || "Document requires revision.";
+    nextFlaggedReasons[documentType] = reason || DEFAULT_REQUIRED_DOCUMENT_FLAG_REASON;
     await updateSupplierWorkflow(id, {
       flaggedReasons: nextFlaggedReasons,
       notifSent: false,
+      accountLocked: true,
     });
+
+    // mark supplier account as requiring revision
+    await db.user.update({ where: { id }, data: { status: "revision_required" } });
+
+    // send a document-level rejection email
+    try {
+      await sendDocumentRejectedEmail({
+        to: String(supplier.email),
+        supplierName: String(supplier.full_name || "Supplier"),
+        documentName: definition.name,
+        reason: verificationNotes || DEFAULT_REQUIRED_DOCUMENT_FLAG_REASON,
+        loginUrl: `${new URL(request.url).origin}/login`,
+      });
+    } catch (e) {
+      // ignore email send failures
+    }
   } else {
     delete nextFlaggedReasons[documentType];
     await updateSupplierWorkflow(id, {
