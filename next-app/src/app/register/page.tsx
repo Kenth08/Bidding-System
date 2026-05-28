@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload, AlertCircle } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload, AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { Suspense, useState, ChangeEvent, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,7 +31,7 @@ const REQUIRED_DOCUMENTS_SECTIONS = {
   ],
 };
 
-function FileUploadField({ label, file, error, onChange, optional = false }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; optional?: boolean }) {
+function FileUploadField({ label, file, error, onChange, onClear, optional = false }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; onClear?: () => void; optional?: boolean }) {
   const inputId = label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   return (
     <label htmlFor={inputId} className="block">
@@ -44,7 +44,12 @@ function FileUploadField({ label, file, error, onChange, optional = false }: { l
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-700">Click to upload or drag and drop</p>
             <p className="text-xs text-slate-400">PDF, JPG, PNG &middot; Max 5MB</p>
-            <p className="mt-1 truncate text-xs text-slate-600">{file?.name || "No file selected"}</p>
+            <div className="mt-1 flex items-center gap-3">
+              <p className="truncate text-xs text-slate-600">{file?.name || "No file selected"}</p>
+              {file ? (
+                <button type="button" onClick={(e) => { e.preventDefault(); onClear?.(); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+              ) : null}
+            </div>
           </div>
         </div>
         <input id={inputId} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={onChange} className="sr-only" />
@@ -65,6 +70,26 @@ function DateInputField({ label, value, onChange }: { label: string; value: stri
         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
       />
     </label>
+  );
+}
+
+function CollapsibleSection({ title, description, defaultOpen = true, children }: { title: string; description?: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="md:col-span-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            {description ? <p className="text-xs text-slate-500">{description}</p> : null}
+          </div>
+        </div>
+        <button type="button" onClick={() => setOpen((s) => !s)} className="text-slate-500">
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+      </div>
+      {open ? <div className="mt-3">{children}</div> : null}
+    </div>
   );
 }
 
@@ -546,143 +571,65 @@ function RegisterPageContent() {
                 </label>
 
                 {/* Legal Documents */}
-                <SectionTitle
-                  title="Legal Documents"
-                  description="Required for company registration and compliance"
-                />
-
-                <FileUploadField
-                  label="SEC or DTI Certificate"
-                  file={form.secDtiCertificate as File | null}
-                  error={fileErrors["secDtiCertificate"]}
-                  onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])}
-                />
-
-                <div className="grid grid-cols-1 gap-4 md:col-span-2 md:grid-cols-3">
-                  <FileUploadField
-                    label="Mayor's Permit / Business Permit"
-                    file={form.mayorsPm as File | null}
-                    error={fileErrors["mayorsPm"]}
-                    onChange={(e) => updateFile("mayorsPm", e.target.files?.[0])}
-                  />
-                  <DateInputField
-                    label="Mayor's Permit Expiry Date"
-                    value={form.mayorsPmExpiry as string}
-                    onChange={(e) => updateForm("mayorsPmExpiry", e.target.value)}
-                  />
-                </div>
-
-                <FileUploadField
-                  label="PhilGEPS Registration Certificate"
-                  file={form.philGepsRegistration as File | null}
-                  error={fileErrors["philGepsRegistration"]}
-                  onChange={(e) => updateFile("philGepsRegistration", e.target.files?.[0])}
-                />
-
-                <FileUploadField
-                  label="Valid ID (Government-Issued)"
-                  file={form.validId as File | null}
-                  error={fileErrors["validId"]}
-                  onChange={(e) => updateFile("validId", e.target.files?.[0])}
-                />
+                <CollapsibleSection title="Legal Documents" description="Required for company registration and compliance">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <FileUploadField label="SEC or DTI Certificate" file={form.secDtiCertificate as File | null} error={fileErrors["secDtiCertificate"]} onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])} onClear={() => updateFile("secDtiCertificate", undefined)} />
+                      <FileUploadField label="PhilGEPS Registration Certificate" file={form.philgepsRegistration as File | null} error={fileErrors["philgepsRegistration"]} onChange={(e) => updateFile("philgepsRegistration", e.target.files?.[0])} onClear={() => updateFile("philgepsRegistration", undefined)} />
+                    </div>
+                    <div className="space-y-4">
+                      <FileUploadField label="Mayor's Permit / Business Permit" file={form.mayorsPm as File | null} error={fileErrors["mayorsPm"]} onChange={(e) => updateFile("mayorsPm", e.target.files?.[0])} onClear={() => updateFile("mayorsPm", undefined)} />
+                      <DateInputField label="Mayor's Permit Expiry Date" value={form.mayorsPmExpiry as string} onChange={(e) => updateForm("mayorsPmExpiry", e.target.value)} />
+                      <FileUploadField label="Valid ID (Government-Issued)" file={form.validId as File | null} error={fileErrors["validId"]} onChange={(e) => updateFile("validId", e.target.files?.[0])} onClear={() => updateFile("validId", undefined)} />
+                    </div>
+                  </div>
+                </CollapsibleSection>
 
                 {/* Financial Documents */}
-                <SectionTitle
-                  title="Financial Documents"
-                  description="Required to verify financial capacity and stability"
-                />
-
-                <div className="grid grid-cols-1 gap-4 md:col-span-2 md:grid-cols-3">
-                  <FileUploadField
-                    label="Tax Clearance Certificate"
-                    file={form.taxClearance as File | null}
-                    error={fileErrors["taxClearance"]}
-                    onChange={(e) => updateFile("taxClearance", e.target.files?.[0])}
-                  />
-                  <DateInputField
-                    label="Tax Clearance Expiry"
-                    value={form.taxClearanceExpiry as string}
-                    onChange={(e) => updateForm("taxClearanceExpiry", e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:col-span-2 md:grid-cols-3">
-                  <FileUploadField
-                    label="Audited Financial Statements (Latest 1-2 years)"
-                    file={form.auditedFinancialStatements as File | null}
-                    error={fileErrors["auditedFinancialStatements"]}
-                    onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])}
-                  />
-                  <label>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Financial Statement Year
-                    </span>
-                    <StrictNumberInput
-                      min="2020"
-                      max={new Date().getFullYear()}
-                      value={form.financialStatementYear as string}
-                      onChange={(value) => updateForm("financialStatementYear", value)}
-                      placeholder={`e.g. ${new Date().getFullYear()}`}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                      helperText="Numbers only. Enter the year as digits."
-                    />
-                  </label>
-                </div>
-
-                <FileUploadField
-                  label="Bank Reference Letter or Credit Report"
-                  file={form.bankReferenceDocument as File | null}
-                  error={fileErrors["bankReferenceDocument"]}
-                  onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])}
-                />
+                <CollapsibleSection title="Financial Documents" description="Required to verify financial capacity and stability">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <FileUploadField label="Tax Clearance Certificate" file={form.taxClearance as File | null} error={fileErrors["taxClearance"]} onChange={(e) => updateFile("taxClearance", e.target.files?.[0])} onClear={() => updateFile("taxClearance", undefined)} />
+                      <FileUploadField label="Audited Financial Statements (Latest 1-2 years)" file={form.auditedFinancialStatements as File | null} error={fileErrors["auditedFinancialStatements"]} onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])} onClear={() => updateFile("auditedFinancialStatements", undefined)} />
+                    </div>
+                    <div className="space-y-4">
+                      <DateInputField label="Tax Clearance Expiry" value={form.taxClearanceExpiry as string} onChange={(e) => updateForm("taxClearanceExpiry", e.target.value)} />
+                      <label>
+                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Financial Statement Year</span>
+                        <StrictNumberInput min="2020" max={new Date().getFullYear()} value={form.financialStatementYear as string} onChange={(value) => updateForm("financialStatementYear", value)} placeholder={`e.g. ${new Date().getFullYear()}`} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" helperText="Numbers only. Enter the year as digits." />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <FileUploadField label="Bank Reference Letter or Credit Report" file={form.bankReferenceDocument as File | null} error={fileErrors["bankReferenceDocument"]} onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])} onClear={() => updateFile("bankReferenceDocument", undefined)} />
+                  </div>
+                </CollapsibleSection>
 
                 {/* Qualifications & Track Record */}
-                <SectionTitle
-                  title="Qualifications & Track Record"
-                  description="Demonstrate your company's experience and capabilities"
-                />
-
-                <FileUploadField
-                  label="Performance Certificates / ISO Certifications"
-                  file={form.performanceCertificates as File | null}
-                  error={fileErrors["performanceCertificates"]}
-                  onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])}
-                  optional={true}
-                />
-
-                <FileUploadField
-                  label="Similar Past Contracts or Purchase Orders"
-                  file={form.pastContractsDocument as File | null}
-                  error={fileErrors["pastContractsDocument"]}
-                  onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])}
-                  optional={true}
-                />
-
-                <label className="md:col-span-2">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Track Record Description (Optional)
-                  </span>
-                  <textarea
-                    rows={3}
-                    value={form.trackRecordDescription as string}
-                    onChange={(e) => updateForm("trackRecordDescription", e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                    placeholder="Brief description of similar projects completed in the last 5 years"
-                  />
-                </label>
+                <CollapsibleSection title="Qualifications & Track Record" description="Demonstrate your company's experience and capabilities">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FileUploadField label="Performance Certificates / ISO Certifications" file={form.performanceCertificates as File | null} error={fileErrors["performanceCertificates"]} onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])} onClear={() => updateFile("performanceCertificates", undefined)} optional={true} />
+                    <FileUploadField label="Similar Past Contracts or Purchase Orders" file={form.pastContractsDocument as File | null} error={fileErrors["pastContractsDocument"]} onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])} onClear={() => updateFile("pastContractsDocument", undefined)} optional={true} />
+                  </div>
+                  <div className="mt-3">
+                    <label>
+                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Track Record Description (Optional)</span>
+                      <textarea rows={3} value={form.trackRecordDescription as string} onChange={(e) => updateForm("trackRecordDescription", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Brief description of similar projects completed in the last 5 years" />
+                    </label>
+                  </div>
+                </CollapsibleSection>
 
                 {/* Representative Authorization */}
-                <SectionTitle title="Representative Authorization" />
-
-                <FileUploadField
-                  label="Authorization Letter or Special Power of Attorney (SPA)"
-                  file={form.representativeAuthorizationDocument as File | null}
-                  error={fileErrors["representativeAuthorizationDocument"]}
-                  onChange={(e) => updateFile("representativeAuthorizationDocument", e.target.files?.[0])}
-                />
+                <CollapsibleSection title="Representative Authorization">
+                  <FileUploadField label="Authorization Letter or Special Power of Attorney (SPA)" file={form.representativeAuthorizationDocument as File | null} error={fileErrors["representativeAuthorizationDocument"]} onChange={(e) => updateFile("representativeAuthorizationDocument", e.target.files?.[0])} onClear={() => updateFile("representativeAuthorizationDocument", undefined)} />
+                </CollapsibleSection>
 
                 {/* Good Standing Declaration */}
-                <SectionTitle title="Good Standing Declaration" />
+                <CollapsibleSection title="Good Standing Declaration">
+                  <label>
+                    
+                  </label>
+                </CollapsibleSection>
 
                 <label className="md:col-span-2">
                   <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -703,24 +650,12 @@ function RegisterPageContent() {
                   </div>
                 </label>
 
-                <FileUploadField
-                  label="Sworn Statement / Affidavit (Optional)"
-                  file={form.blacklistingDeclarationDocument as File | null}
-                  error={fileErrors["blacklistingDeclarationDocument"]}
-                  onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])}
-                  optional={true}
-                />
+                <FileUploadField label="Sworn Statement / Affidavit (Optional)" file={form.blacklistingDeclarationDocument as File | null} error={fileErrors["blacklistingDeclarationDocument"]} onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])} onClear={() => updateFile("blacklistingDeclarationDocument", undefined)} optional={true} />
 
                 {/* Other Documents */}
-                <SectionTitle title="Additional Documents" />
-
-                <FileUploadField
-                  label="Other Supporting Documents"
-                  file={form.supportingDocuments as File | null}
-                  error={fileErrors["supportingDocuments"]}
-                  onChange={(e) => updateFile("supportingDocuments", e.target.files?.[0])}
-                  optional={true}
-                />
+                <CollapsibleSection title="Additional Documents">
+                  <FileUploadField label="Other Supporting Documents" file={form.supportingDocuments as File | null} error={fileErrors["supportingDocuments"]} onChange={(e) => updateFile("supportingDocuments", e.target.files?.[0])} onClear={() => updateFile("supportingDocuments", undefined)} optional={true} />
+                </CollapsibleSection>
 
                 {/* Info Box */}
                 <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 flex gap-3">
