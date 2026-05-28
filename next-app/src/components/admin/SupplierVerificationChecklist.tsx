@@ -1,422 +1,298 @@
-import { AlertCircle, CheckCircle2, Clock, FileCheck, FileText, Upload, X } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, CheckCircle2, Clock3, FileText, Flag, Lock, Upload, XCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 
-interface DocumentChecklistItem {
+export type SupplierDocumentState = "missing" | "uploaded" | "flagged" | "revised" | "approved";
+
+export interface SupplierReviewDocument {
   id: string;
-  label: string;
-  field: string;
-  fileValue: string | null;
+  name: string;
+  category: "legal" | "financial" | "technical";
+  required: boolean;
+  uploaded: boolean;
+  file: string | null;
+  state: SupplierDocumentState;
+  reason?: string | null;
   expiryDate?: string | null;
-  expiryField?: string;
-  isExpired?: boolean;
-  isExpiringSoon?: boolean;
-  isApproved?: boolean;
-  flagReason?: string;
+}
+
+export interface SupplierActivityLogItem {
+  id: string;
+  message: string;
+  createdAt: string;
+  tone: "green" | "red" | "blue" | "amber";
 }
 
 interface SupplierVerificationChecklistProps {
-  supplier: any;
-  onDocumentApprove: (field: string, approve: boolean, reason?: string) => void;
-  onDocumentFlagChange?: (field: string, reason: string) => void;
-  isEditing?: boolean;
+  documents: SupplierReviewDocument[];
+  accountLocked: boolean;
+  notifSent: boolean;
+  activityLog: SupplierActivityLogItem[];
+  onApproveDocument: (documentId: string) => Promise<void> | void;
+  onFlagDocument: (documentId: string, reason: string) => Promise<void> | void;
+  onNotifySupplier: () => Promise<void> | void;
+  onApproveAllUnlock: () => Promise<void> | void;
+  isBusy?: boolean;
+}
+
+function Dot({ tone }: { tone: SupplierActivityLogItem["tone"] }) {
+  const style = tone === "green"
+    ? "bg-emerald-500"
+    : tone === "red"
+      ? "bg-red-500"
+      : tone === "blue"
+        ? "bg-blue-500"
+        : "bg-amber-500";
+  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${style}`} />;
+}
+
+function formatStatus(document: SupplierReviewDocument) {
+  if (document.state === "approved") return "Approved";
+  if (document.state === "flagged") return "Flagged";
+  if (document.state === "revised") return "Revised - re-review";
+  if (document.state === "uploaded") return "Uploaded";
+  return document.required ? "Not uploaded - Required" : "Not uploaded";
+}
+
+function statusPillClass(state: SupplierDocumentState) {
+  if (state === "approved") return "bg-emerald-100 text-emerald-700";
+  if (state === "flagged") return "bg-red-100 text-red-700";
+  if (state === "revised") return "bg-blue-100 text-blue-700";
+  if (state === "uploaded") return "bg-slate-100 text-slate-700";
+  return "bg-amber-100 text-amber-700";
+}
+
+function stateIcon(state: SupplierDocumentState) {
+  if (state === "approved") return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+  if (state === "flagged") return <Flag className="h-4 w-4 text-red-600" />;
+  if (state === "revised") return <Clock3 className="h-4 w-4 text-blue-600" />;
+  if (state === "uploaded") return <FileText className="h-4 w-4 text-slate-600" />;
+  return <XCircle className="h-4 w-4 text-amber-600" />;
+}
+
+function getOverallStatus(documents: SupplierReviewDocument[]) {
+  const required = documents.filter((doc) => doc.required);
+  const missingRequired = required.some((doc) => !doc.uploaded);
+  const allRequiredApproved = required.length > 0 && required.every((doc) => doc.state === "approved");
+  const hasFlagged = documents.some((doc) => doc.state === "flagged");
+  const allRequiredUploaded = required.every((doc) => doc.uploaded);
+
+  if (allRequiredApproved) return { label: "Approved", className: "bg-emerald-100 text-emerald-700" };
+  if (hasFlagged) return { label: "Documents Flagged", className: "bg-red-100 text-red-700" };
+  if (!missingRequired && allRequiredUploaded) return { label: "Pending", className: "bg-blue-100 text-blue-700" };
+  return { label: "Incomplete", className: "bg-amber-100 text-amber-700" };
 }
 
 export default function SupplierVerificationChecklist({
-  supplier,
-  onDocumentApprove,
-  onDocumentFlagChange,
-  isEditing = false,
+  documents,
+  accountLocked,
+  notifSent,
+  activityLog,
+  onApproveDocument,
+  onFlagDocument,
+  onNotifySupplier,
+  onApproveAllUnlock,
+  isBusy = false,
 }: SupplierVerificationChecklistProps) {
-  const today = new Date();
-  const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const [flagDrafts, setFlagDrafts] = useState<Record<string, string>>({});
 
-  const isDocExpired = (dateStr: string | null) => {
-    if (!dateStr) return false;
-    const date = new Date(dateStr);
-    date.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    return date < today;
-  };
+  const stats = useMemo(() => {
+    const total = documents.length;
+    const uploaded = documents.filter((doc) => doc.uploaded).length;
+    const approved = documents.filter((doc) => doc.state === "approved").length;
+    const flagged = documents.filter((doc) => doc.state === "flagged").length;
 
-  const isDocExpiringSoon = (dateStr: string | null) => {
-    if (!dateStr || isDocExpired(dateStr)) return false;
-    const date = new Date(dateStr);
-    return date <= in30Days;
-  };
+    const now = Date.now();
+    const soonLimit = now + 30 * 24 * 60 * 60 * 1000;
+    const expiringSoon = documents.filter((doc) => {
+      if (!doc.expiryDate) return false;
+      const expiresAt = new Date(doc.expiryDate).getTime();
+      return expiresAt >= now && expiresAt <= soonLimit;
+    }).length;
 
-  const documents: DocumentChecklistItem[] = [
-    // Legal Documents
-    {
-      id: "sec-dti",
-      label: "SEC or DTI Certificate",
-      field: "sec_dti_certificate",
-      fileValue: supplier?.sec_dti_certificate,
-    },
-    {
-      id: "mayors-permit",
-      label: "Mayor's Permit / Business Permit",
-      field: "mayors_permit",
-      fileValue: supplier?.mayors_permit,
-      expiryDate: supplier?.mayors_permit_expiry,
-      expiryField: "mayors_permit_expiry",
-      isExpired: isDocExpired(supplier?.mayors_permit_expiry),
-      isExpiringSoon: isDocExpiringSoon(supplier?.mayors_permit_expiry),
-    },
-    {
-      id: "philgeps",
-      label: "PhilGEPS Registration",
-      field: "philgeps_registration",
-      fileValue: supplier?.philgeps_registration,
-    },
-    {
-      id: "valid-id",
-      label: "Valid ID (Government-Issued)",
-      field: "valid_id",
-      fileValue: supplier?.valid_id,
-    },
-    // Financial Documents
-    {
-      id: "tax-clearance",
-      label: "Tax Clearance Certificate",
-      field: "tax_clearance",
-      fileValue: supplier?.tax_clearance,
-      expiryDate: supplier?.tax_clearance_expiry,
-      expiryField: "tax_clearance_expiry",
-      isExpired: isDocExpired(supplier?.tax_clearance_expiry),
-      isExpiringSoon: isDocExpiringSoon(supplier?.tax_clearance_expiry),
-    },
-    {
-      id: "financial-statements",
-      label: "Audited Financial Statements",
-      field: "audited_financial_statements",
-      fileValue: supplier?.audited_financial_statements,
-    },
-    {
-      id: "bank-reference",
-      label: "Bank Reference Letter or Credit Report",
-      field: "bank_reference_document",
-      fileValue: supplier?.bank_reference_document,
-    },
-    // Qualifications & Track Record
-    {
-      id: "performance-certs",
-      label: "Performance Certificates / ISO Certifications",
-      field: "performance_certificates",
-      fileValue: supplier?.performance_certificates,
-    },
-    {
-      id: "past-contracts",
-      label: "Similar Past Contracts or Purchase Orders",
-      field: "past_contracts_document",
-      fileValue: supplier?.past_contracts_document,
-    },
-    // Representative & Declarations
-    {
-      id: "representative-auth",
-      label: "Representative Authorization / SPA",
-      field: "representative_authorization_document",
-      fileValue: supplier?.representative_authorization_document,
-    },
-    {
-      id: "not-blacklisted",
-      label: "Good Standing Declaration (Not Blacklisted)",
-      field: "not_blacklisted_declaration",
-      fileValue: supplier?.not_blacklisted_declaration ? "DECLARED" : null,
-    },
-  ];
+    return { total, uploaded, approved, flagged, expiringSoon };
+  }, [documents]);
 
-  const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
-  const [flaggedDocs, setFlaggedDocs] = useState<Record<string, string>>({});
+  const flaggedDocuments = useMemo(
+    () => documents.filter((doc) => doc.state === "flagged"),
+    [documents]
+  );
 
-  const handleFlagChange = (field: string, reason: string) => {
-    setFlaggedDocs((prev) => ({
-      ...prev,
-      [field]: reason,
-    }));
-    onDocumentFlagChange?.(field, reason);
-  };
+  const canNotifySupplier = flaggedDocuments.length > 0 && !notifSent;
+  const canApproveAllUnlock = useMemo(() => {
+    const required = documents.filter((doc) => doc.required);
+    return required.length > 0 && required.every((doc) => doc.state === "approved");
+  }, [documents]);
 
-  const handleApproveDocument = (field: string) => {
-    onDocumentApprove(field, true);
-    setFlaggedDocs((prev) => {
-      const newFlagged = { ...prev };
-      delete newFlagged[field];
-      return newFlagged;
-    });
-  };
-
-  const handleFlagDocument = (field: string) => {
-    const reason = flaggedDocs[field] || "Does not meet requirements";
-    onDocumentApprove(field, false, reason);
-  };
-
-  const requiredCount = documents.length;
-  const uploadedCount = documents.filter((d) => d.fileValue).length;
-  const expiredCount = documents.filter((d) => d.isExpired).length;
-  const expiringSoonCount = documents.filter((d) => d.isExpiringSoon).length;
+  const overall = getOverallStatus(documents);
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs text-slate-500 font-medium">UPLOADED</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">
-            {uploadedCount}/{requiredCount}
-          </p>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <StatCard label="Uploaded" value={`${stats.uploaded}/${stats.total}`} tone="slate" />
+        <StatCard label="Expiring Soon" value={String(stats.expiringSoon)} tone="amber" />
+        <StatCard label="Flagged" value={String(stats.flagged)} tone="red" />
+        <StatCard label="Approved" value={String(stats.approved)} tone="green" />
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overall Status</p>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${overall.className}`}>{overall.label}</span>
+      </div>
+
+      {accountLocked ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <Lock className="mt-0.5 h-4 w-4 text-amber-700" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Supplier account is locked pending document revisions.</p>
+              <p className="mt-1 text-xs text-amber-700">
+                Documents requiring revision: {flaggedDocuments.length ? flaggedDocuments.map((doc) => doc.name).join(", ") : "None"}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-          <p className="text-xs text-yellow-700 font-medium">EXPIRING SOON</p>
-          <p className="mt-1 text-2xl font-bold text-yellow-900">{expiringSoonCount}</p>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-          <p className="text-xs text-red-700 font-medium">EXPIRED</p>
-          <p className="mt-1 text-2xl font-bold text-red-900">{expiredCount}</p>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-xs text-emerald-700 font-medium">STATUS</p>
-          <p className="mt-1 text-sm font-bold text-emerald-900">
-            {supplier?.verification_status ? supplier.verification_status.toUpperCase() : "PENDING"}
-          </p>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-slate-200">
+        <div className="divide-y divide-slate-200">
+          {documents.map((document) => {
+            const canApprove = document.uploaded && document.state !== "approved";
+            const canFlag = document.uploaded && document.state !== "approved";
+            const draftReason = flagDrafts[document.id] ?? document.reason ?? "";
+
+            return (
+              <div key={document.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {stateIcon(document.state)}
+                      <p className="truncate text-sm font-semibold text-slate-900">{document.name}</p>
+                      {!document.required ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">Optional</span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusPillClass(document.state)}`}>
+                        {formatStatus(document)}
+                      </span>
+                      {document.file ? (
+                        <a href={document.file} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-600 hover:underline">
+                          View file
+                        </a>
+                      ) : null}
+                    </div>
+                    {document.state === "flagged" && document.reason ? (
+                      <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                        <span className="font-semibold">Flag reason:</span> {document.reason}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!canApprove || isBusy}
+                      onClick={() => onApproveDocument(document.id)}
+                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canFlag || isBusy}
+                      onClick={() => {
+                        const reason = draftReason.trim();
+                        if (!reason) return;
+                        onFlagDocument(document.id, reason);
+                      }}
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Flag
+                    </button>
+                  </div>
+                </div>
+
+                {canFlag ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      value={draftReason}
+                      onChange={(event) => setFlagDrafts((prev) => ({ ...prev, [document.id]: event.target.value }))}
+                      placeholder="Enter a reason before flagging"
+                      className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Document Checklist */}
-      <div className="space-y-2">
-        <h3 className="font-semibold text-slate-900 text-sm">Required Documents Checklist</h3>
+      <div className="grid gap-3 md:grid-cols-2">
+        <button
+          type="button"
+          disabled={!canNotifySupplier || isBusy}
+          onClick={() => onNotifySupplier()}
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Notify supplier of flagged documents
+        </button>
+        <button
+          type="button"
+          disabled={!canApproveAllUnlock || isBusy}
+          onClick={() => onApproveAllUnlock()}
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Approve all & unlock supplier
+        </button>
+      </div>
 
-        {/* Legal Documents Section */}
-        <div className="rounded-lg border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-900">Legal Documents</h4>
-          </div>
-          <div className="divide-y divide-slate-200">
-            {documents
-              .slice(0, 4)
-              .map((doc) => (
-                <DocumentChecklistRow
-                  key={doc.id}
-                  doc={doc}
-                  expanded={expandedDoc === doc.id}
-                  onExpand={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
-                  flagReason={flaggedDocs[doc.field]}
-                  onFlagChange={(reason) => handleFlagChange(doc.field, reason)}
-                  onApprove={() => handleApproveDocument(doc.field)}
-                  onFlag={() => handleFlagDocument(doc.field)}
-                  isEditing={isEditing}
-                />
-              ))}
-          </div>
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-4 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Activity Log</p>
         </div>
-
-        {/* Financial Documents Section */}
-        <div className="rounded-lg border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-900">Financial Documents</h4>
-          </div>
-          <div className="divide-y divide-slate-200">
-            {documents
-              .slice(4, 7)
-              .map((doc) => (
-                <DocumentChecklistRow
-                  key={doc.id}
-                  doc={doc}
-                  expanded={expandedDoc === doc.id}
-                  onExpand={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
-                  flagReason={flaggedDocs[doc.field]}
-                  onFlagChange={(reason) => handleFlagChange(doc.field, reason)}
-                  onApprove={() => handleApproveDocument(doc.field)}
-                  onFlag={() => handleFlagDocument(doc.field)}
-                  isEditing={isEditing}
-                />
-              ))}
-          </div>
-        </div>
-
-        {/* Qualifications Section */}
-        <div className="rounded-lg border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-900">Qualifications & Track Record</h4>
-          </div>
-          <div className="divide-y divide-slate-200">
-            {documents
-              .slice(7, 9)
-              .map((doc) => (
-                <DocumentChecklistRow
-                  key={doc.id}
-                  doc={doc}
-                  expanded={expandedDoc === doc.id}
-                  onExpand={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
-                  flagReason={flaggedDocs[doc.field]}
-                  onFlagChange={(reason) => handleFlagChange(doc.field, reason)}
-                  onApprove={() => handleApproveDocument(doc.field)}
-                  onFlag={() => handleFlagDocument(doc.field)}
-                  isEditing={isEditing}
-                />
-              ))}
-          </div>
-        </div>
-
-        {/* Representative & Declarations Section */}
-        <div className="rounded-lg border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-900">Representative & Declarations</h4>
-          </div>
-          <div className="divide-y divide-slate-200">
-            {documents
-              .slice(9)
-              .map((doc) => (
-                <DocumentChecklistRow
-                  key={doc.id}
-                  doc={doc}
-                  expanded={expandedDoc === doc.id}
-                  onExpand={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
-                  flagReason={flaggedDocs[doc.field]}
-                  onFlagChange={(reason) => handleFlagChange(doc.field, reason)}
-                  onApprove={() => handleApproveDocument(doc.field)}
-                  onFlag={() => handleFlagDocument(doc.field)}
-                  isEditing={isEditing}
-                />
-              ))}
-          </div>
+        <div className="max-h-52 space-y-2 overflow-y-auto px-4 py-3">
+          {activityLog.length === 0 ? (
+            <p className="text-xs text-slate-400">No document activity yet.</p>
+          ) : (
+            activityLog.map((item) => (
+              <div key={item.id} className="flex items-start gap-2 text-xs text-slate-600">
+                <Dot tone={item.tone} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-slate-700">{item.message}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">{new Date(item.createdAt).toLocaleString()}</p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Info Box */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex gap-3">
-        <AlertCircle className="h-5 w-5 shrink-0 text-blue-600 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-blue-900">Verification Guidelines</p>
-          <ul className="mt-1 text-xs text-blue-700 space-y-1">
-            <li>• Red flags indicate expired documents or issues to resolve</li>
-            <li>• Yellow warnings mean documents expire within 30 days</li>
-            <li>• Supplier can only submit bids when all documents are approved</li>
-            <li>• Use the flag button to request corrections or document re-submission</li>
-          </ul>
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <p>
+            Notify button is enabled only when there are flagged documents and notification has not been sent. Final unlock is enabled only when all required documents are approved.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function DocumentChecklistRow({
-  doc,
-  expanded,
-  onExpand,
-  flagReason,
-  onFlagChange,
-  onApprove,
-  onFlag,
-  isEditing,
-}: {
-  doc: DocumentChecklistItem;
-  expanded: boolean;
-  onExpand: () => void;
-  flagReason?: string;
-  onFlagChange: (reason: string) => void;
-  onApprove: () => void;
-  onFlag: () => void;
-  isEditing: boolean;
-}) {
-  const hasFile = !!doc.fileValue;
-  const isExpired = doc.isExpired;
-  const isExpiringSoon = doc.isExpiringSoon;
+function StatCard({ label, value, tone }: { label: string; value: string; tone: "slate" | "amber" | "red" | "green" }) {
+  const classes = tone === "amber"
+    ? "border-amber-200 bg-amber-50 text-amber-900"
+    : tone === "red"
+      ? "border-red-200 bg-red-50 text-red-900"
+      : tone === "green"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+        : "border-slate-200 bg-slate-50 text-slate-900";
 
   return (
-    <div className="px-4 py-3">
-      <div className="flex items-start gap-3">
-        {/* Status Icon */}
-        <div className="mt-0.5 flex-shrink-0">
-          {isExpired ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-              <X className="h-4 w-4 text-red-600" />
-            </div>
-          ) : isExpiringSoon && hasFile ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-100">
-              <Clock className="h-4 w-4 text-yellow-600" />
-            </div>
-          ) : hasFile ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </div>
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-              <FileText className="h-4 w-4 text-slate-400" />
-            </div>
-          )}
-        </div>
-
-        {/* Document Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-medium text-slate-900">{doc.label}</p>
-            {isExpired && <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">EXPIRED</span>}
-            {isExpiringSoon && !isExpired && (
-              <span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded font-medium">EXPIRING SOON</span>
-            )}
-            {!hasFile && (
-              <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded font-medium">NOT UPLOADED</span>
-            )}
-          </div>
-
-          {hasFile && doc.expiryDate && (
-            <p className="text-xs text-slate-500 mt-1">
-              {doc.expiryField === "mayors_permit_expiry" ? "Permit Expiry: " : "Expires: "}
-              {new Date(doc.expiryDate).toLocaleDateString()}
-            </p>
-          )}
-
-          {hasFile && !doc.fileValue?.includes("DECLARED") && (
-            <div className="mt-2 flex items-center gap-1">
-              <FileCheck className="h-4 w-4 text-slate-400" />
-              <a href={doc.fileValue!} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
-                View Document
-              </a>
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        {isEditing && (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={onApprove}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-medium transition"
-              title="Approve this document"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Approve
-            </button>
-            <button
-              onClick={onExpand}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-medium transition"
-              title="Flag this document for revision"
-            >
-              <AlertCircle className="h-3.5 w-3.5" />
-              Flag
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Expanded Flag Section */}
-      {expanded && isEditing && (
-        <div className="mt-3 ml-11 space-y-2 p-2 bg-slate-50 rounded">
-          <input
-            type="text"
-            value={flagReason || ""}
-            onChange={(e) => onFlagChange(e.target.value)}
-            placeholder="Reason for flag (e.g., 'Document expired, please re-submit')"
-            className="w-full text-xs px-2 py-1 border border-slate-200 rounded"
-          />
-          <button
-            onClick={onFlag}
-            className="w-full px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-medium transition"
-          >
-            Confirm Flag
-          </button>
-        </div>
-      )}
+    <div className={`rounded-xl border px-3 py-2 ${classes}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-1 text-xl font-bold">{value}</p>
     </div>
   );
 }

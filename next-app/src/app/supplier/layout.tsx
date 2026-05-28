@@ -6,7 +6,7 @@ import SupplierSidebar from "@/components/supplier/SupplierSidebar";
 import SupplierProfileModal from "@/components/supplier/SupplierProfileModal";
 import SupplierSettingsModal from "@/components/supplier/SupplierSettingsModal";
 import { useAuthStore } from "@/stores/auth";
-import { notificationsAPI } from "@/services/api";
+import { notificationsAPI, suppliersAPI } from "@/services/api";
 
 const PATH_TO_PAGE: Record<string, string> = { "": "dashboard", "projects": "available-projects", "bids": "my-bids", "results": "results", "profile": "profile" };
 const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "available-projects": "projects", "my-bids": "bids", "results": "results", "profile": "profile" };
@@ -64,7 +64,23 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     } else if (user.status === "rejected") {
       router.replace("/login?error=rejected");
     }
-  }, [user, router]);
+  }, [user, router, pathname]);
+
+  useEffect(() => {
+    if (!user || user.role !== "supplier") return;
+    if (pathname.startsWith("/supplier/profile")) return;
+
+    (async () => {
+      try {
+        const response = await suppliersAPI.getMyDocumentWorkflow();
+        if (response.data?.accountLocked) {
+          router.replace("/supplier/profile");
+        }
+      } catch {
+        // ignore workflow fetch errors in layout guard
+      }
+    })();
+  }, [user, pathname, router]);
 
   const currentPage = useMemo(() => {
     const segment = pathname.replace(/^\/supplier\/?/, "").split("/")[0] || "";
@@ -118,7 +134,7 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <SupplierSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} />
-      <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-[248px]">
+      <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-62">
         <SupplierHeader title={pageMeta.title} user={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} onOpenProfile={() => setShowProfileModal(true)} onOpenSettings={() => setShowSettingsModal(true)} />
         <main className="flex-1 p-6">{children}</main>
       </div>

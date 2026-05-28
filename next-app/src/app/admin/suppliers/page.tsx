@@ -20,10 +20,54 @@ export default function AdminSuppliers() {
   const [viewing, setViewing] = useState<any>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" | "verify" | "reject_verification" } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
+  const [isWorkflowBusy, setIsWorkflowBusy] = useState(false);
+  const [workflow, setWorkflow] = useState<{ documents: any[]; accountLocked: boolean; notifSent: boolean; activityLog: any[] } | null>(null);
+  const [isDebugLoading, setIsDebugLoading] = useState(false);
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
+  const [debugPayload, setDebugPayload] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (!viewing?.id) {
+      setWorkflow(null);
+      return;
+    }
+    fetchWorkflow(viewing.id);
+  }, [viewing]);
+
+  async function fetchWorkflow(supplierId: string) {
+    try {
+      const response = await suppliersAPI.getDocumentWorkflow(supplierId);
+      setWorkflow({
+        documents: response.data?.documents || [],
+        accountLocked: Boolean(response.data?.accountLocked),
+        notifSent: Boolean(response.data?.notifSent),
+        activityLog: Array.isArray(response.data?.activityLog) ? response.data.activityLog : [],
+      });
+    } catch {
+      setWorkflow({ documents: [], accountLocked: false, notifSent: false, activityLog: [] });
+    }
+  }
+
+  async function openWorkflowDebug() {
+    if (!viewing?.id) return;
+    setIsDebugLoading(true);
+    try {
+      const response = await suppliersAPI.getWorkflowDebug(viewing.id);
+      setDebugPayload(response.data ?? null);
+      setIsDebugOpen(true);
+    } catch (error: any) {
+      const message = error?.response?.data?.error || "Failed to load debug payload.";
+      setDebugPayload({ error: message });
+      setIsDebugOpen(true);
+      setToast({ message, type: "error" });
+    } finally {
+      setIsDebugLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => suppliers.filter((s) => {
     const statusMatch = filter === "All" || s.status === filter;
@@ -132,45 +176,73 @@ export default function AdminSuppliers() {
             <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Qualification Documents</p>
               <SupplierVerificationChecklist
-                supplier={viewing}
-                isEditing={true}
-                onDocumentApprove={async (field, approve, reason) => {
+                documents={workflow?.documents || []}
+                accountLocked={Boolean(workflow?.accountLocked)}
+                notifSent={Boolean(workflow?.notifSent)}
+                activityLog={workflow?.activityLog || []}
+                isBusy={isWorkflowBusy}
+                onApproveDocument={async (documentId) => {
+                  setIsWorkflowBusy(true);
                   try {
-                    const docsRes = await (await import("@/services/api")).documentAPI.getAll();
-                    const docs = Array.isArray(docsRes.data) ? docsRes.data : docsRes.data?.data || [];
-                    const doc = docs.find((d: any) => d.user_id === viewing.id && d.document_type === field);
-                    if (!doc) {
-                      setToast({ message: "No uploaded document found for this field.", type: "error" });
-                      return;
-                    }
-                    const payload: any = { verification_status: approve ? "Approved" : "Rejected" };
-                    if (reason) payload.verification_notes = reason;
-                    await (await import("@/services/api")).documentAPI.update(doc.id, payload);
-                    setToast({ message: `Document ${approve ? "approved" : "flagged"}`, type: "success" });
+                    await suppliersAPI.reviewDocument(viewing.id, documentId, "approve");
+                    await fetchWorkflow(viewing.id);
                     fetchData();
-                  } catch (e) {
-                    setToast({ message: "Failed to update document", type: "error" });
+                    setToast({ message: "Document approved.", type: "success" });
+                  } catch (error: any) {
+                    setToast({ message: error?.response?.data?.error || "Failed to approve document.", type: "error" });
+                  } finally {
+                    setIsWorkflowBusy(false);
                   }
                 }}
-                onDocumentFlagChange={async (field, reason) => {
+                onFlagDocument={async (documentId, reason) => {
+                  setIsWorkflowBusy(true);
                   try {
-                    const docsRes = await (await import("@/services/api")).documentAPI.getAll();
-                    const docs = Array.isArray(docsRes.data) ? docsRes.data : docsRes.data?.data || [];
-                    const doc = docs.find((d: any) => d.user_id === viewing.id && d.document_type === field);
-                    if (!doc) {
-                      setToast({ message: "No uploaded document found to flag.", type: "error" });
-                      return;
-                    }
-                    await (await import("@/services/api")).documentAPI.update(doc.id, { verification_notes: reason, verification_status: "Needs Revision" });
-                    setToast({ message: "Flagged document for revision", type: "success" });
+                    await suppliersAPI.reviewDocument(viewing.id, documentId, "flag", reason);
+                    await fetchWorkflow(viewing.id);
                     fetchData();
-                  } catch (e) {
-                    setToast({ message: "Failed to flag document", type: "error" });
+                    setToast({ message: "Document flagged for revision.", type: "success" });
+                  } catch (error: any) {
+                    setToast({ message: error?.response?.data?.error || "Failed to flag document.", type: "error" });
+                  } finally {
+                    setIsWorkflowBusy(false);
+                  }
+                }}
+                onNotifySupplier={async () => {
+                  setIsWorkflowBusy(true);
+                  try {
+                    await suppliersAPI.notifyFlagged(viewing.id);
+                    await fetchWorkflow(viewing.id);
+                    fetchData();
+                    setToast({ message: "Supplier notified of flagged documents.", type: "success" });
+                  } catch (error: any) {
+                    setToast({ message: error?.response?.data?.error || "Failed to notify supplier.", type: "error" });
+                  } finally {
+                    setIsWorkflowBusy(false);
+                  }
+                }}
+                onApproveAllUnlock={async () => {
+                  setIsWorkflowBusy(true);
+                  try {
+                    await suppliersAPI.approveAllUnlock(viewing.id);
+                    await fetchWorkflow(viewing.id);
+                    fetchData();
+                    setToast({ message: "Supplier fully approved and unlocked.", type: "success" });
+                  } catch (error: any) {
+                    setToast({ message: error?.response?.data?.error || "Unable to unlock supplier.", type: "error" });
+                  } finally {
+                    setIsWorkflowBusy(false);
                   }
                 }}
               />
             </div>
             <div className="flex gap-3 pt-2">
+              <button
+                onClick={openWorkflowDebug}
+                disabled={isDebugLoading || !viewing?.id}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDebugLoading ? "Loading Debug..." : "Debug Workflow"}
+              </button>
               {viewing.status === "pending" && (
                 <>
                   <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "approved" }); }} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors">Approve Supplier</button>
@@ -186,6 +258,30 @@ export default function AdminSuppliers() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} title="Workflow Debug Payload" size="xl">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(JSON.stringify(debugPayload ?? {}, null, 2));
+                  setToast({ message: "Debug JSON copied.", type: "success" });
+                } catch {
+                  setToast({ message: "Unable to copy debug JSON.", type: "error" });
+                }
+              }}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Copy JSON
+            </button>
+          </div>
+          <pre className="max-h-[60vh] overflow-auto rounded-xl bg-slate-900 p-4 text-xs text-slate-100">
+            {JSON.stringify(debugPayload ?? {}, null, 2)}
+          </pre>
+        </div>
       </Modal>
 
       <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleStatusChange} 

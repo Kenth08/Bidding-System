@@ -19,6 +19,9 @@ const ICON_MAP: Record<string, { icon: LucideIcon; bg: string; color: string }> 
   winner_selected: { icon: Award, bg: "bg-emerald-50", color: "text-emerald-500" },
   blockchain_recorded: { icon: Shield, bg: "bg-slate-100", color: "text-slate-500" },
   revision_required: { icon: RotateCcw, bg: "bg-blue-50", color: "text-blue-500" },
+  supplier_documents_flagged: { icon: AlertCircle, bg: "bg-amber-50", color: "text-amber-600" },
+  supplier_document_resubmitted: { icon: RotateCcw, bg: "bg-blue-50", color: "text-blue-600" },
+  supplier_documents_approved: { icon: CheckCircle, bg: "bg-emerald-50", color: "text-emerald-600" },
 };
 
 function timeAgo(dateStr: string) {
@@ -103,7 +106,7 @@ export default function NotificationPanel({ onNavigate }: { onNavigate?: (link: 
       <button type="button" onClick={() => setOpen((p) => !p)} className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100" aria-label="Notifications">
         <Bell className="h-4 w-4" />
         {unreadCount > 0 ? (
-          <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+          <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}

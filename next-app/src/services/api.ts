@@ -85,6 +85,17 @@ export const notificationsAPI = {
 export const suppliersAPI = {
   getAll: () => api.get("/auth/suppliers"),
   updateStatus: (id: string, status: string) => api.patch(`/auth/suppliers/${id}/status`, { status }),
+  getDocumentWorkflow: (id: string) => api.get(`/auth/suppliers/${id}/documents`),
+  reviewDocument: (id: string, documentType: string, action: "approve" | "flag", reason?: string) =>
+    api.patch(`/auth/suppliers/${id}/documents`, { documentType, action, reason }),
+  getWorkflowDebug: (id: string) => api.get(`/auth/suppliers/${id}/workflow-debug`),
+  notifyFlagged: (id: string) => api.post(`/auth/suppliers/${id}/notify-flagged`),
+  approveAllUnlock: (id: string) => api.post(`/auth/suppliers/${id}/approve-all-unlock`),
+  getMyDocumentWorkflow: () => api.get("/auth/supplier-documents"),
+  resubmitDocument: (documentType: string, data: FormData) =>
+    api.patch(`/auth/supplier-documents/${encodeURIComponent(documentType)}`, data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 };
 
 export const usersAPI = {

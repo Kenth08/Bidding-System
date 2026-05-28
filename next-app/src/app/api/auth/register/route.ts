@@ -58,32 +58,55 @@ export async function POST(request: Request) {
   const tin = String(formData.get("tin") || "").trim();
   const company_profile = String(formData.get("company_profile") || "").trim();
   const fromGoogle = formData.get("from_google") === "true";
+
+  const mayors_permit_expiry_raw = formData.get("mayors_permit_expiry");
+  const mayors_permit_expiry = mayors_permit_expiry_raw ? new Date(String(mayors_permit_expiry_raw)) : null;
+  const tax_clearance_expiry_raw = formData.get("tax_clearance_expiry");
+  const tax_clearance_expiry = tax_clearance_expiry_raw ? new Date(String(tax_clearance_expiry_raw)) : null;
+
   const philgeps_registration_expiry_raw = formData.get("philgeps_registration_expiry");
   const philgeps_registration_expiry = philgeps_registration_expiry_raw ? new Date(String(philgeps_registration_expiry_raw)) : null;
-  const bir_form_2303_file = formData.get("bir_form_2303") as File | null;
   const valid_id_type = String(formData.get("valid_id_type") || "").trim();
   const valid_id_number = String(formData.get("valid_id_number") || "").trim();
   const representative_job_title = String(formData.get("representative_job_title") || "").trim();
   const iso_certificate_type = String(formData.get("iso_certificate_type") || "").trim();
-  const iso_certificate_file = formData.get("iso_certificate") as File | null;
   const iso_certificate_expiry_raw = formData.get("iso_certificate_expiry");
   const iso_certificate_expiry = iso_certificate_expiry_raw ? new Date(String(iso_certificate_expiry_raw)) : null;
   const bank_name = String(formData.get("bank_name") || "").trim();
   const bank_account_name = String(formData.get("bank_account_name") || "").trim();
   const bank_account_number = String(formData.get("bank_account_number") || "").trim();
   const not_blacklisted_declaration = formData.get("not_blacklisted_declaration") === "true";
-  const blacklisting_declaration_document_file = formData.get("blacklisting_declaration_document") as File | null;
-  const audited_financial_statements_file = formData.get("audited_financial_statements") as File | null;
   const financial_statement_year = formData.get("financial_statement_year") ? Number(formData.get("financial_statement_year")) : null;
-  const bank_reference_document_file = formData.get("bank_reference_document") as File | null;
-  const performance_certificates_file = formData.get("performance_certificates") as File | null;
-  const representative_authorization_document_file = formData.get("representative_authorization_document") as File | null;
+  const track_record_description = String(formData.get("track_record_description") || "").trim();
 
   if (!full_name || !email || !company_name || !representative_name || !tin || !company_profile) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
   if (!fromGoogle && (!password || password.length < 6)) {
     return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+  }
+
+  const requiredDocumentKeys = [
+    "sec_dti_certificate",
+    "mayors_permit",
+    "philgeps_registration",
+    "valid_id",
+    "tax_clearance",
+    "audited_financial_statements",
+    "bank_reference_document",
+    "representative_authorization_document",
+  ] as const;
+
+  const hasMissingRequiredDocument = requiredDocumentKeys.some((key) => {
+    const file = formData.get(key) as File | null;
+    return !file || file.size <= 0;
+  }) || !not_blacklisted_declaration;
+
+  if (hasMissingRequiredDocument) {
+    return NextResponse.json(
+      { error: "You must upload all required documents before registering." },
+      { status: 400 }
+    );
   }
 
   const existing = await dbDirect.user.findUnique({ where: { email } });
@@ -103,6 +126,8 @@ export async function POST(request: Request) {
   // Google flow: create new user without password
   if (fromGoogle) {
     const docFields = [
+      "sec_dti_certificate",
+      "mayors_permit",
       "business_permit_document",
       "philgeps_registration",
       "tax_clearance",
@@ -114,6 +139,7 @@ export async function POST(request: Request) {
       "audited_financial_statements",
       "bank_reference_document",
       "performance_certificates",
+      "past_contracts_document",
       "representative_authorization_document",
     ] as const;
     const docPaths: Record<string, string | null> = {};
@@ -135,6 +161,9 @@ export async function POST(request: Request) {
       representative_name,
       tin,
       company_profile,
+      sec_dti_certificate: docPaths.sec_dti_certificate,
+      mayors_permit: docPaths.mayors_permit,
+      mayors_permit_expiry,
       business_permit_document: docPaths.business_permit_document,
       philgeps_registration: docPaths.philgeps_registration,
       philgeps_registration_expiry: philgeps_registration_expiry,
@@ -150,18 +179,22 @@ export async function POST(request: Request) {
       bank_name,
       bank_account_name,
       bank_account_number,
+      tax_clearance: docPaths.tax_clearance,
+      tax_clearance_expiry,
       not_blacklisted_declaration,
       blacklisting_declaration_document: docPaths.blacklisting_declaration_document,
       audited_financial_statements: docPaths.audited_financial_statements,
       financial_statement_year,
       bank_reference_document: docPaths.bank_reference_document,
       performance_certificates: docPaths.performance_certificates,
+      past_contracts_document: docPaths.past_contracts_document,
+      track_record_description,
       representative_authorization_document: docPaths.representative_authorization_document,
     };
 
     const user = existing
-      ? await dbDirect.user.update({ where: { id: existing.id }, data: profileData })
-      : await dbDirect.user.create({
+      ? await db.user.update({ where: { id: existing.id }, data: profileData })
+      : await db.user.create({
           data: {
             id: uuid(),
             ...profileData,
@@ -211,6 +244,8 @@ export async function POST(request: Request) {
 
   // Save uploaded documents
   const docFields = [
+    "sec_dti_certificate",
+    "mayors_permit",
     "business_permit_document",
     "philgeps_registration",
     "tax_clearance",
@@ -222,6 +257,7 @@ export async function POST(request: Request) {
     "audited_financial_statements",
     "bank_reference_document",
     "performance_certificates",
+    "past_contracts_document",
     "representative_authorization_document",
   ] as const;
   const docPaths: Record<string, string | null> = {};
@@ -248,6 +284,9 @@ export async function POST(request: Request) {
       representative_name,
       tin,
       company_profile,
+      sec_dti_certificate: docPaths.sec_dti_certificate,
+      mayors_permit: docPaths.mayors_permit,
+      mayors_permit_expiry,
       business_permit_document: docPaths.business_permit_document,
       philgeps_registration: docPaths.philgeps_registration,
       philgeps_registration_expiry: philgeps_registration_expiry,
@@ -263,12 +302,16 @@ export async function POST(request: Request) {
       bank_name,
       bank_account_name,
       bank_account_number,
+      tax_clearance: docPaths.tax_clearance,
+      tax_clearance_expiry,
       not_blacklisted_declaration,
       blacklisting_declaration_document: docPaths.blacklisting_declaration_document,
       audited_financial_statements: docPaths.audited_financial_statements,
       financial_statement_year,
       bank_reference_document: docPaths.bank_reference_document,
       performance_certificates: docPaths.performance_certificates,
+      past_contracts_document: docPaths.past_contracts_document,
+      track_record_description,
       representative_authorization_document: docPaths.representative_authorization_document,
     },
   });
@@ -292,6 +335,18 @@ export async function POST(request: Request) {
         data: { user_id: user.id, document_type: key, file_name: key, file: docPaths[key] },
       });
     }
+  }
+
+  if (not_blacklisted_declaration) {
+    await db.documentUpload.create({
+      data: {
+        user_id: user.id,
+        document_type: "not_blacklisted_declaration",
+        file_name: "Good Standing Declaration",
+        file: "DECLARED",
+        verification_status: "Pending",
+      },
+    });
   }
 
   await logAudit("CREATE", user.id, `Supplier registration submitted for ${company_name}`, "supplier", user.id).catch(() => {});
