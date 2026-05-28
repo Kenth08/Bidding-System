@@ -2,9 +2,12 @@ import { Pool } from 'pg';
 import { v4 as uuid } from 'uuid';
 
 // Direct PostgreSQL connection (bypass Supabase API issues)
+const databaseUrl = process.env.DATABASE_URL || '';
+const useSsl = /supabase|aws|cloud/i.test(databaseUrl) && !/localhost|127\.0\.0\.1|\[::1\]/i.test(databaseUrl);
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  connectionString: databaseUrl,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined
 });
 
 const USERS_TABLE = 'public.users';
@@ -55,6 +58,16 @@ function hydrateNotification(row: any) {
   return {
     ...row,
     created_at: row.created_at ? new Date(String(row.created_at)) : row.created_at,
+  };
+}
+
+function hydrateDocumentUpload(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    created_at: row.created_at ? new Date(String(row.created_at)) : row.created_at,
+    updated_at: row.updated_at ? new Date(String(row.updated_at)) : row.updated_at,
+    verified_at: row.verified_at ? new Date(String(row.verified_at)) : row.verified_at,
   };
 }
 
@@ -444,4 +457,248 @@ export const dbDirect = {
       }
     },
   },
+
+  documentUpload: {
+    findMany: async (params: { where?: Record<string, any>; orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM document_uploads');
+        const filtered = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        const limited = applyTake(sorted, params);
+        return limited.map(hydrateDocumentUpload);
+      } finally {
+        client.release();
+      }
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const result = await client.query(
+          `INSERT INTO document_uploads (
+            id, user_id, document_type, file_name, file, file_size,
+            verification_status, verification_notes, verified_by_id, verified_at,
+            created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+          RETURNING *`,
+          [
+            data.id || uuid(),
+            data.user_id,
+            data.document_type,
+            data.file_name,
+            data.file || null,
+            data.file_size ?? 0,
+            data.verification_status || 'Pending',
+            data.verification_notes ?? null,
+            data.verified_by_id ?? null,
+            data.verified_at ?? null,
+          ]
+        );
+        return hydrateDocumentUpload(result.rows[0]);
+      } finally {
+        client.release();
+      }
+    },
+
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) {
+        throw new Error('Update requires an id-based where clause.');
+      }
+
+      const updateData = isPlainObject(data) ? data : {};
+      const client = await pool.connect();
+      try {
+        const entries = Object.entries(updateData);
+        if (!entries.length) {
+          const result = await client.query('SELECT * FROM document_uploads WHERE id = $1', [id]);
+          return hydrateDocumentUpload(result.rows[0] || null);
+        }
+
+        const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
+        const values = entries.map(([, value]) => value);
+        const result = await client.query(
+          `UPDATE document_uploads SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`,
+          [id, ...values]
+        );
+        return hydrateDocumentUpload(result.rows[0] || null);
+      } finally {
+        client.release();
+      }
+    },
+  },
+
+  bid: {
+    count: async (params: { where?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM bids_bid');
+        return result.rows.filter((row) => matchesWhere(row, params.where ?? params)).length;
+      } finally {
+        client.release();
+      }
+    },
+
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number; select?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM bids_bid');
+        let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+        return rows;
+      } finally {
+        client.release();
+      }
+    },
+
+    findUnique: async (where: { id?: string; where?: { id?: string } }) => {
+      const filter = where.where ?? where;
+      const client = await pool.connect();
+      try {
+        if (filter.id) {
+          const res = await client.query('SELECT * FROM bids_bid WHERE id = $1', [filter.id]);
+          return res.rows[0] || null;
+        }
+        return null;
+      } finally {
+        client.release();
+      }
+    },
+
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: any } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM bids_bid');
+        const filtered = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        return (applyTake(sorted, { take: 1 })[0]) || null;
+      } finally {
+        client.release();
+      }
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const id = data.id || uuid();
+        const result = await client.query(
+          `INSERT INTO bids_bid (id, project_id, supplier_id, bid_amount, status, submitted_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *`,
+          [id, data.project_id, data.supplier_id, data.bid_amount ?? null, data.status ?? 'submitted', data.submitted_at ?? null]
+        );
+        return result.rows[0];
+      } finally {
+        client.release();
+      }
+    },
+
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const id = whereOrParams?.id ?? whereOrParams?.where?.id;
+      const data = dataArg ?? whereOrParams?.data ?? whereOrParams;
+      if (!id) throw new Error('Update requires id');
+      const client = await pool.connect();
+      try {
+        const entries = Object.entries(data);
+        if (!entries.length) {
+          const res = await client.query('SELECT * FROM bids_bid WHERE id = $1', [id]);
+          return res.rows[0] || null;
+        }
+        const assignments = entries.map(([k], i) => `"${k}" = $${i + 2}`).join(', ');
+        const values = entries.map(([, v]) => v);
+        const res = await client.query(`UPDATE bids_bid SET ${assignments} WHERE id = $1 RETURNING *`, [id, ...values]);
+        return res.rows[0] || null;
+      } finally {
+        client.release();
+      }
+    }
+  },
+
+  project: {
+    count: async (params: { where?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM projects_project');
+        return result.rows.filter((row) => matchesWhere(row, params.where ?? params)).length;
+      } finally {
+        client.release();
+      }
+    },
+
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM projects_project');
+        let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+        return rows;
+      } finally {
+        client.release();
+      }
+    },
+
+    findUnique: async (where: { id?: string; where?: { id?: string } }) => {
+      const filter = where.where ?? where;
+      const client = await pool.connect();
+      try {
+        if (filter.id) {
+          const res = await client.query('SELECT * FROM projects_project WHERE id = $1', [filter.id]);
+          return res.rows[0] || null;
+        }
+        return null;
+      } finally {
+        client.release();
+      }
+    },
+
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: any } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM projects_project');
+        const filtered = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        const sorted = sortRows(filtered, params.orderBy);
+        return (applyTake(sorted, { take: 1 })[0]) || null;
+      } finally {
+        client.release();
+      }
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const id = data.id || uuid();
+        const result = await client.query(
+          `INSERT INTO projects_project (id, title, description, status, created_by_id, start_date, end_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
+          [id, data.title || null, data.description || null, data.status || 'draft', data.created_by_id || null, data.start_date || null, data.end_date || null]
+        );
+        return result.rows[0];
+      } finally {
+        client.release();
+      }
+    },
+
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const id = whereOrParams?.id ?? whereOrParams?.where?.id;
+      const data = dataArg ?? whereOrParams?.data ?? whereOrParams;
+      if (!id) throw new Error('Update requires id');
+      const client = await pool.connect();
+      try {
+        const entries = Object.entries(data);
+        if (!entries.length) {
+          const res = await client.query('SELECT * FROM projects_project WHERE id = $1', [id]);
+          return res.rows[0] || null;
+        }
+        const assignments = entries.map(([k], i) => `"${k}" = $${i + 2}`).join(', ');
+        const values = entries.map(([, v]) => v);
+        const res = await client.query(`UPDATE projects_project SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`, [id, ...values]);
+        return res.rows[0] || null;
+      } finally {
+        client.release();
+      }
+    }
+  }
 };

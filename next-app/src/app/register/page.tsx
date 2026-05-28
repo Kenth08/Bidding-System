@@ -7,6 +7,8 @@ import { authAPI } from "@/services/api";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
 import DropdownWithMore from "@/components/shared/DropdownWithMore";
 
+const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+
 const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -334,21 +336,23 @@ function RegisterPageContent() {
               </div>
               <h1 className="mt-4 text-2xl font-bold text-emerald-700">Registration Submitted!</h1>
               <p className="mt-2 text-sm text-slate-500">
-                Your account is pending admin approval.
-                <br />
-                Verify your email first using the code sent to your inbox.
+                {isLocalMode
+                  ? "Your account is ready for local sign-in and is pending admin approval."
+                  : "Your account is pending admin approval.\nVerify your email first using the code sent to your inbox."}
               </p>
               <p className="mt-3 text-sm text-slate-500">
                 Registered Email: <span className="font-semibold text-slate-700">{form.email as string}</span>
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push(`/verify-email?email=${encodeURIComponent(String(form.email || ""))}`)}
-                  className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600"
-                >
-                  Verify Email Now
-                </button>
+                {!isLocalMode ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/verify-email?email=${encodeURIComponent(String(form.email || ""))}`)}
+                    className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600"
+                  >
+                    Verify Email Now
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => router.push("/login")}

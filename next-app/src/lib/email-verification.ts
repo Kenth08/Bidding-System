@@ -5,6 +5,7 @@ const CODE_LENGTH = 6;
 const CODE_EXPIRY_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_VERIFICATION_ATTEMPTS = 5;
+const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
 
 export function generateVerificationCode() {
   const min = 10 ** (CODE_LENGTH - 1);
@@ -25,6 +26,10 @@ export function buildVerificationCodePayload(email: string) {
 }
 
 function getSmtpTransport() {
+  if (isLocalMode) {
+    return null;
+  }
+
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
@@ -43,6 +48,10 @@ function getSmtpTransport() {
 }
 
 export async function sendVerificationCodeEmail(params: { to: string; fullName?: string; code: string }) {
+  if (isLocalMode) {
+    return;
+  }
+
   const fromEmail = process.env.SMTP_FROM_EMAIL;
   const fromName = process.env.SMTP_FROM_NAME || "Blockchain E-Procurement";
   if (!fromEmail) {

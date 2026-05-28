@@ -11,6 +11,9 @@ export async function GET() {
   });
 
   // Public view: no hash exposed
-  const publicRecords = records.map(({ hash, ...r }) => r);
+  const publicRecords = records.map((record: any) => {
+    const { hash, ...safeRecord } = record;
+    return safeRecord;
+  });
   return json(publicRecords);
 }

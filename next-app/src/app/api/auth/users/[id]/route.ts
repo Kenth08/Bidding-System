@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.password) data.password_hash = await bcrypt.hash(body.password, 12);
 
   const user = await db.user.update({ where: { id }, data });
-  const { password_hash: _, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user as any;
   return json(safeUser);
 }
 

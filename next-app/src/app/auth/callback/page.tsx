@@ -4,12 +4,19 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth";
 
+const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+
 export default function AuthCallback() {
   const router = useRouter();
   const { login } = useAuthStore();
 
   useEffect(() => {
     async function handleCallback() {
+      if (isLocalMode) {
+        router.replace("/login?error=local_mode");
+        return;
+      }
+
       // PKCE: if there's a code in the URL, exchange it first
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");

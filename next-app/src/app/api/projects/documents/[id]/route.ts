@@ -2,11 +2,11 @@ import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifyUser } from "@/lib/actions";
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireRole(request, "admin");
   if (error) return error;
 
-  const id = params.id;
+  const { id } = await params;
   const body = await request.json();
   const updates: any = {};
 

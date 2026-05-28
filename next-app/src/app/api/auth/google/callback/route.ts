@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { dbDirect } from "@/lib/db-direct";
 import { signAccessToken, signRefreshToken } from "@/lib/auth";
 
+const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+
 export async function POST(request: Request) {
+  if (isLocalMode) {
+    return NextResponse.json({ redirect: "/login?error=local_mode" }, { status: 403 });
+  }
+
   const { email: rawEmail } = await request.json();
   if (!rawEmail) return NextResponse.json({ error: "Missing email" }, { status: 400 });
 
@@ -47,7 +53,7 @@ export async function POST(request: Request) {
   const access = await signAccessToken({ id: existingUser.id, email: existingUser.email, role: existingUser.role });
   const refresh = await signRefreshToken(existingUser.id);
 
-  const { password_hash: _, ...safeUser } = existingUser;
+  const { password_hash, ...safeUser } = existingUser as any;
   const response = NextResponse.json({ access, refresh, user: safeUser });
   response.cookies.set("access_token", access, {
     httpOnly: true,

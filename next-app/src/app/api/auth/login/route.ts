@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
   if (user.role === "supplier" && user.status === "incomplete_registration") {
-    const { password_hash: _, ...safeUser } = user;
+    const { password_hash, ...safeUser } = user as any;
     return NextResponse.json({ error: "Please complete your registration first.", user: safeUser, incomplete: true }, { status: 403 });
   }
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
   await logAudit("LOGIN", user.id, `${user.full_name} logged in`, "auth", user.id).catch(() => {});
 
-  const { password_hash: _, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user as any;
   const response = NextResponse.json({ access, refresh, user: safeUser });
   response.cookies.set("access_token", access, {
     httpOnly: true,

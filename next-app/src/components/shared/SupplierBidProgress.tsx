@@ -108,7 +108,7 @@ export default function SupplierBidProgress({ status, technical_compliance }: Su
           const isDone = step.state === "done";
           const isCurrent = step.state === "current";
           const isFinal = index === steps.length - 1;
-            const isFlashing = flashStep === (step.key === 'evaluated' ? 'evaluated' : step.key === 'result' || step.key === 'evaluated' ? (step.key === 'outcome' ? 'outcome' : flashStep) : flashStep) || flashStep === step.key;
+            const isFlashing = flashStep === step.key;
 
           return (
             <div key={step.key} className="relative rounded-xl border border-slate-100 bg-white p-3">

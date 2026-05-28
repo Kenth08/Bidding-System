@@ -16,19 +16,19 @@ export async function GET(request: Request) {
   const total_awarded_amount = Number(totalAwardedResult._sum.bid_amount || 0);
 
   const byType = await db.project.groupBy({ by: ["procurement_type"], _count: { id: true }, orderBy: { procurement_type: "asc" } });
-  const by_procurement_type = byType.map((t) => ({ procurement_type: t.procurement_type, count: t._count.id }));
+  const by_procurement_type = byType.map((row: any) => ({ procurement_type: row.procurement_type, count: row._count.id }));
 
   const recentAwards = await db.blockchainRecord.findMany({
     take: 10,
     orderBy: { recorded_at: "desc" },
     include: { project: { select: { title: true } }, winner: { select: { full_name: true, company_name: true } } },
   });
-  const recent_awards = recentAwards.map((r) => ({
-    project__title: r.project.title,
-    winner__full_name: r.winner.full_name,
-    winner__company_name: r.winner.company_name,
-    bid_amount: Number(r.bid_amount),
-    recorded_at: r.recorded_at,
+  const recent_awards = recentAwards.map((row: any) => ({
+    project__title: row.project.title,
+    winner__full_name: row.winner.full_name,
+    winner__company_name: row.winner.company_name,
+    bid_amount: Number(row.bid_amount),
+    recorded_at: row.recorded_at,
   }));
 
   return json({

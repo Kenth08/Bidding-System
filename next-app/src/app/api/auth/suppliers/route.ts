@@ -23,12 +23,12 @@ export async function GET(request: Request) {
         if (bid?.status === "won") acc[supplierId].win_count += 1;
         return acc;
       }, {})
-    );
+    ) as Array<{ supplier_id: string; bid_count: number; win_count: number }>;
 
     const supplierById = new Map<string, any>();
 
     for (const user of users) {
-      const { password_hash: _, ...safeUser } = user as any;
+      const { password_hash, ...safeUser } = user as any;
       supplierById.set(user.id, {
         ...safeUser,
         bid_count: 0,
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
       const supplierFromBid = await db.user.findUnique({ where: { id: bidRow.supplier_id } });
       if (supplierFromBid) {
-        const { password_hash: _, ...safeUser } = supplierFromBid as any;
+        const { password_hash, ...safeUser } = supplierFromBid as any;
         supplierById.set(supplierFromBid.id, {
           ...safeUser,
           role: safeUser.role || "supplier",

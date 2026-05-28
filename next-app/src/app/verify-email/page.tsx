@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 import LoadingButton from "@/components/ui/LoadingButton";
 
+const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+
 function VerifyEmailPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,7 +68,7 @@ function VerifyEmailPageContent() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-7 shadow-sm">
         <h1 className="text-xl font-bold text-slate-900">Verify Your Email</h1>
-        <p className="mt-2 text-sm text-slate-500">Enter the 6-digit verification code sent to your email address.</p>
+        <p className="mt-2 text-sm text-slate-500">{isLocalMode ? "Email verification is disabled in local mode." : "Enter the 6-digit verification code sent to your email address."}</p>
 
         <form onSubmit={handleVerify} className="mt-6 space-y-4">
           <label className="block">

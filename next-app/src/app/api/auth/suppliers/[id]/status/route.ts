@@ -47,7 +47,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await db.user.update({ where: { id }, data: updateData });
     const updated = await db.user.findUnique({ where: { id } });
     if (!updated) return json({ error: "Supplier not found after update" }, 404);
-    const { password_hash: _, ...safe } = updated as any;
+    const { password_hash, ...safe } = updated as any;
     return json(safe);
   } catch (e) {
     console.error("[supplier status]", e);

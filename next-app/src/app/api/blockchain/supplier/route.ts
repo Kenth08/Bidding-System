@@ -15,6 +15,9 @@ export async function GET(request: Request) {
   });
 
   // No hash exposed for supplier view
-  const safeRecords = records.map(({ hash, ...r }) => r);
+  const safeRecords = records.map((record: any) => {
+    const { hash, ...safeRecord } = record;
+    return safeRecord;
+  });
   return json(safeRecords);
 }

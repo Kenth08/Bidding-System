@@ -8,6 +8,8 @@ import { buildVerificationCodePayload, sendVerificationCodeEmail } from "@/lib/e
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
+const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+
 async function saveFile(file: File, folder: string): Promise<string> {
   const dir = path.join(process.cwd(), "public", "uploads", folder);
   await mkdir(dir, { recursive: true });
@@ -189,7 +191,7 @@ export async function POST(request: Request) {
   }
 
   const password_hash = await bcrypt.hash(password, 12);
-  const verification = buildVerificationCodePayload(email);
+  const verification = isLocalMode ? null : buildVerificationCodePayload(email);
 
   const user = await db.user.create({
     data: {
@@ -234,10 +236,10 @@ export async function POST(request: Request) {
   await db.user.update({
     where: { id: user.id },
     data: {
-      email_verified: false,
-      email_verified_at: null,
-      email_verification_code_hash: verification.codeHash,
-      email_verification_expires_at: verification.expiresAt,
+      email_verified: isLocalMode,
+      email_verified_at: isLocalMode ? new Date() : null,
+      email_verification_code_hash: verification?.codeHash || null,
+      email_verification_expires_at: verification?.expiresAt || null,
       email_verification_attempts: 0,
       email_verification_sent_at: new Date(),
     },
@@ -255,13 +257,19 @@ export async function POST(request: Request) {
   await logAudit("CREATE", user.id, `Supplier registration submitted for ${company_name}`, "supplier", user.id).catch(() => {});
   await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", user.id).catch(() => {});
 
-  await sendVerificationCodeEmail({
-    to: email,
-    fullName: full_name,
-    code: verification.code,
-  });
+  if (!isLocalMode && verification) {
+    await sendVerificationCodeEmail({
+      to: email,
+      fullName: full_name,
+      code: verification.code,
+    });
+  }
 
-    return NextResponse.json({ message: "Registration submitted. Check your email for the verification code.", verification_required: true, email }, { status: 201 });
+    return NextResponse.json({
+      message: isLocalMode ? "Registration submitted. Your account is ready for local sign-in after admin approval." : "Registration submitted. Check your email for the verification code.",
+      verification_required: !isLocalMode,
+      email,
+    }, { status: 201 });
   } catch (e: any) {
     console.error('[register] uncaught error', e);
     return NextResponse.json({ error: e?.message || String(e), stack: e?.stack || null }, { status: 500 });

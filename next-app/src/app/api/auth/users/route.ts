@@ -9,7 +9,10 @@ export async function GET(request: Request) {
     const { error } = await requireRole(request, "admin");
     if (error) return error;
     const users = await db.user.findMany({ orderBy: { created_at: "desc" } });
-    const safe = users.map(({ password_hash: _, ...u }) => u);
+    const safe = users.map((user: any) => {
+      const { password_hash, ...safeUser } = user;
+      return safeUser;
+    });
     return json(safe);
   } catch (error) {
     console.error("[api/auth/users]", error);
@@ -22,14 +25,14 @@ export async function POST(request: Request) {
   if (error) return error;
 
   const body = await request.json();
-  const password_hash = body.password ? await bcrypt.hash(body.password, 12) : await bcrypt.hash("default123", 12);
+  const hashedPassword = body.password ? await bcrypt.hash(body.password, 12) : await bcrypt.hash("default123", 12);
 
   const user = await db.user.create({
     data: {
       id: uuid(),
       full_name: body.full_name || "",
       email: body.email,
-      password_hash,
+      password_hash: hashedPassword,
       role: body.role || "viewer",
       status: body.status || "active",
       company_name: body.company_name || "",
@@ -42,6 +45,6 @@ export async function POST(request: Request) {
     },
   });
 
-  const { password_hash: _, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user as any;
   return json(safeUser, 201);
 }

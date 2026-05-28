@@ -1,5 +1,6 @@
-// Import the Supabase-based database utility
-// This replaces the Prisma client to prevent data loss issues
-import { db } from "./db-supabase";
+import { db as supabaseDb } from "./db-supabase";
+import { dbDirect } from "./db-direct";
 
-export { db };
+const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+
+export const db: any = isLocalMode ? dbDirect : supabaseDb;

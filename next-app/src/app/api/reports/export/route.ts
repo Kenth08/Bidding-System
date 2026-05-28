@@ -249,11 +249,11 @@ export async function GET(request: Request) {
           `Total Awarded Amount: ${total_awarded_amount}`,
         ] });
 
-        blocks.push({ heading: "By Procurement Type", rows: byTypeRows.map(r => `${r.procurement_type}: ${r._count.id}`) });
+        blocks.push({ heading: "By Procurement Type", rows: byTypeRows.map((row: any) => `${row.procurement_type}: ${row._count.id}`) });
 
-        blocks.push({ heading: "Recent Awards", rows: recentAwards.map(r => `${r.project?.title || "-"} — ${ (r.winner?.company_name || r.winner?.full_name) || "-" } — ${r.bid_amount ?? ""} — ${r.recorded_at?.toISOString().split("T")[0] || ""}`) });
+        blocks.push({ heading: "Recent Awards", rows: recentAwards.map((row: any) => `${row.project?.title || "-"} — ${ (row.winner?.company_name || row.winner?.full_name) || "-" } — ${row.bid_amount ?? ""} — ${row.recorded_at?.toISOString().split("T")[0] || ""}`) });
 
-        const pdfBuf = await createProcurementPDF("Procurement Report", { total_projects, active_projects, awarded_projects, total_bids, total_awarded_amount }, byTypeRows, recentAwards.map(r => ({ ...r, project__title: r.project?.title })));
+        const pdfBuf = await createProcurementPDF("Procurement Report", { total_projects, active_projects, awarded_projects, total_bids, total_awarded_amount }, byTypeRows, recentAwards.map((row: any) => ({ ...row, project__title: row.project?.title })));
         return new Response(pdfBuf, { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="procurement-report.pdf"` } });
       }
 

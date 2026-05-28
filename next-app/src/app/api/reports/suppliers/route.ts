@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         if (bid?.status === "won") acc[supplierId].win_count += 1;
         return acc;
       }, {})
-    );
+    ) as Array<{ supplier_id: string; bid_count: number; win_count: number }>;
 
     const supplierById = new Map<string, any>();
     for (const supplier of suppliers) {

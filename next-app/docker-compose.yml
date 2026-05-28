@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15
+    container_name: bidding-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bidding_system
+    ports:
+      - '5433:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
+    name: bidding_db_data

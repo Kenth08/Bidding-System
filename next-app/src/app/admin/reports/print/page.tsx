@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { reportsAPI } from "@/services/api";
 
 function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Number(v || 0)); }
 
-export default function PrintReport() {
+function PrintReportContent() {
   const searchParams = useSearchParams();
   const type = searchParams?.get("type") || "procurement";
   const [data, setData] = useState<any>(null);
@@ -80,5 +80,13 @@ export default function PrintReport() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+export default function PrintReport() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40 }}>Loading...</div>}>
+      <PrintReportContent />
+    </Suspense>
   );
 }

@@ -5,7 +5,7 @@ import { requireAuth, json } from "@/lib/api-utils";
 export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
-  const { password_hash: _, ...safeUser } = user!;
+  const { password_hash, ...safeUser } = user! as any;
   return json(safeUser);
 }
 
@@ -21,6 +21,6 @@ export async function PATCH(request: Request) {
   }
 
   const updated = await db.user.update({ where: { id: user!.id }, data });
-  const { password_hash: _, ...safeUser } = updated;
+  const { password_hash, ...safeUser } = updated as any;
   return json(safeUser);
 }
