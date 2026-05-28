@@ -8,6 +8,12 @@ type LifecycleInput = {
   bidCount?: number;
   hasUnderEvaluation?: boolean;
   hasWinner?: boolean;
+  // optional timestamps
+  createdAt?: string | null;
+  approvedAt?: string | null;
+  publishedAt?: string | null;
+  evaluationAt?: string | null;
+  winnerAt?: string | null;
   compact?: boolean;
 };
 
@@ -56,6 +62,26 @@ export default function BiddingLifecycleProgress(input: LifecycleInput) {
   const stages = buildStages(input);
   const compact = Boolean(input.compact);
 
+  function formatTs(v?: string | null) {
+    if (!v) return null;
+    try {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return null;
+      // show relative time with ISO tooltip
+      const diff = Date.now() - d.getTime();
+      const sec = Math.round(diff / 1000);
+      const abs = Math.abs(sec);
+      let rel = "";
+      if (abs < 60) rel = `${abs}s ago`;
+      else if (abs < 3600) rel = `${Math.round(abs / 60)}m ago`;
+      else if (abs < 86400) rel = `${Math.round(abs / 3600)}h ago`;
+      else rel = `${Math.round(abs / 86400)}d ago`;
+      return <time title={d.toISOString()}>{rel}</time>;
+    } catch {
+      return null;
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
       <div className={`grid gap-3 ${compact ? "grid-cols-1" : "md:grid-cols-5"}`}>
@@ -87,6 +113,16 @@ export default function BiddingLifecycleProgress(input: LifecycleInput) {
                   </span>
                 </span>
                 <p className={`text-xs font-semibold ${isDone ? "text-emerald-700" : isCurrent ? "text-amber-700" : "text-slate-500"}`}>{stage.label}</p>
+                {/* show timestamp where available for each stage */}
+                {!compact ? (
+                  <p className="text-[11px] text-slate-400">
+                    {stage.key === "created" && formatTs(input.createdAt)}
+                    {stage.key === "head_approval" && formatTs(input.approvedAt)}
+                    {stage.key === "publish" && formatTs(input.publishedAt)}
+                    {stage.key === "evaluation" && formatTs(input.evaluationAt)}
+                    {stage.key === "winner" && formatTs(input.winnerAt)}
+                  </p>
+                ) : null}
               </div>
             </div>
           );

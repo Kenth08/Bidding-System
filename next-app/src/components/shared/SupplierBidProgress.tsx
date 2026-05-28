@@ -6,6 +6,11 @@ import { useEffect, useRef, useState } from "react";
 type SupplierBidProgressProps = {
   status?: string | null;
   technical_compliance?: boolean | null;
+  // optional timestamps
+  submittedAt?: string | null;
+  updatedAt?: string | null;
+  // optional audit logs for this bid (admin only)
+  auditLogs?: any[];
 };
 
 type Step = {
@@ -58,6 +63,22 @@ function buildSteps(status?: string | null, technical_compliance?: boolean | nul
 }
 
 export default function SupplierBidProgress({ status, technical_compliance }: SupplierBidProgressProps) {
+  // accept timestamps via props (and prefer audit logs if provided)
+  const props = arguments[0] as any;
+  let submittedAt = props?.submittedAt as string | undefined;
+  let updatedAt = props?.updatedAt as string | undefined;
+  const auditLogs = props?.auditLogs as any[] | undefined;
+  if (auditLogs && auditLogs.length && props?.id) {
+    const bidId = String(props.id);
+    const bidLogs = auditLogs.filter((a: any) => String(a.resource_id) === bidId || String(a.resource_id) === String(props.project_id || props.project?.id || ""));
+    if (bidLogs.length) {
+      const submit = bidLogs.find((a: any) => String(a.action) === "SUBMIT_BID");
+      if (submit) submittedAt = submit.created_at;
+      // pick latest audit timestamp as updated
+      const latest = bidLogs.reduce((acc: any, cur: any) => (new Date(cur.created_at) > new Date(acc.created_at || 0) ? cur : acc), {});
+      if (latest && latest.created_at) updatedAt = latest.created_at;
+    }
+  }
   const normalized = String(status || "").trim().toLowerCase();
   const steps = buildSteps(status, technical_compliance);
   const isWon = normalized === "won";
@@ -93,6 +114,25 @@ export default function SupplierBidProgress({ status, technical_compliance }: Su
     return () => clearTimeout(t);
   }, [flashStep]);
 
+  function formatTs(v?: string | null) {
+    if (!v) return null;
+    try {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return null;
+      const diff = Date.now() - d.getTime();
+      const sec = Math.round(diff / 1000);
+      const abs = Math.abs(sec);
+      let rel = "";
+      if (abs < 60) rel = `${abs}s ago`;
+      else if (abs < 3600) rel = `${Math.round(abs / 60)}m ago`;
+      else if (abs < 86400) rel = `${Math.round(abs / 3600)}h ago`;
+      else rel = `${Math.round(abs / 86400)}d ago`;
+      return <time title={d.toISOString()}>{rel}</time>;
+    } catch {
+      return null;
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -103,7 +143,7 @@ export default function SupplierBidProgress({ status, technical_compliance }: Su
         </span>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-4">
           {steps.map((step, index) => {
           const isDone = step.state === "done";
           const isCurrent = step.state === "current";
@@ -133,6 +173,12 @@ export default function SupplierBidProgress({ status, technical_compliance }: Su
                 </span>
 
                 <p className={`text-xs font-semibold ${isDone ? "text-emerald-700" : isCurrent ? "text-amber-700" : "text-slate-500"}`}>{step.label}</p>
+                <p className="text-[11px] text-slate-400">
+                  {step.key === "submitted" && submittedAt ? formatTs(submittedAt) : null}
+                  {step.key === "review" && normalized === "under_evaluation" && updatedAt ? formatTs(updatedAt) : null}
+                  {step.key === "evaluated" && updatedAt && normalized !== "submitted" ? formatTs(updatedAt) : null}
+                  {step.key === "outcome" && (normalized === "won" || normalized === "lost") && updatedAt ? formatTs(updatedAt) : null}
+                </p>
               </div>
             </div>
           );

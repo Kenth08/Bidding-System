@@ -306,13 +306,47 @@ function AdminBidEvaluationContent() {
             <StatusBadge status={selectedProjectData.status} />
           </div>
           <div className="mt-5">
-            <BiddingLifecycleProgress
-              projectStatus={selectedProjectData.status}
-              procurementStatus={selectedProjectData.procurement_request?.status}
-              bidCount={currentBids.length}
-              hasUnderEvaluation={currentBids.some((b) => b.status === "under_evaluation")}
-              hasWinner={currentBids.some((b) => b.status === "won")}
-            />
+            {
+              (() => {
+                // Prefer audit log timestamps when available; otherwise fallback to bid updated_at
+                const audit = (selectedProjectData as any).audit_logs || [];
+                const projectAudit = audit.filter((a: any) => String(a.resource_id) === String(selectedProjectData.id) && String(a.resource_type) === "project");
+                const bidAudit = audit.filter((a: any) => String(a.resource_type) === "bid");
+
+                const createdAt = (projectAudit.find((a: any) => String(a.action) === "CREATE") || {}).created_at || selectedProjectData.created_at;
+                const approvedAt = (projectAudit.find((a: any) => String(a.action) === "APPROVE") || {}).created_at || selectedProjectData.procurement_request?.updated_at;
+                const publishedAt = (projectAudit.find((a: any) => String(a.description || "").toLowerCase().includes("published project") && a) || {}).created_at || selectedProjectData.published_at;
+
+                // evaluationAt: prefer latest audit log that indicates bid entered under evaluation, otherwise use latest updated_at among under_evaluation bids
+                const evalAuditCandidates = bidAudit.filter((a: any) => String(a.description || "").toLowerCase().includes("under review") || String(a.description || "").toLowerCase().includes("under evaluation") || String(a.action) === "UPDATE");
+                let evaluationAt = null as any;
+                if (evalAuditCandidates.length) {
+                  evaluationAt = evalAuditCandidates.reduce((acc: any, cur: any) => (new Date(cur.created_at) > new Date(acc.created_at || 0) ? cur : acc), {}).created_at || null;
+                }
+                if (!evaluationAt) {
+                  const evalDates = currentBids.filter((b) => b.status === "under_evaluation").map((b) => b.updated_at).filter(Boolean);
+                  evaluationAt = evalDates.length ? evalDates.reduce((a, c) => (new Date(a) > new Date(c) ? a : c)) : null; // latest
+                }
+
+                const winnerAudit = audit.find((a: any) => String(a.action) === "SELECT_WINNER") || {};
+                const winnerAt = winnerAudit.created_at || selectedProjectData.awarded_at;
+
+                return (
+                  <BiddingLifecycleProgress
+                    projectStatus={selectedProjectData.status}
+                    procurementStatus={selectedProjectData.procurement_request?.status}
+                    bidCount={currentBids.length}
+                    hasUnderEvaluation={currentBids.some((b) => b.status === "under_evaluation")}
+                    hasWinner={currentBids.some((b) => b.status === "won")}
+                    createdAt={createdAt}
+                    approvedAt={approvedAt}
+                    publishedAt={publishedAt}
+                    evaluationAt={evaluationAt}
+                    winnerAt={winnerAt}
+                  />
+                );
+              })()
+            }
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-4">
             <DetailBadge label="Lowest Offered Price" value={currentBids.length ? formatPeso(currentBids[0]?.bid_amount) : "—"} />

@@ -13,8 +13,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
   if (!project) return json({ error: "Not found." }, 404);
 
+  // include related audit logs when available (admin use)
+  let audit_logs: any[] = [];
+  try {
+    const all = await db.auditLog.findMany({ include: { user: { select: { id: true, full_name: true, email: true } } }, orderBy: { created_at: "asc" } });
+    const bidIds = (project.bids || []).map((b: any) => String(b.id));
+    const related = all.filter((r: any) => {
+      const rid = String(r.resource_id || "");
+      return rid === String(project.id) || bidIds.includes(rid) || (project.procurement_request && rid === String(project.procurement_request.id));
+    });
+    audit_logs = related;
+  } catch (e) {
+    // ignore if audit logs unavailable in current DB wrapper
+  }
+
   if (user!.role === "supplier" && project.status !== "active") return json({ error: "Not found." }, 404);
-  return json(project);
+  // return project with optional audit_logs attached for admin UIs
+  return json({ ...project, audit_logs });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

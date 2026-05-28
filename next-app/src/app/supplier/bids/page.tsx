@@ -192,7 +192,7 @@ export default function SupplierBids() {
               </div>
             </div>
 
-            <SupplierBidProgress status={selectedBid.status} technical_compliance={selectedBid.technical_compliance} />
+            <SupplierBidProgress status={selectedBid.status} technical_compliance={selectedBid.technical_compliance} submittedAt={selectedBid.submitted_at} updatedAt={selectedBid.updated_at} />
 
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evaluation Remarks</p>
