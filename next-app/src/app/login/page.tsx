@@ -17,11 +17,17 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuthStore();
+  const [nextPath, setNextPath] = useState<string | null>(null);
+  const [incomingMessage, setIncomingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const err = searchParams.get("error");
     const verified = searchParams.get("verified");
     const emailFromQuery = searchParams.get("email");
+    const next = searchParams.get("next");
+    const message = searchParams.get("message");
+    if (next) setNextPath(next);
+    if (message) setIncomingMessage(message);
     if (err === "pending") setError("Your account is pending admin approval. Please wait for verification.");
     else if (err === "rejected") setError("Your registration has been rejected. Please contact the administrator.");
     else if (err === "inactive") setError("Your account is inactive.");
@@ -46,10 +52,22 @@ function LoginPageContent() {
       }
       login(access, refresh, user);
       const role = user?.role;
+      // If there's a nextPath provided (user clicked an open bid), prefer redirecting there.
+      if (nextPath) {
+        // If supplier but not approved, append account_status to let destination handle UI
+        if (role === "supplier" && !["approved", "active"].includes(user?.status)) {
+          const sep = nextPath.includes("?") ? "&" : "?";
+          router.push(`${nextPath}${sep}account_status=pending`);
+          return;
+        }
+        router.push(nextPath);
+        return;
+      }
+
       if (role === "admin") router.push("/admin");
       else if (role === "school_head") router.push("/school-head");
       else if (role === "supplier") router.push("/supplier");
-      else router.push("/supplier");
+      else router.push("/");
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { error?: string; incomplete?: boolean; user?: { email?: string } } } })?.response?.data;
       if (response?.incomplete && response?.user?.email) {
@@ -95,9 +113,14 @@ function LoginPageContent() {
 
       <div className="flex min-h-screen flex-1 flex-col items-center justify-center bg-white px-6 py-8 lg:px-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
           </div>
+          {incomingMessage ? (
+            <div className="mb-4 rounded-xl border-l-4 border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {incomingMessage}
+            </div>
+          ) : null}
           <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email Address</span>
@@ -115,10 +138,16 @@ function LoginPageContent() {
             <LoadingButton type="submit" isLoading={isLoading} loadingText="Signing In..." className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600 active:scale-[0.98]">Sign In</LoadingButton>
             {error ? <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div> : null}
             {isLocalMode ? <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs text-slate-500">Local mode is enabled. Google sign-in is disabled.</p> : null}
-            <p className="mt-4 text-center text-sm text-slate-500">
-              Don&apos;t have an account?{" "}
-              <button type="button" onClick={() => router.push("/register")} className="font-medium text-emerald-600 hover:text-emerald-700">Register as Supplier</button>
-            </p>
+            <div className="mt-4">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <h3 className="text-sm font-semibold text-slate-900">Want to Join Procurement Opportunities?</h3>
+                <p className="mt-2 text-xs text-slate-500">Register as a supplier to submit proposals, participate in bidding, and access procurement opportunities.</p>
+                <div className="mt-3 flex gap-3">
+                  <button type="button" onClick={() => router.push("/register")} className="rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white">Register Supplier</button>
+                  <button type="button" onClick={() => {/* stay on login */}} className="rounded-xl border px-3 py-2 text-sm font-semibold text-emerald-600">Login</button>
+                </div>
+              </div>
+            </div>
           </form>
         </div>
         <div className="mt-8 flex items-center justify-center gap-1.5 text-xs text-slate-300"><Lock className="h-3.5 w-3.5" /><span>Secured by blockchain technology</span></div>

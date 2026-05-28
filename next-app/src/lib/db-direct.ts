@@ -328,6 +328,44 @@ export const dbDirect = {
     },
   },
 
+  blockchainRecord: {
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+      const client = await pool.connect();
+      try {
+        const q = `SELECT b.*, p.id AS p_id, p.title AS p_title, p.procurement_type AS p_procurement_type, p.budget AS p_budget, p.deadline AS p_deadline, p.public_result_expiry_date AS p_public_result_expiry_date, p.awarded_at AS p_awarded_at, p.updated_at AS p_updated_at, w.full_name AS winner_full_name, w.company_name AS winner_company_name, bd.bid_amount AS bid_bid_amount, bd.submitted_at AS bid_submitted_at, bd.company_name AS bid_company_name FROM blockchain_blockchainrecord b LEFT JOIN projects_project p ON p.id = b.project_id LEFT JOIN users w ON w.id = b.winner_id LEFT JOIN bids_bid bd ON bd.id = b.bid_id`;
+        const result = await client.query(q);
+        let rows = result.rows;
+        // simple where filtering by top-level fields
+        if (params.where) rows = rows.filter((r) => matchesWhere(r, params.where));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+
+        return rows.map((r) => ({
+          id: r.id,
+          project_id: r.project_id,
+          bid_id: r.bid_id,
+          winner_id: r.winner_id,
+          recorded_at: r.recorded_at,
+          hash: r.hash,
+          project: r.p_id ? {
+            id: r.p_id,
+            title: r.p_title,
+            procurement_type: r.p_procurement_type,
+            budget: r.p_budget,
+            deadline: r.p_deadline,
+            public_result_expiry_date: r.p_public_result_expiry_date,
+            awarded_at: r.p_awarded_at,
+            updated_at: r.p_updated_at,
+          } : null,
+          winner: r.winner_full_name || r.winner_company_name ? { full_name: r.winner_full_name, company_name: r.winner_company_name } : null,
+          bid: r.bid_bid_amount != null ? { bid_amount: r.bid_bid_amount, submitted_at: r.bid_submitted_at, company_name: r.bid_company_name } : null,
+        }));
+      } finally {
+        client.release();
+      }
+    }
+  },
+
   notification: {
     findUnique: async (params: { where?: { id?: string; recipient_id?: string; is_read?: boolean } } = {}) => {
       const client = await pool.connect();
