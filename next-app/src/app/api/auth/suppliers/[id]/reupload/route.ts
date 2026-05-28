@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         file: filePath,
         file_name: file.name,
         file_size: file.size,
-        verification_status: "Revised",
+        verification_status: "Pending",
         verification_notes: null,
         verified_at: null,
         verified_by_id: null,
@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         file_name: file.name,
         file: filePath,
         file_size: file.size,
-        verification_status: "Revised",
+        verification_status: "Pending",
         verification_notes: null,
       },
     });
@@ -84,8 +84,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await notifyAdmins(
     "supplier_document_resubmitted",
-    "Supplier Document Re-uploaded",
-    `Supplier has re-uploaded ${definition.name}. Please re-review.`,
+    "Supplier Submitted Corrected Verification Documents",
+    "Supplier submitted corrected verification documents.",
     "/admin/suppliers",
     id
   ).catch(() => {});
@@ -94,7 +94,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     supplierId: id,
     actorId: id,
     eventType: "SUPPLIER_DOCUMENT_RESUBMITTED",
-    message: `Supplier has re-uploaded ${definition.name}. Please re-review.`,
+    message: `Supplier submitted corrected verification documents: ${definition.name}.`,
     tone: "blue",
     metadata: { documentType, file: filePath },
   }).catch(() => {});
@@ -103,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     success: true,
     documentType,
     file: filePath,
-    state: "revised",
+    state: "pending",
     accountLocked: false,
     notifSent: false,
   });

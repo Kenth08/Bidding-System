@@ -34,7 +34,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    if (role === "supplier" && pathname.startsWith("/supplier") && !pathname.startsWith("/supplier/documents/reupload")) {
+    if (role === "supplier" && pathname.startsWith("/supplier")) {
       try {
         const workflowResponse = await fetch(new URL("/api/auth/supplier-documents", request.url), {
           headers: {
@@ -44,8 +44,16 @@ export async function proxy(request: NextRequest) {
 
         if (workflowResponse.ok) {
           const workflow = await workflowResponse.json();
-          if (workflow?.accountLocked) {
-            return NextResponse.redirect(new URL("/supplier/documents/reupload", request.url));
+          const accessState = String(workflow?.accessState || "restricted");
+          const verificationState = String(workflow?.verificationState || "pending");
+          const allowedSupplierPaths = ["/supplier/profile", "/supplier/verification-status", "/supplier/documents/reupload"];
+
+          if (accessState !== "verified") {
+            const isAllowedPath = allowedSupplierPaths.some((path) => pathname.startsWith(path));
+            if (!isAllowedPath) {
+              const redirectPath = verificationState === "flagged" ? "/supplier/documents/reupload" : "/supplier/verification-status";
+              return NextResponse.redirect(new URL(redirectPath, request.url));
+            }
           }
         }
       } catch {

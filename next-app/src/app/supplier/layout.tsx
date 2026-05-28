@@ -8,8 +8,8 @@ import SupplierSettingsModal from "@/components/supplier/SupplierSettingsModal";
 import { useAuthStore } from "@/stores/auth";
 import { notificationsAPI, suppliersAPI } from "@/services/api";
 
-const PATH_TO_PAGE: Record<string, string> = { "": "dashboard", "projects": "available-projects", "bids": "my-bids", "results": "results", "profile": "profile" };
-const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "available-projects": "projects", "my-bids": "bids", "results": "results", "profile": "profile" };
+const PATH_TO_PAGE: Record<string, string> = { "": "dashboard", "projects": "available-projects", "bids": "my-bids", "results": "results", "profile": "profile", "verification-status": "verification-status" };
+const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "available-projects": "projects", "my-bids": "bids", "results": "results", "profile": "profile", "verification-status": "verification-status" };
 
 export default function SupplierLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +18,7 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [accessState, setAccessState] = useState<"verified" | "restricted">("restricted");
 
   useEffect(() => { restoreSession(); }, [restoreSession]);
 
@@ -68,18 +69,39 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || user.role !== "supplier") return;
-    if (pathname.startsWith("/supplier/documents/reupload")) return;
 
-    (async () => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    const syncAccess = async () => {
       try {
         const response = await suppliersAPI.getMyDocumentWorkflow();
-        if (response.data?.accountLocked) {
-          router.replace("/supplier/documents/reupload");
+        const accessState = String(response.data?.accessState || "restricted");
+        const verificationState = String(response.data?.verificationState || "pending");
+        setAccessState(accessState === "verified" ? "verified" : "restricted");
+        const currentPath = pathname || "";
+        const isAllowedPath =
+          currentPath.startsWith("/supplier/profile") ||
+          currentPath.startsWith("/supplier/verification-status") ||
+          currentPath.startsWith("/supplier/documents/reupload");
+
+        if (accessState !== "verified" && !isAllowedPath) {
+          router.replace(verificationState === "flagged" ? "/supplier/documents/reupload" : "/supplier/verification-status");
+          return;
+        }
+
+        if (accessState === "verified" && (currentPath.startsWith("/supplier/verification-status") || currentPath.startsWith("/supplier/documents/reupload"))) {
+          router.replace("/supplier");
         }
       } catch {
         // ignore workflow fetch errors in layout guard
       }
-    })();
+    };
+
+    syncAccess();
+    timer = setInterval(syncAccess, 15000);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [user, pathname, router]);
 
   const currentPage = useMemo(() => {
@@ -97,6 +119,7 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     if (currentPage === "my-bids") return { title: "My Bids" };
     if (currentPage === "results") return { title: "Results" };
     if (currentPage === "profile") return { title: "My Profile" };
+    if (currentPage === "verification-status") return { title: "Verification Status" };
     return { title: "Supplier Dashboard" };
   }, [currentPage]);
 
@@ -133,7 +156,7 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <SupplierSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} />
+      <SupplierSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} restrictedAccess={accessState !== "verified"} />
       <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-62">
         <SupplierHeader title={pageMeta.title} user={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} onOpenProfile={() => setShowProfileModal(true)} onOpenSettings={() => setShowSettingsModal(true)} />
         <main className="flex-1 p-6">{children}</main>

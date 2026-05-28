@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   await updateSupplierWorkflow(id, {
-    accountLocked: true,
+    accountLocked: false,
     notifSent: true,
     flaggedReasons: nextFlaggedReasons,
   });
@@ -78,7 +78,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }).catch(() => {});
 
   return json({
-    accountLocked: true,
+    accountLocked: false,
     notifSent: true,
     flaggedDocuments: flaggedNames,
   });

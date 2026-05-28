@@ -40,6 +40,7 @@ export default function SupplierProfile() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [documents, setDocuments] = useState<SupplierDocWorkflowItem[]>([]);
   const [accountLocked, setAccountLocked] = useState(false);
+  const [verificationState, setVerificationState] = useState<string>("pending");
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
   const [isResubmitting, setIsResubmitting] = useState<Record<string, boolean>>({});
 
@@ -47,10 +48,12 @@ export default function SupplierProfile() {
     try {
       const response = await suppliersAPI.getMyDocumentWorkflow();
       setDocuments(Array.isArray(response.data?.documents) ? response.data.documents : []);
-      setAccountLocked(Boolean(response.data?.accountLocked));
+      setAccountLocked(String(response.data?.accessState || "restricted") !== "verified");
+      setVerificationState(String(response.data?.verificationState || "pending"));
     } catch {
       setDocuments([]);
       setAccountLocked(false);
+      setVerificationState("pending");
     }
   }
 
@@ -117,7 +120,7 @@ export default function SupplierProfile() {
             <AlertCircle className="mt-0.5 h-4 w-4 text-amber-700" />
             <div>
               <p className="text-sm font-semibold text-amber-900">Your account is temporarily locked while document revisions are pending.</p>
-              <p className="mt-1 text-xs text-amber-700">Please resubmit the flagged documents below, then wait for admin approval.</p>
+              <p className="mt-1 text-xs text-amber-700">Verification state: {verificationState}. Please resubmit the flagged documents below, then wait for admin approval.</p>
             </div>
           </div>
         </div>

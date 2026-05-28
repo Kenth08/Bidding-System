@@ -16,6 +16,18 @@ function normalizeDocumentFile(value: unknown) {
   return null;
 }
 
+function buildVerificationState(documents: Array<{ required: boolean; state: string }>) {
+  const requiredDocs = documents.filter((doc) => doc.required);
+  const allRequiredApproved = requiredDocs.length > 0 && requiredDocs.every((doc) => doc.state === "approved");
+  const hasFlaggedDocs = documents.some((doc) => doc.state === "flagged");
+  const hasPendingDocs = documents.some((doc) => doc.state === "uploaded" || doc.state === "revised" || doc.state === "missing");
+
+  const verificationState = allRequiredApproved ? "verified" : hasFlaggedDocs ? "flagged" : hasPendingDocs ? "pending" : "restricted";
+  const accessState = verificationState === "verified" ? "verified" : "restricted";
+
+  return { verificationState, accessState };
+}
+
 export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -53,9 +65,12 @@ export async function GET(request: Request) {
   });
 
   const workflow = await getSupplierWorkflow(user!.id);
+  const { verificationState, accessState } = buildVerificationState(documents);
   return json({
     accountLocked: workflow.account_locked,
     notifSent: workflow.notif_sent,
+    verificationState,
+    accessState,
     documents,
   });
 }
