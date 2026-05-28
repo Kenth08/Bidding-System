@@ -22,7 +22,13 @@ export async function GET(request: Request) {
 
   if (user!.role === "supplier") {
     if (!["approved", "active"].includes(user!.status)) return json([]);
-    where = { ...where, status: "active", deadline: { gte: today } };
+    // Only show active, non-expired projects matching at least one of the
+    // supplier's selected business types (by `BusinessType.name`). If the
+    // supplier has not selected any business types, return an empty list.
+    const supplierTypes = await db.supplierBusinessType.findMany({ where: { supplier_id: user!.id }, include: { business_type: { select: { name: true } } } });
+    const typeNames = supplierTypes.map((s: any) => s.business_type.name);
+    if (typeNames.length === 0) return json([]);
+    where = { ...where, status: "active", deadline: { gte: today }, procurement_type: { in: typeNames } };
   }
 
   if (statusFilter) where.status = statusFilter;

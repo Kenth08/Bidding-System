@@ -77,6 +77,7 @@ model User {
   procurements             Procurement[]      @relation("CreatedProcurements")
   reviewed_procurements    Procurement[]      @relation("ReviewedProcurements")
   projects                 Project[]          @relation("CreatedProjects")
+  supplier_business_types  SupplierBusinessType[]
 
   @@map("users")
 }
@@ -233,4 +234,28 @@ model Notification {
   recipient     User     @relation(fields: [recipient_id], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model BusinessType {
+  id          String                    @id @default(uuid()) @db.Uuid
+  name        String                    @unique @db.VarChar(255)
+  description String?                   @db.Text
+  is_active   Boolean                   @default(true)
+  created_at  DateTime                  @default(now())
+  updated_at  DateTime                  @updatedAt
+  suppliers   SupplierBusinessType[]
+
+  @@map("business_types")
+}
+
+model SupplierBusinessType {
+  supplier_id      String           @db.Uuid
+  business_type_id String           @db.Uuid
+  created_at       DateTime         @default(now())
+
+  supplier         User             @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  business_type    BusinessType     @relation(fields: [business_type_id], references: [id], onDelete: Cascade)
+
+  @@unique([supplier_id, business_type_id])
+  @@map("supplier_business_types")
 }

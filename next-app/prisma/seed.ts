@@ -58,6 +58,41 @@ const SEED_USERS = [
 async function main() {
   console.log("🌱 Seeding accounts...\n");
 
+  const DEFAULT_BUSINESS_TYPES = [
+    "IT Equipment",
+    "Office Supplies",
+    "Construction Materials",
+    "Electrical Supplies",
+    "Medical Supplies",
+    "Agricultural Supplies",
+    "Furniture & Fixtures",
+    "Printing Services",
+    "Vehicle Parts & Supplies",
+    "Security Equipment",
+    "Cleaning Supplies",
+    "Food & Catering Services",
+    "Hardware & Tools",
+    "ICT Services",
+    "IT Services",
+    "Consultancy Services",
+    "Logistics & Transportation",
+  ];
+
+  console.log("🌱 Seeding business types (idempotent)...\n");
+  for (const name of DEFAULT_BUSINESS_TYPES) {
+    try {
+      await db.businessType.upsert({
+        where: { name },
+        update: { is_active: true },
+        create: { id: uuid(), name, description: "", is_active: true },
+      });
+      console.log(`  ✅ ${name}`);
+    } catch (e) {
+      console.log(`  ⚠️  ${name} — upsert failed:`, e instanceof Error ? e.message : e);
+    }
+  }
+
+
   for (const user of SEED_USERS) {
     const existing = await db.user.findUnique({ where: { email: user.email } });
     if (existing) {
@@ -79,6 +114,35 @@ async function main() {
         is_active: true,
       },
     });
+
+    // If the seeded user specifies a business_type string, link it to the
+    // newly-created BusinessType (idempotent). Use case-insensitive lookup
+    // and fallback to a contains match to handle slight name differences.
+    if (user.business_type && user.role === "supplier") {
+      const supplier = await db.user.findUnique({ where: { email: user.email } });
+      if (supplier) {
+        const bt = await db.businessType.findFirst({
+          where: {
+            OR: [
+              { name: { equals: user.business_type, mode: "insensitive" } },
+              { name: { contains: user.business_type, mode: "insensitive" } },
+            ],
+          },
+        });
+
+        if (bt) {
+          const exists = await db.supplierBusinessType.findFirst({
+            where: { supplier_id: supplier.id, business_type_id: bt.id },
+          });
+          if (!exists) {
+            await db.supplierBusinessType.create({
+              data: { supplier_id: supplier.id, business_type_id: bt.id },
+            });
+            console.log(`  🔗 Linked ${supplier.email} → ${bt.name}`);
+          }
+        }
+      }
+    }
 
     console.log(`  ✅ ${user.email} (${user.role}) — created`);
   }

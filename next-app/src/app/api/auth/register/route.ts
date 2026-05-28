@@ -30,6 +30,30 @@ export async function POST(request: Request) {
   const company_address = String(formData.get("company_address") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const business_type = String(formData.get("business_type") || "Other").trim();
+  // Support multiple business type ids or names as repeated fields `business_type_ids`
+  const rawBusinessTypeIds = formData.getAll("business_type_ids").map(String).filter(Boolean);
+
+  async function resolveBusinessTypeIds(items: string[]) {
+    const resolved: string[] = [];
+    for (const item of items) {
+      // try by id first
+      let bt = null as any;
+      try {
+        bt = item.match?.(/[0-9a-fA-F\-]{36}/) ? await db.businessType.findUnique({ where: { id: item } }) : null;
+      } catch (e) {
+        bt = null;
+      }
+      if (!bt) {
+        bt = await db.businessType.findFirst({ where: { name: { equals: item, mode: "insensitive" } } });
+      }
+      if (!bt) {
+        // create a new business type (admin can later edit)
+        bt = await db.businessType.create({ data: { id: uuid(), name: item, description: "", is_active: true } });
+      }
+      if (bt) resolved.push(bt.id);
+    }
+    return resolved;
+  }
   const representative_name = String(formData.get("representative_name") || "").trim();
   const tin = String(formData.get("tin") || "").trim();
   const company_profile = String(formData.get("company_profile") || "").trim();
@@ -144,6 +168,22 @@ export async function POST(request: Request) {
           },
         });
 
+    // Link supplier to selected business types (if provided)
+    if (rawBusinessTypeIds.length > 0) {
+      const resolved = await resolveBusinessTypeIds(rawBusinessTypeIds);
+      if (resolved.length > 0) {
+        await db.supplierBusinessType.createMany({
+          data: resolved.map((btId) => ({ supplier_id: user.id, business_type_id: btId })),
+          skipDuplicates: true,
+        });
+        // keep legacy single string for quick reads
+        const firstBt = await db.businessType.findUnique({ where: { id: resolved[0] } });
+        if (firstBt) {
+          await db.user.update({ where: { id: user.id }, data: { business_type: firstBt.name } });
+        }
+      }
+    }
+
     await db.user.update({
       where: { id: user.id },
       data: {
@@ -256,6 +296,32 @@ export async function POST(request: Request) {
 
   await logAudit("CREATE", user.id, `Supplier registration submitted for ${company_name}`, "supplier", user.id).catch(() => {});
   await notifyAdmins("new_supplier", "New Supplier Registration", `${full_name} from ${company_name} has registered and is pending approval.`, "/admin/suppliers", user.id).catch(() => {});
+
+  // Persist business types selection (required)
+  let finalBusinessTypeIds: string[] = [];
+  if (rawBusinessTypeIds.length > 0) {
+    finalBusinessTypeIds = await resolveBusinessTypeIds(rawBusinessTypeIds);
+  } else if (business_type) {
+    // fallback to legacy single string
+    const bt = await db.businessType.findFirst({ where: { name: { equals: business_type, mode: "insensitive" } } });
+    if (bt) finalBusinessTypeIds = [bt.id];
+    else {
+      const nb = await db.businessType.create({ data: { id: uuid(), name: business_type, description: "", is_active: true } });
+      finalBusinessTypeIds = [nb.id];
+    }
+  }
+
+  if (finalBusinessTypeIds.length === 0) {
+    return NextResponse.json({ error: "Please select at least one business category." }, { status: 400 });
+  }
+
+  await db.supplierBusinessType.createMany({ data: finalBusinessTypeIds.map((btId) => ({ supplier_id: user.id, business_type_id: btId })), skipDuplicates: true });
+
+  // update legacy business_type text with first selection for compatibility
+  const firstBT = await db.businessType.findUnique({ where: { id: finalBusinessTypeIds[0] } });
+  if (firstBT) {
+    await db.user.update({ where: { id: user.id }, data: { business_type: firstBT.name } });
+  }
 
   if (!isLocalMode && verification) {
     await sendVerificationCodeEmail({

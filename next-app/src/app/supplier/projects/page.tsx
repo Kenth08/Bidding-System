@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Calendar, DollarSign, FileCheck2, ShieldCheck, Signature, TriangleAlert, Upload, X } from "lucide-react";
 import { projectsAPI, bidsAPI } from "@/services/api";
 import Modal from "@/components/shared/Modal";
@@ -102,6 +103,7 @@ export default function SupplierProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [bids, setBids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userBusinessType, setUserBusinessType] = useState<string | null>(null);
   const [selected, setSelected] = useState<Project | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [additionalRemarks, setAdditionalRemarks] = useState("");
@@ -166,9 +168,11 @@ export default function SupplierProjects() {
   useEffect(() => {
     async function load() {
       try {
-        const [projectsRes, bidsRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll()]);
+        const [projectsRes, bidsRes, meRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll(), /* get current user */ (await import("@/services/api")).authAPI.me()]);
         setProjects(projectsRes.data);
         setBids(bidsRes.data);
+        const user = meRes.data;
+        setUserBusinessType(user?.business_type || null);
       } catch {
         // ignore
       } finally {
@@ -263,7 +267,20 @@ export default function SupplierProjects() {
   }
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-24 rounded-2xl bg-slate-100" /><div className="h-24 rounded-2xl bg-slate-100" /></div>;
-  if (!projects.length) return <EmptyState title="No active projects" subtitle="Check back later for new procurement opportunities." />;
+  if (!projects.length) {
+    if (userBusinessType) {
+      const router = useRouter();
+      return (
+        <EmptyState
+          title="No matching projects"
+          subtitle="No procurement opportunities match your selected business categories. Update your profile to see more projects."
+          actionLabel="Update profile"
+          onAction={() => router.push("/supplier/profile")}
+        />
+      );
+    }
+    return <EmptyState title="No active projects" subtitle="Check back later for new procurement opportunities." />;
+  }
 
   const submitButtonLabel = canSubmitBid ? "Submit Bid" : "Complete Required Fields";
 

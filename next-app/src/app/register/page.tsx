@@ -1,7 +1,7 @@
 "use client";
 import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload, AlertCircle } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
-import { Suspense, useState, ChangeEvent } from "react";
+import { Suspense, useState, ChangeEvent, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
@@ -9,7 +9,8 @@ import DropdownWithMore from "@/components/shared/DropdownWithMore";
 
 const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
 
-const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
+// initial fallback; will be replaced by server list
+const FALLBACK_BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const REQUIRED_DOCUMENTS_SECTIONS = {
@@ -83,7 +84,7 @@ function RegisterPageContent() {
   const isFromGoogle = searchParams.get("from") === "google";
   const noAccountMessage = searchParams.get("message") === "no_account";
 
-  const [form, setForm] = useState<Record<string, string | File | null | boolean>>({
+  const [form, setForm] = useState<Record<string, any>>({
     fullName: "",
     email: googleEmail,
     password: "",
@@ -92,6 +93,7 @@ function RegisterPageContent() {
     companyAddress: "",
     phone: "",
     businessType: "",
+    businessTypeIds: [] as unknown as string[],
     businessTypeCustom: "",
     representativeName: "",
     tin: "",
@@ -127,6 +129,24 @@ function RegisterPageContent() {
     supportingDocuments: null,
   });
 
+  const [availableBusinessTypes, setAvailableBusinessTypes] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/public/business-types");
+        if (res.ok) {
+          const json = await res.json();
+          setAvailableBusinessTypes(json || []);
+        } else {
+          setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
+        }
+      } catch (e) {
+        setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
+      }
+    })();
+  }, []);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -134,7 +154,7 @@ function RegisterPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
 
-  function updateForm(key: string, value: string | File | null | boolean) {
+  function updateForm(key: string, value: any) {
     setForm((p) => ({ ...p, [key]: value }));
   }
 
@@ -240,7 +260,11 @@ function RegisterPageContent() {
       payload.append("company_name", form.companyName as string);
       payload.append("company_address", form.companyAddress as string);
       payload.append("phone", form.phone as string);
-      payload.append("business_type", (form.businessType === "__more__" ? form.businessTypeCustom : form.businessType) as string);
+      // Attach selected business type ids or names. The server accepts repeated `business_type_ids` fields.
+      const selected = (form.businessTypeIds as unknown as string[]) || [];
+      for (const v of selected) {
+        payload.append("business_type_ids", v);
+      }
       payload.append("representative_name", form.representativeName as string);
       payload.append("tin", form.tin as string);
       payload.append("company_profile", form.companyProfile as string);
@@ -448,10 +472,10 @@ function RegisterPageContent() {
                   { key: "phone", label: "Phone Number" },
                   {
                     key: "businessType",
-                    label: "Business Type",
-                    select: true,
-                    options: BUSINESS_TYPES,
-                  },
+                      label: "Business Type",
+                      select: true,
+                      options: FALLBACK_BUSINESS_TYPES,
+                    },
                   { key: "representativeName", label: "Representative Name", span: true },
                   { key: "tin", label: "TIN (Tax Identification Number)" },
                 ].map(({ key, label, span, select, options }) => (
@@ -460,17 +484,43 @@ function RegisterPageContent() {
                       {label}
                     </span>
                     {select ? (
-                      <DropdownWithMore
-                        value={form[key] as string}
-                        customValue={form.businessTypeCustom as string}
-                        onChange={(value) => updateForm(key, value)}
-                        onCustomValueChange={(value) => updateForm("businessTypeCustom", value)}
-                        options={options || []}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                        selectPlaceholder={`Select ${label.toLowerCase()}`}
-                        customPlaceholder={`Type a custom ${label.toLowerCase()}`}
-                        helperText="Choose More... to type a custom value."
-                      />
+                      // Multi-select checkboxes sourced from the server
+                      <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                        <div className="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto">
+                          {availableBusinessTypes.map((bt) => (
+                            <label key={bt.id} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={(form.businessTypeIds as unknown as string[]).includes(bt.id)}
+                                onChange={(e) => {
+                                  const ids = new Set(form.businessTypeIds as unknown as string[]);
+                                  if (e.target.checked) ids.add(bt.id); else ids.delete(bt.id);
+                                  updateForm("businessTypeIds", Array.from(ids));
+                                }}
+                                className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                              />
+                              <span className="text-sm text-slate-700">{bt.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Add custom category"
+                            value={form.businessTypeCustom as string}
+                            onChange={(e) => updateForm("businessTypeCustom", e.target.value)}
+                            className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm outline-none"
+                          />
+                          <button type="button" onClick={() => {
+                            const v = String(form.businessTypeCustom || "").trim();
+                            if (!v) return;
+                            const ids = new Set(form.businessTypeIds as unknown as string[]);
+                            ids.add(v);
+                            updateForm("businessTypeIds", Array.from(ids));
+                            updateForm("businessTypeCustom", "");
+                          }} className="rounded-md bg-emerald-500 px-3 py-1 text-sm text-white">Add</button>
+                        </div>
+                      </div>
                     ) : (
                       <input
                         type="text"

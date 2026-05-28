@@ -3,12 +3,20 @@
 import { BadgeCheck, Building2, Mail, MapPin, PencilLine, Phone, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const BUSINESS_TYPES = ["Construction", "IT Services", "Healthcare", "Logistics", "Consulting", "Other"];
-
 interface SupplierProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser?: { fullName?: string; email?: string; status?: string; company_name?: string; company_address?: string; phone?: string; business_type?: string; representative_name?: string; tin?: string } | null;
+  currentUser?: {
+    fullName?: string;
+    email?: string;
+    status?: string;
+    company_name?: string;
+    company_address?: string;
+    phone?: string;
+    business_type?: string;
+    representative_name?: string;
+    tin?: string;
+  } | null;
 }
 
 export default function SupplierProfileModal({ isOpen, onClose, currentUser }: SupplierProfileModalProps) {
@@ -24,6 +32,9 @@ export default function SupplierProfileModal({ isOpen, onClose, currentUser }: S
     businessType: currentUser?.business_type || "",
   });
 
+  const [availableBusinessTypes, setAvailableBusinessTypes] = useState<{ id: string; name: string }[]>([]);
+  const [selectedBusinessTypeIds, setSelectedBusinessTypeIds] = useState<string[]>([]);
+
   useEffect(() => {
     if (!currentUser) return;
 
@@ -37,20 +48,47 @@ export default function SupplierProfileModal({ isOpen, onClose, currentUser }: S
       address: currentUser.company_address || "",
       businessType: currentUser.business_type || "",
     });
+
+    (async () => {
+      try {
+        const res = await fetch("/api/public/business-types");
+        const list = res.ok ? await res.json() : [];
+        setAvailableBusinessTypes(list || []);
+        if (currentUser.business_type) {
+          const match = (list || []).find((b: any) => b.name?.toLowerCase() === String(currentUser.business_type).toLowerCase());
+          if (match) setSelectedBusinessTypeIds([match.id]);
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
   }, [currentUser]);
 
   if (!isOpen) return null;
 
-  function handleSave() {
-    setIsEditing(false);
+  async function handleSave() {
+    try {
+      const payload: any = {
+        full_name: formData.fullName,
+        company_name: formData.company,
+        company_address: formData.address,
+        phone: formData.phone,
+        representative_name: formData.representativeName,
+        tin: formData.tin,
+      };
+      if (selectedBusinessTypeIds.length > 0) payload.business_type_ids = selectedBusinessTypeIds;
+      const res = await fetch("/api/auth/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error("Failed to update profile");
+      setIsEditing(false);
+    } catch (e) {
+      console.error("profile save failed", e);
+    }
   }
 
   const displayName = currentUser?.fullName || "Supplier User";
   const companyName = formData.company || "—";
   const statusLabel = currentUser?.status === "pending" ? "Pending" : "Approved";
-  const statusStyle = statusLabel === "Approved"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-amber-200 bg-amber-50 text-amber-700";
+  const statusStyle = statusLabel === "Approved" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-2 backdrop-blur-[2px] sm:p-4">
@@ -153,13 +191,25 @@ export default function SupplierProfileModal({ isOpen, onClose, currentUser }: S
               ))}
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">Business Type</span>
-                <select
-                  value={formData.businessType}
-                  onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-                >
-                  {BUSINESS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto">
+                    {availableBusinessTypes.map((bt) => (
+                      <label key={bt.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedBusinessTypeIds.includes(bt.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedBusinessTypeIds);
+                            if (e.target.checked) next.add(bt.id); else next.delete(bt.id);
+                            setSelectedBusinessTypeIds(Array.from(next));
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                        />
+                        <span className="text-sm text-slate-700">{bt.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </label>
             </div>
           )}
