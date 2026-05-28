@@ -65,6 +65,20 @@ function getQualificationTone(status: string) {
   return "bg-yellow-100 text-yellow-700";
 }
 
+type ProcurementCategory = "all" | "goods" | "services" | "infrastructure" | "more";
+
+function normalizeText(v: unknown) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function getProcurementCategory(value: unknown): Exclude<ProcurementCategory, "all"> {
+  const t = normalizeText(value);
+  if (t === "goods") return "goods";
+  if (t === "services") return "services";
+  if (t === "infrastructure") return "infrastructure";
+  return "more";
+}
+
 function DetailBadge({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-slate-50 p-3">
@@ -88,6 +102,7 @@ function AdminBidEvaluationContent() {
   const [isEvalSaving, setIsEvalSaving] = useState(false);
   const [bidDetail, setBidDetail] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ProcurementCategory>("all");
 
   useEffect(() => {
     Promise.all([
@@ -143,13 +158,26 @@ function AdminBidEvaluationContent() {
   const projectsList = useMemo(() => {
     const bidsByProject: Record<string, any[]> = {};
     bids.forEach((b) => { const pid = b.project_id || b.project?.id; if (pid) { if (!bidsByProject[pid]) bidsByProject[pid] = []; bidsByProject[pid].push(b); } });
-    return projects.filter((p) => ["active", "closed", "awarded"].includes(p.status)).map((p) => ({
-      ...p,
-      bidCount: bidsByProject[p.id]?.length || 0,
-      hasUnderEvaluation: (bidsByProject[p.id] || []).some((b) => b.status === "under_evaluation"),
-      hasWinner: (bidsByProject[p.id] || []).some((b) => b.status === "won"),
-    }));
+    return projects
+      .filter((p) => ["active", "closed", "awarded"].includes(p.status))
+      .map((p) => {
+        const procurementType = p.procurement_type || p.procurement_request?.procurement_type || "More";
+        const procurementCategory = getProcurementCategory(procurementType);
+        return {
+          ...p,
+          procurementType,
+          procurementCategory,
+          bidCount: bidsByProject[p.id]?.length || 0,
+          hasUnderEvaluation: (bidsByProject[p.id] || []).some((b) => b.status === "under_evaluation"),
+          hasWinner: (bidsByProject[p.id] || []).some((b) => b.status === "won"),
+        };
+      });
   }, [projects, bids]);
+
+  const filteredProjectsList = useMemo(() => {
+    if (selectedCategory === "all") return projectsList;
+    return projectsList.filter((p) => p.procurementCategory === selectedCategory);
+  }, [projectsList, selectedCategory]);
 
   const currentBids = useMemo(() => {
     if (!selectedProject) return [];
@@ -206,12 +234,32 @@ function AdminBidEvaluationContent() {
         <div className="mb-5">
           <h2 className="text-lg font-bold text-slate-900">Select a Project to Evaluate</h2>
           <p className="mt-1 text-sm text-slate-500">Click a project below to review and evaluate submitted bids.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {([
+              { key: "all", label: "All" },
+              { key: "goods", label: "Goods" },
+              { key: "services", label: "Services" },
+              { key: "infrastructure", label: "Infrastructure" },
+              { key: "more", label: "More" },
+            ] as Array<{ key: ProcurementCategory; label: string }>).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setSelectedCategory(opt.key)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${selectedCategory === opt.key ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
-        {projectsList.length === 0 ? (
-          <EmptyState title="No projects available for evaluation" subtitle="Published projects will appear here; bids will update automatically." />
+        {filteredProjectsList.length === 0 ? (
+          <EmptyState
+            title={projectsList.length === 0 ? "No projects available for evaluation" : "No projects for this category"}
+            subtitle={projectsList.length === 0 ? "Published projects will appear here; bids will update automatically." : "Try another category filter or publish more projects."}
+          />
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {projectsList.map((p) => (
+            {filteredProjectsList.map((p) => (
               <button key={p.id} onClick={() => setSelectedProject(p.id)} className="group flex min-h-[190px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -220,6 +268,7 @@ function AdminBidEvaluationContent() {
                     </div>
                     <p className="text-base font-semibold text-slate-900">{p.title}</p>
                     <p className="mt-1 text-sm text-slate-500">{formatPeso(p.budget)} budget</p>
+                    <p className="mt-1 text-xs font-medium text-emerald-700">{p.procurementType}</p>
                     <p className="mt-3 text-xs leading-5 text-slate-400">Click to open the project, review submitted bids, and mark the winning supplier.</p>
                   </div>
                   <ArrowRight className="mt-1 h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />

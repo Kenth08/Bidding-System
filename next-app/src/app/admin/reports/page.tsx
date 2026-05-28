@@ -11,6 +11,14 @@ export default function AdminReports() {
   const [procData, setProcData] = useState<any>(null);
   const [suppData, setSuppData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [exportingCSV, setExportingCSV] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [toasts, setToasts] = useState<Array<{ id: number; msg: string; type?: "success" | "error" }>>([]);
+  const pushToast = (msg: string, type: "success" | "error" = "success") => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((t) => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
+  };
 
   useEffect(() => {
     Promise.all([
@@ -21,11 +29,82 @@ export default function AdminReports() {
 
   if (loading) return <SkeletonTable />;
 
+  async function downloadCSV(kind: "procurement" | "suppliers") {
+    setExportingCSV(true);
+    try {
+      const res = await fetch(`/api/reports/export?type=${kind}&format=csv`, { method: "GET" });
+      if (!res.ok) throw new Error("Failed to export");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${kind}-report.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      pushToast("CSV download started", "success");
+    } catch (e) {
+      console.error(e);
+      pushToast("CSV export failed", "error");
+    } finally {
+      setExportingCSV(false);
+    }
+  }
+
+  function exportPDF(kind: "procurement" | "suppliers") {
+    setExportingPDF(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/reports/export?type=${kind}&format=pdf`, { method: "GET" });
+        if (!res.ok) throw new Error("Failed to export PDF");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${kind}-report.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        pushToast("PDF download started", "success");
+      } catch (e) {
+        console.error(e);
+        pushToast("PDF export failed", "error");
+      } finally {
+        setExportingPDF(false);
+      }
+    })();
+  }
+
   return (
     <div>
-      <div className="flex gap-1 mb-6">
-        <button onClick={() => setTab("procurement")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab === "procurement" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Procurement Report</button>
-        <button onClick={() => setTab("suppliers")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab === "suppliers" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Supplier Report</button>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex gap-1">
+          <button onClick={() => setTab("procurement")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab === "procurement" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Procurement Report</button>
+          <button onClick={() => setTab("suppliers")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab === "suppliers" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Supplier Report</button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => downloadCSV(tab)} disabled={exportingCSV} className={`px-3 py-2 rounded-xl text-sm ${exportingCSV ? 'bg-slate-200 text-slate-400 cursor-wait' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+            {exportingCSV ? (
+              <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>Exporting...</span>
+            ) : ('Export CSV')}
+          </button>
+          <button onClick={() => exportPDF(tab)} disabled={exportingPDF} className={`px-3 py-2 rounded-xl text-sm ${exportingPDF ? 'bg-emerald-300 text-white cursor-wait' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+            {exportingPDF ? (
+              <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>Exporting PDF...</span>
+            ) : ('Export PDF')}
+          </button>
+        </div>
+      </div>
+
+      {/* Toasts */}
+      <div className="fixed right-4 bottom-4 flex flex-col gap-2 z-50">
+        {toasts.map((t) => (
+          <div key={t.id} className={`px-4 py-2 rounded shadow-md text-sm ${t.type === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+            {t.msg}
+          </div>
+        ))}
       </div>
 
       {tab === "procurement" && procData && (

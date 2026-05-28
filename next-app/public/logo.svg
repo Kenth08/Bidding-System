@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80">
+  <rect width="320" height="80" fill="transparent" />
+  <circle cx="40" cy="40" r="28" fill="#10b981" />
+  <text x="40" y="47" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="28" fill="#ffffff" font-weight="700" text-anchor="middle">E</text>
+  <text x="84" y="34" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="18" fill="#0f172a" font-weight="700">E-Procurement</text>
+</svg>
