@@ -34,6 +34,45 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
+    if (role === "supplier" && pathname.startsWith("/supplier")) {
+      try {
+        const workflowResponse = await fetch(new URL("/api/auth/supplier-documents", request.url), {
+          headers: {
+            cookie: request.headers.get("cookie") || "",
+          },
+        });
+
+        if (workflowResponse.ok) {
+          const workflow = await workflowResponse.json();
+          const accessState = String(workflow?.accessState || "restricted");
+          const accountStatus = String(workflow?.accountStatus || "");
+          const allowedRevisionPaths = [
+            "/supplier/revision-required",
+            "/supplier/verification",
+            "/supplier/verification-status",
+            "/supplier/profile",
+            "/supplier/notifications",
+            "/supplier/documents",
+          ];
+
+          if (accountStatus === "waiting_admin_approval" || accountStatus === "waiting_admin_review") {
+            return NextResponse.redirect(new URL("/login?error=under_review", request.url));
+          }
+
+          if (accessState === "revision_required") {
+            const isAllowedPath = allowedRevisionPaths.some((path) => pathname.startsWith(path));
+            if (!isAllowedPath) {
+              return NextResponse.redirect(new URL("/supplier/revision-required", request.url));
+            }
+          } else if (accessState !== "verified") {
+            return NextResponse.redirect(new URL("/supplier/verification-status", request.url));
+          }
+        }
+      } catch {
+        // If the workflow check fails, fall through and let the app handle it.
+      }
+    }
+
     return NextResponse.next();
   } catch (err: any) {
     if (err?.code === "ERR_JWT_EXPIRED") {

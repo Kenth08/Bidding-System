@@ -62,11 +62,25 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { user, error } = await requireAuth(request);
+  const { user: authUser, error } = await requireAuth(request);
   if (error) return error;
 
-  if (user!.role !== "supplier") {
+  // Fetch latest status from DB to ensure "No logout required" rule
+  const user = await db.user.findUnique({
+    where: { id: authUser!.id },
+    select: { id: true, role: true, verification_status: true, company_name: true, full_name: true }
+  });
+
+  if (!user || user.role !== "supplier") {
     return json({ error: "Only suppliers can submit bids." }, 403);
+  }
+
+  // Business Logic: Block bids if not fully verified
+  if (user.verification_status !== "verified") {
+    return json({ 
+      error: "Account Restricted. You cannot submit bids until your verification status is 'verified'.",
+      status: user.verification_status 
+    }, 403);
   }
 
   const contentType = request.headers.get("content-type") || "";

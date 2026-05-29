@@ -47,6 +47,25 @@ function getSmtpTransport() {
   });
 }
 
+function formatSmtpError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code || "") : "";
+  const response = typeof error === "object" && error && "response" in error ? String((error as { response?: unknown }).response || "") : "";
+
+  if (
+    code === "535" ||
+    response.includes("5.7.8") ||
+    response.includes("Username and Password not accepted") ||
+    message.includes("Username and Password not accepted")
+  ) {
+    return new Error(
+      "Gmail rejected the SMTP login. Use a Gmail App Password with 2-Step Verification enabled, and make sure SMTP_USER matches the Gmail account that owns the app password."
+    );
+  }
+
+  return error instanceof Error ? error : new Error(message);
+}
+
 export async function sendVerificationCodeEmail(params: { to: string; fullName?: string; code: string }) {
   if (isLocalMode) {
     return;
@@ -82,13 +101,17 @@ export async function sendVerificationCodeEmail(params: { to: string; fullName?:
     </div>
   `;
 
-  await transporter.sendMail({
-    from: `${fromName} <${fromEmail}>`,
-    to: params.to,
-    subject,
-    text,
-    html,
-  });
+  try {
+    await transporter.sendMail({
+      from: `${fromName} <${fromEmail}>`,
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  } catch (error) {
+    throw formatSmtpError(error);
+  }
 }
 
 export const emailVerificationRules = {

@@ -10,7 +10,10 @@ export type NotificationType =
   | "procurement_request"
   | "request_approved"
   | "request_rejected"
-  | "winner_selected";
+  | "winner_selected"
+  | "supplier_documents_flagged"
+  | "supplier_document_resubmitted"
+  | "supplier_documents_approved";
 
 export type ResourceType = "project" | "bid" | "request" | "supplier" | "user";
 

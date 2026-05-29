@@ -202,6 +202,15 @@ async function buildUserCount(client: any, userId: string, select?: Record<strin
 }
 
 export const dbDirect = {
+  query: async (text: string, values: any[] = []) => {
+    const client = await pool.connect();
+    try {
+      return await client.query(text, values);
+    } finally {
+      client.release();
+    }
+  },
+
   user: {
     findUnique: async (where: { email?: string; id?: string; where?: { email?: string; id?: string } }) => {
       const filter = where.where ?? where;

@@ -34,6 +34,20 @@ export async function POST(request: Request) {
   if (user.role === "supplier" && user.status === "rejected") {
     return NextResponse.json({ error: "Your registration has been rejected." }, { status: 403 });
   }
+
+  if (user.role === "supplier") {
+    const workflow = await dbDirect.query(
+      `SELECT account_locked FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
+      [user.id]
+    );
+    const isLocked = Boolean(workflow.rows[0]?.account_locked);
+    if (isLocked) {
+      return NextResponse.json({
+        error: "Your account is temporarily locked. Please revise and resubmit flagged documents from your profile.",
+      }, { status: 403 });
+    }
+  }
+
   if (!user.is_active || user.status === "inactive") {
     return NextResponse.json({ error: "Your account is inactive." }, { status: 403 });
   }
