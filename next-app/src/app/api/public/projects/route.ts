@@ -9,11 +9,14 @@ export async function GET(request: Request) {
 
   if (section === 'open') {
     // Active projects whose deadline has not passed and without a winning bid
-    const projects = await db.project.findMany({ where: { status: 'active', deadline: { gte: today } }, orderBy: { created_at: 'desc' } });
+    const projects = await db.project.findMany({ where: { status: 'active' }, orderBy: { created_at: 'desc' } });
 
     // Filter out projects that already have a winner (bid with status 'won' or blockchain record)
     const filtered: any[] = [];
     for (const p of projects) {
+      const deadline = p.deadline ? new Date(p.deadline) : null;
+      if (!deadline || deadline < today) continue;
+
       const winningBid = await db.bid.findFirst({ where: { project_id: p.id, status: 'won' } });
       const hasRecord = (await (db as any).blockchainRecord?.findMany ? (await (db as any).blockchainRecord.findMany({ where: { project_id: p.id } })).length > 0 : false);
       if (!winningBid && !hasRecord) filtered.push(p);

@@ -385,7 +385,7 @@ function AdminBidEvaluationContent() {
                                 {isExpanded ? "Close" : "Evaluate"}
                               </button>
                             )}
-                            {b.technical_compliance && b.status !== "won" && b.status !== "lost" && (
+                            {b.technical_compliance && selectedProjectData?.status === "closed" && b.status !== "won" && b.status !== "lost" && (
                               <button onClick={() => setWinnerConfirm(b)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100">Select Winner</button>
                             )}
                           </div>

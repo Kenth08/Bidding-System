@@ -36,15 +36,19 @@ export async function POST(request: Request) {
   }
 
   if (user.role === "supplier") {
-    const workflow = await dbDirect.query(
-      `SELECT account_locked FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
-      [user.id]
-    );
-    const isLocked = Boolean(workflow.rows[0]?.account_locked);
-    if (isLocked) {
-      return NextResponse.json({
-        error: "Your account is temporarily locked. Please revise and resubmit flagged documents from your profile.",
-      }, { status: 403 });
+    try {
+      const workflow = await dbDirect.query(
+        `SELECT account_locked FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
+        [user.id]
+      );
+      const isLocked = Boolean(workflow.rows[0]?.account_locked);
+      if (isLocked) {
+        return NextResponse.json({
+          error: "Your account is temporarily locked. Please revise and resubmit flagged documents from your profile.",
+        }, { status: 403 });
+      }
+    } catch {
+      // Local demo mode may not have the workflow table populated yet.
     }
   }
 

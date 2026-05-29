@@ -52,15 +52,16 @@ function LoginPageContent() {
       }
       login(access, refresh, user);
       const role = user?.role;
+      const targetNext = nextPath || searchParams.get("next");
       // If there's a nextPath provided (user clicked an open bid), prefer redirecting there.
-      if (nextPath) {
+      if (targetNext) {
         // If supplier but not approved, append account_status to let destination handle UI
         if (role === "supplier" && !["approved", "active"].includes(user?.status)) {
-          const sep = nextPath.includes("?") ? "&" : "?";
-          router.push(`${nextPath}${sep}account_status=pending`);
+          const sep = targetNext.includes("?") ? "&" : "?";
+          router.push(`${targetNext}${sep}account_status=pending`);
           return;
         }
-        router.push(nextPath);
+        router.push(targetNext);
         return;
       }
 

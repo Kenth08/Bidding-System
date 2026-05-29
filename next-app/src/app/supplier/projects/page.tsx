@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, DollarSign, FileCheck2, ShieldCheck, Signature, TriangleAlert, Upload, X } from "lucide-react";
 import { projectsAPI, bidsAPI } from "@/services/api";
 import Modal from "@/components/shared/Modal";
@@ -100,6 +100,9 @@ function DocumentUploadField({
 }
 
 export default function SupplierProjects() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedProjectId = searchParams.get("project");
   const [projects, setProjects] = useState<Project[]>([]);
   const [bids, setBids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -182,6 +185,12 @@ export default function SupplierProjects() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    if (!selectedProjectId || !projects.length) return;
+    const match = projects.find((project) => project.id === selectedProjectId);
+    if (match) setSelected(match);
+  }, [projects, selectedProjectId]);
 
   const submittedProjectIds = new Set(
     bids.map((bid) => {
@@ -269,7 +278,6 @@ export default function SupplierProjects() {
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-24 rounded-2xl bg-slate-100" /><div className="h-24 rounded-2xl bg-slate-100" /></div>;
   if (!projects.length) {
     if (userBusinessType) {
-      const router = useRouter();
       return (
         <EmptyState
           title="No matching projects"
@@ -300,6 +308,7 @@ export default function SupplierProjects() {
               onClick={() => {
                 if (submittedProjectIds.has(p.id)) return;
                 setSelected(p);
+                router.replace(`/supplier/projects?project=${p.id}`);
               }}
               disabled={submittedProjectIds.has(p.id)}
               aria-disabled={submittedProjectIds.has(p.id)}

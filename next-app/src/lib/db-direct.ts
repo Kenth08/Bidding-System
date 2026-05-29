@@ -122,6 +122,54 @@ function pickUser(row: any, select?: Record<string, any>) {
   return result;
 }
 
+async function loadBidWithInclude(row: any, include?: Record<string, any>) {
+  if (!row || !include) return row;
+
+  const result: Record<string, any> = { ...row };
+
+  if (include.project) {
+    const projectResult = await dbDirect.project.findUnique({ where: { id: row.project_id } });
+    result.project = projectResult ? (include.project.select ? pickUser(projectResult, include.project.select) : projectResult) : null;
+  }
+
+  if (include.supplier) {
+    const supplierResult = await dbDirect.user.findUnique({ id: row.supplier_id });
+    result.supplier = supplierResult ? (include.supplier.select ? pickUser(supplierResult, include.supplier.select) : supplierResult) : null;
+  }
+
+  return result;
+}
+
+function hydrateProcurement(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    deadline: row.deadline ? new Date(String(row.deadline)) : row.deadline,
+    public_result_expiry_date: row.public_result_expiry_date ? new Date(String(row.public_result_expiry_date)) : row.public_result_expiry_date,
+    reviewed_at: row.reviewed_at ? new Date(String(row.reviewed_at)) : row.reviewed_at,
+    created_at: row.created_at ? new Date(String(row.created_at)) : row.created_at,
+    updated_at: row.updated_at ? new Date(String(row.updated_at)) : row.updated_at,
+  };
+}
+
+async function loadProcurementWithInclude(row: any, include?: Record<string, any>) {
+  if (!row || !include) return hydrateProcurement(row);
+
+  const result: Record<string, any> = { ...hydrateProcurement(row) };
+
+  if (include.created_by) {
+    const createdBy = await dbDirect.user.findUnique({ id: row.created_by_id });
+    result.created_by = createdBy ? (include.created_by.select ? pickUser(createdBy, include.created_by.select) : createdBy) : null;
+  }
+
+  if (include.reviewed_by) {
+    const reviewedBy = row.reviewed_by_id ? await dbDirect.user.findUnique({ id: row.reviewed_by_id }) : null;
+    result.reviewed_by = reviewedBy ? (include.reviewed_by.select ? pickUser(reviewedBy, include.reviewed_by.select) : reviewedBy) : null;
+  }
+
+  return result;
+}
+
 async function buildUserCount(client: any, userId: string, select?: Record<string, any>) {
   const count: Record<string, number> = {};
   if (!select) return count;
@@ -845,6 +893,169 @@ export const dbDirect = {
     },
   },
 
+  procurement: {
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number; include?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM procurements');
+        let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
+        rows = sortRows(rows, params.orderBy);
+        rows = applyTake(rows, params);
+
+        if (params.include) {
+          const mapped = [] as any[];
+          for (const row of rows) {
+            mapped.push(await loadProcurementWithInclude(row, params.include));
+          }
+          return mapped;
+        }
+
+        return rows.map(hydrateProcurement);
+      } finally {
+        client.release();
+      }
+    },
+
+    findUnique: async (where: { id?: string; where?: { id?: string }; include?: Record<string, any> }) => {
+      const filter = where.where ?? where;
+      const client = await pool.connect();
+      try {
+        if (filter.id) {
+          const res = await client.query('SELECT * FROM procurements WHERE id = $1', [filter.id]);
+          const row = res.rows[0] || null;
+          return where.include ? await loadProcurementWithInclude(row, where.include) : hydrateProcurement(row);
+        }
+        return null;
+      } finally {
+        client.release();
+      }
+    },
+
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: any; include?: Record<string, any> } = {}) => {
+      const rows = await dbDirect.procurement.findMany(params);
+      return rows[0] || null;
+    },
+
+    create: async (params: any) => {
+      const data = params.data || params;
+      const client = await pool.connect();
+      try {
+        const id = data.id || uuid();
+        const result = await client.query(
+          `INSERT INTO procurements (
+            id, project_title, budget, deadline, public_result_expiry_date, procurement_type,
+            technical_specifications, procurement_schedule, delivery_period, status,
+            rejection_reason, revision_notes, review_remarks, reviewed_by_id, reviewed_at,
+            created_by_id, created_at, updated_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW()) RETURNING *`,
+          [
+            id,
+            data.project_title,
+            data.budget,
+            data.deadline ?? null,
+            data.public_result_expiry_date ?? null,
+            data.procurement_type,
+            data.technical_specifications ?? '',
+            data.procurement_schedule ?? '',
+            data.delivery_period ?? '',
+            data.status ?? 'Draft',
+            data.rejection_reason ?? '',
+            data.revision_notes ?? '',
+            data.review_remarks ?? null,
+            data.reviewed_by_id ?? null,
+            data.reviewed_at ?? null,
+            data.created_by_id ?? null,
+          ]
+        );
+        return hydrateProcurement(result.rows[0]);
+      } finally {
+        client.release();
+      }
+    },
+
+    upsert: async (params: { where: Record<string, any>; update: Record<string, any>; create: Record<string, any> }) => {
+      const where = params?.where || {};
+      const updateData = params?.update || {};
+      const createData = params?.create || {};
+
+      const client = await pool.connect();
+      try {
+        let existing = null;
+        if (where.id) {
+          const result = await client.query('SELECT * FROM projects_project WHERE id = $1', [where.id]);
+          existing = result.rows[0] || null;
+        } else if (where.procurement_request_id) {
+          const result = await client.query('SELECT * FROM projects_project WHERE procurement_request_id = $1', [where.procurement_request_id]);
+          existing = result.rows[0] || null;
+        }
+
+        if (existing) {
+          return await dbDirect.project.update({ where: { id: existing.id }, data: updateData });
+        }
+
+        return await dbDirect.project.create({ data: { ...createData, ...updateData } });
+      } finally {
+        client.release();
+      }
+    },
+
+    update: async (whereOrParams: any, dataArg?: any) => {
+      const id = whereOrParams?.id ?? whereOrParams?.where?.id;
+      const data = dataArg ?? whereOrParams?.data ?? whereOrParams;
+      if (!id) throw new Error('Update requires id');
+      const client = await pool.connect();
+      try {
+        const entries = Object.entries(data);
+        if (!entries.length) {
+          const res = await client.query('SELECT * FROM procurements WHERE id = $1', [id]);
+          return hydrateProcurement(res.rows[0] || null);
+        }
+        const assignments = entries.map(([k], i) => `"${k}" = $${i + 2}`).join(', ');
+        const values = entries.map(([, v]) => v);
+        const res = await client.query(`UPDATE procurements SET ${assignments}, updated_at = NOW() WHERE id = $1 RETURNING *`, [id, ...values]);
+        return hydrateProcurement(res.rows[0] || null);
+      } finally {
+        client.release();
+      }
+    },
+
+    updateMany: async (params: { where?: Record<string, any>; data?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM procurements');
+        const rows = result.rows.filter((row) => matchesWhere(row, params.where));
+        if (!rows.length) return { count: 0 };
+
+        const updateData = isPlainObject(params.data) ? params.data : {};
+        const entries = Object.entries(updateData);
+        if (!entries.length) return { count: rows.length };
+
+        const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
+        const values = entries.map(([, value]) => value);
+
+        for (const row of rows) {
+          await client.query(`UPDATE procurements SET ${assignments}, updated_at = NOW() WHERE id = $1`, [row.id, ...values]);
+        }
+
+        return { count: rows.length };
+      } finally {
+        client.release();
+      }
+    },
+
+    delete: async (whereOrParams: any) => {
+      const id = whereOrParams?.id ?? whereOrParams?.where?.id;
+      if (!id) throw new Error('Delete requires id');
+      const client = await pool.connect();
+      try {
+        const res = await client.query('DELETE FROM procurements WHERE id = $1 RETURNING *', [id]);
+        return hydrateProcurement(res.rows[0] || null);
+      } finally {
+        client.release();
+      }
+    },
+  },
+
   bid: {
     count: async (params: { where?: Record<string, any> } = {}) => {
       const client = await pool.connect();
@@ -863,6 +1074,13 @@ export const dbDirect = {
         let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
         rows = sortRows(rows, params.orderBy);
         rows = applyTake(rows, params);
+        if ((params as any).include) {
+          const mapped = [] as any[];
+          for (const row of rows) {
+            mapped.push(await loadBidWithInclude(row, (params as any).include));
+          }
+          return mapped;
+        }
         return rows;
       } finally {
         client.release();
@@ -871,11 +1089,12 @@ export const dbDirect = {
 
     findUnique: async (where: { id?: string; where?: { id?: string } }) => {
       const filter = where.where ?? where;
+      const include = (where as any).include;
       const client = await pool.connect();
       try {
         if (filter.id) {
           const res = await client.query('SELECT * FROM bids_bid WHERE id = $1', [filter.id]);
-          return res.rows[0] || null;
+          return include ? await loadBidWithInclude(res.rows[0] || null, include) : res.rows[0] || null;
         }
         return null;
       } finally {
@@ -953,6 +1172,30 @@ export const dbDirect = {
         const values = entries.map(([, v]) => v);
         const res = await client.query(`UPDATE bids_bid SET ${assignments} WHERE id = $1 RETURNING *`, [id, ...values]);
         return res.rows[0] || null;
+      } finally {
+        client.release();
+      }
+    }
+    ,
+    updateMany: async (params: { where?: Record<string, any>; data?: Record<string, any> } = {}) => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM bids_bid');
+        const rows = result.rows.filter((row) => matchesWhere(row, params.where));
+        if (!rows.length) return { count: 0 };
+
+        const updateData = isPlainObject(params.data) ? params.data : {};
+        const entries = Object.entries(updateData);
+        if (!entries.length) return { count: rows.length };
+
+        const assignments = entries.map(([key], index) => `"${key}" = $${index + 2}`).join(', ');
+        const values = entries.map(([, value]) => value);
+
+        for (const row of rows) {
+          await client.query(`UPDATE bids_bid SET ${assignments}, updated_at = NOW() WHERE id = $1`, [row.id, ...values]);
+        }
+
+        return { count: rows.length };
       } finally {
         client.release();
       }

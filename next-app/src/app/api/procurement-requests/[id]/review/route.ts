@@ -40,37 +40,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ? parseInt(String(procurement.delivery_period).replace(/\D/g, "")) || 0
       : 0;
 
-    project = await db.project.upsert({
-      where: { procurement_request_id: id },
-      update: {
-        title: procurement.project_title,
-        budget: procurement.budget,
-        deadline: procurement.deadline || new Date(Date.now() + 14 * 86400000),
-        procurement_schedule: procurement.procurement_schedule ? new Date(procurement.procurement_schedule) : null,
-        public_result_expiry_date: procurement.public_result_expiry_date,
-        requirements: procurement.technical_specifications,
-        procurement_type: procurement.procurement_type,
-        delivery_period: deliveryPeriod,
-        technical_specifications: procurement.technical_specifications,
-        status: "draft",
-        created_by_id: procurement.created_by_id,
-      },
-      create: {
-        id: uuid(),
-        procurement_request_id: id,
-        title: procurement.project_title,
-        budget: procurement.budget,
-        deadline: procurement.deadline || new Date(Date.now() + 14 * 86400000),
-        procurement_schedule: procurement.procurement_schedule ? new Date(procurement.procurement_schedule) : null,
-        public_result_expiry_date: procurement.public_result_expiry_date,
-        requirements: procurement.technical_specifications,
-        procurement_type: procurement.procurement_type,
-        delivery_period: deliveryPeriod,
-        technical_specifications: procurement.technical_specifications,
-        status: "draft",
-        created_by_id: procurement.created_by_id,
-      },
-    });
+    const existingProject = await db.project.findFirst({ where: { procurement_request_id: id } });
+    const projectData = {
+      title: procurement.project_title,
+      budget: procurement.budget,
+      deadline: procurement.deadline || new Date(Date.now() + 14 * 86400000),
+      procurement_schedule: procurement.procurement_schedule ? new Date(procurement.procurement_schedule) : null,
+      public_result_expiry_date: procurement.public_result_expiry_date,
+      requirements: procurement.technical_specifications,
+      procurement_type: procurement.procurement_type,
+      delivery_period: deliveryPeriod,
+      technical_specifications: procurement.technical_specifications,
+      status: "draft",
+      created_by_id: procurement.created_by_id,
+    };
+
+    project = existingProject
+      ? await db.project.update({ where: { id: existingProject.id }, data: projectData })
+      : await db.project.create({ data: { id: uuid(), procurement_request_id: id, ...projectData } });
 
     await logAudit("APPROVE", user!.id, `Approved procurement request ${procurement.project_title}`, "procurement", id);
     if (procurement.created_by_id) {

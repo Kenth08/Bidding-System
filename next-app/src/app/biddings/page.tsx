@@ -43,7 +43,7 @@ export default function BiddingsPage() {
     try {
       const me = await authAPI.me();
       if (!me?.data) {
-        router.push(`/login?next=/projects/${projectId}&message=${encodeURIComponent('Please log in or create an account to participate in bidding.')}`);
+        router.push(`/login?next=${encodeURIComponent(`/supplier/projects?project=${projectId}`)}&message=${encodeURIComponent('Please log in or create an account to participate in bidding.')}`);
         return;
       }
       const user = me.data;
@@ -53,9 +53,9 @@ export default function BiddingsPage() {
         return;
       }
       // approved supplier — go to project details
-      router.push(`/projects/${projectId}`);
+      router.push(`/supplier/projects?project=${projectId}`);
     } catch (e) {
-      router.push(`/login?next=/projects/${projectId}`);
+      router.push(`/login?next=${encodeURIComponent(`/supplier/projects?project=${projectId}`)}`);
     }
   }
 
@@ -75,8 +75,8 @@ export default function BiddingsPage() {
               <p className="mt-1 text-sm text-slate-500">Register as a supplier to submit proposals, participate in bidding, and access procurement opportunities.</p>
             </div>
             <div className="mt-2 flex gap-3 md:mt-0">
-              <Link href="/register"><a className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Register Supplier</a></Link>
-              <Link href="/login"><a className="rounded-xl border px-4 py-2 text-sm font-semibold text-emerald-600">Login</a></Link>
+              <Link href="/register" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Register Supplier</Link>
+              <Link href="/login" className="rounded-xl border px-4 py-2 text-sm font-semibold text-emerald-600">Login</Link>
             </div>
           </div>
         </div>

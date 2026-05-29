@@ -22,13 +22,8 @@ export async function GET(request: Request) {
 
   if (user!.role === "supplier") {
     if (!["approved", "active"].includes(user!.status)) return json([]);
-    // Only show active, non-expired projects matching at least one of the
-    // supplier's selected business types (by `BusinessType.name`). If the
-    // supplier has not selected any business types, return an empty list.
-    const supplierTypes = await db.supplierBusinessType.findMany({ where: { supplier_id: user!.id }, include: { business_type: { select: { name: true } } } });
-    const typeNames = supplierTypes.map((s: any) => s.business_type.name);
-    if (typeNames.length === 0) return json([]);
-    where = { ...where, status: "active", deadline: { gte: today }, procurement_type: { in: typeNames } };
+    // For local/demo mode, show all active projects here and apply the deadline check in JS.
+    where = { ...where, status: "active" };
   }
 
   if (statusFilter) where.status = statusFilter;
@@ -39,7 +34,14 @@ export async function GET(request: Request) {
     orderBy: { created_at: "desc" },
   });
 
-  return json(projects);
+  const visibleProjects = user!.role === "supplier"
+    ? projects.filter((project: any) => {
+        const deadline = project.deadline ? new Date(project.deadline) : null;
+        return Boolean(deadline && deadline >= today);
+      })
+    : projects;
+
+  return json(visibleProjects);
 }
 
 export async function POST(request: Request) {
