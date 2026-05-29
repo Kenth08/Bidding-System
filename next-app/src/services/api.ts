@@ -2,14 +2,19 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "/api",
-  headers: { "Content-Type": "application/json" },
+  // No default Content-Type; let axios set appropriate headers per request
   withCredentials: true,
   timeout: 30000,
 });
 
+// Request interceptor to ensure proper multipart/form-data handling
 api.interceptors.request.use((config) => {
-  // httpOnly cookies are sent automatically by browser
-  // No need to add Authorization header
+  if (config.data instanceof FormData) {
+    // Let the browser set Content-Type with proper boundary
+    if (config.headers) {
+      delete config.headers["Content-Type"];
+    }
+  }
   return config;
 });
 
@@ -93,9 +98,7 @@ export const suppliersAPI = {
   approveAllUnlock: (id: string) => api.post(`/auth/suppliers/${id}/approve-all-unlock`),
   getMyDocumentWorkflow: () => api.get("/auth/supplier-documents"),
   resubmitDocument: (documentType: string, data: FormData) =>
-    api.post(`/supplier/documents/${encodeURIComponent(documentType)}/reupload`, data, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
+    api.post(`/auth/supplier-documents/${encodeURIComponent(documentType)}`, data),
   submitRevision: () => api.post("/supplier/submit-revision"),
 };
 

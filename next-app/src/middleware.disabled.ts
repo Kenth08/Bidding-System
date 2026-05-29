@@ -121,6 +121,7 @@ export async function middleware(request: NextRequest) {
     );
   }
 }
+*/
 
 // NOTE: This file must not be named middleware.ts if a separate proxy middleware.ts exists.
 // Next.js throws an error when both middleware and proxy are detected under the same root.

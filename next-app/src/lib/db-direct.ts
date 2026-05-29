@@ -865,6 +865,15 @@ export const dbDirect = {
       }
     },
 
+    findFirst: async (params: { where?: Record<string, any>; orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>; take?: number; limit?: number } = {}) => {
+      const rows = await dbDirect.documentUpload.findMany({
+        where: params.where,
+        orderBy: params.orderBy,
+        take: params.take ?? params.limit ?? 1,
+      });
+      return rows[0] || null;
+    },
+
     create: async (params: any) => {
       const data = params.data || params;
       const client = await pool.connect();

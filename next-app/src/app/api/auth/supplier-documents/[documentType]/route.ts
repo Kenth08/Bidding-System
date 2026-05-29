@@ -105,10 +105,13 @@ export async function PATCH(
   const nextFlaggedReasons = { ...workflow.flagged_reasons };
   delete nextFlaggedReasons[normalizedType];
 
+  // If no more flagged reasons, unlock the account
+  const accountLocked = Object.keys(nextFlaggedReasons).length > 0;
+
   await updateSupplierWorkflow(user!.id, {
-    accountLocked: true,
-    notifSent: workflow.notif_sent,
     flaggedReasons: nextFlaggedReasons,
+    accountLocked,
+    notifSent: false,
   });
 
   await notifyAdmins(
@@ -134,8 +137,8 @@ export async function PATCH(
     filePath,
     fileUrl,
     state: "pending_review",
-    accountLocked: true,
-    notifSent: workflow.notif_sent,
+    accountLocked,
+    notifSent: false,
     requiresSubmit: true,
   });
 }

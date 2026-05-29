@@ -10,6 +10,7 @@ interface SupplierDocWorkflowItem {
   id: string;
   name: string;
   required: boolean;
+  declarationOnly?: boolean;
   uploaded: boolean;
   file: string | null;
   state: "missing" | "uploaded" | "flagged" | "revised" | "approved";
@@ -21,9 +22,7 @@ export default function SupplierDocumentReuploadPage() {
   const [documents, setDocuments] = useState<SupplierDocWorkflowItem[]>([]);
   const [accountLocked, setAccountLocked] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
-  const [isResubmitting, setIsResubmitting] = useState<Record<string, boolean>>({});
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
-  const [canSubmitRevision, setCanSubmitRevision] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -32,7 +31,6 @@ export default function SupplierDocumentReuploadPage() {
       const response = await suppliersAPI.getMyDocumentWorkflow();
       setDocuments(Array.isArray(response.data?.documents) ? response.data.documents : []);
       setAccountLocked(Boolean(response.data?.accountLocked));
-      setCanSubmitRevision(Boolean(response.data?.canSubmitRevision));
     } catch {
       setDocuments([]);
       setAccountLocked(false);
@@ -43,39 +41,31 @@ export default function SupplierDocumentReuploadPage() {
     loadDocumentWorkflow().finally(() => setLoading(false));
   }, []);
 
-  async function handleResubmit(documentId: string) {
-    const file = selectedFiles[documentId];
-    if (!file) {
-      setToast({ message: "Please choose a file before resubmitting."
-        , type: "error" });
-      return;
-    }
-
-    setIsResubmitting((prev) => ({ ...prev, [documentId]: true }));
-    try {
-      const payload = new FormData();
-      payload.append("file", file);
-      const res = await suppliersAPI.resubmitDocument(documentId, payload);
-      setToast({ message: "Document re-uploaded. Continue until all flagged required documents are corrected, then submit revision.", type: "success" });
-      if (res?.data?.forceLogout) {
-        try {
-          await fetch("/api/auth/logout", { method: "POST" });
-        } catch {}
-        window.location.href = "/login?error=submitted_review";
-        return;
-      }
-      setSelectedFiles((prev) => ({ ...prev, [documentId]: null }));
-      await loadDocumentWorkflow();
-    } catch (error: any) {
-      setToast({ message: error?.response?.data?.error || "Failed to resubmit document.", type: "error" });
-    } finally {
-      setIsResubmitting((prev) => ({ ...prev, [documentId]: false }));
-    }
-  }
-
   async function handleSubmitRevision() {
     setIsSubmittingRevision(true);
     try {
+      const flagged = documents.filter((doc) => doc.state === "flagged");
+      const missing = flagged.filter((doc) => !doc.declarationOnly && !selectedFiles[doc.id]);
+      if (missing.length > 0) {
+        setToast({ message: "Please choose a file for every flagged document before submitting.", type: "error" });
+        return;
+      }
+
+      for (const doc of flagged) {
+        const file = selectedFiles[doc.id];
+        const payload = new FormData();
+        if (file) payload.append("file", file);
+        console.log('Resubmitting document', doc.id, file?.name, file?.size);
+        const res = await suppliersAPI.resubmitDocument(doc.id, payload);
+        if (res?.data?.forceLogout) {
+          try {
+            await fetch("/api/auth/logout", { method: "POST" });
+          } catch {}
+          window.location.href = "/login?error=submitted_review";
+          return;
+        }
+      }
+
       const res = await suppliersAPI.submitRevision();
       setToast({ message: res?.data?.message || "Revision submitted.", type: "success" });
       if (res?.data?.forceLogout) {
@@ -100,6 +90,7 @@ export default function SupplierDocumentReuploadPage() {
   const flaggedDocs = documents.filter((doc) => doc.state === "flagged");
   const pendingReviewDocs = documents.filter((doc) => doc.state === "revised");
   const approvedDocs = documents.filter((doc) => doc.state === "approved");
+  const readyToSubmit = flaggedDocs.every((doc) => doc.declarationOnly || Boolean(selectedFiles[doc.id]));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -153,15 +144,6 @@ export default function SupplierDocumentReuploadPage() {
                       }}
                     />
                   </label>
-                  <LoadingButton
-                    type="button"
-                    isLoading={Boolean(isResubmitting[doc.id])}
-                    disabled={!selectedFiles[doc.id] || Boolean(isResubmitting[doc.id])}
-                    onClick={() => handleResubmit(doc.id)}
-                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Resubmit
-                  </LoadingButton>
                 </div>
               </div>
             ))}
@@ -172,15 +154,15 @@ export default function SupplierDocumentReuploadPage() {
           <LoadingButton
             type="button"
             isLoading={isSubmittingRevision}
-            disabled={!canSubmitRevision || isSubmittingRevision}
+            disabled={!readyToSubmit || isSubmittingRevision}
             onClick={handleSubmitRevision}
             className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Submit corrected documents
+            Submit all corrected documents
           </LoadingButton>
-          {!canSubmitRevision ? (
+          {!readyToSubmit ? (
             <p className="mt-2 text-xs text-slate-500">
-              Submit becomes available after all flagged required documents are re-uploaded.
+              Choose a file for every flagged document, then submit once to upload them all for review.
             </p>
           ) : null}
         </div>
