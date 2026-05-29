@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { dbDirect } from "@/lib/db-direct";
+import { db } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 
 export async function GET(request: Request) {
   try {
     // Check if admin exists
-    const admin = await dbDirect.user.findUnique({ email: "admin@gmail.com" });
+    const admin = await db.user.findUnique({ where: { email: "admin@gmail.com" } });
     const url = new URL(request.url);
     const reset = url.searchParams.get('reset') === 'true';
 
@@ -20,11 +20,11 @@ export async function GET(request: Request) {
     // Create or reset admin
     const password_hash = await bcrypt.hash("admin123", 12);
     if (admin && reset) {
-      const updated = await dbDirect.user.update({ where: { id: admin.id }, data: { password_hash } });
+      const updated = await db.user.update({ where: { id: admin.id }, data: { password_hash } });
       return NextResponse.json({ message: "Admin password reset", admin: { email: updated.email, role: updated.role } });
     }
 
-    const newAdmin = await dbDirect.user.create({
+    const newAdmin = await db.user.create({
       id: uuid(),
       full_name: "System Administrator",
       email: "admin@gmail.com",

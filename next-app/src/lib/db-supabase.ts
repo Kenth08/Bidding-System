@@ -456,30 +456,71 @@ async function buildUserCount(userId: string, select?: Record<string, boolean>) 
 export const db = {
   user: {
     findUnique: async (params: { email?: string; id?: string; where?: { email?: string; id?: string } }) => {
-      return dbDirect.user.findUnique(params);
+      const filter = params.where ?? params;
+      if (filter.email) {
+        const { data, error } = await supabaseServer.from(USERS_TABLE).select('*').eq('email', filter.email).maybeSingle();
+        if (error) throw error;
+        return data;
+      }
+      if (filter.id) {
+        const { data, error } = await supabaseServer.from(USERS_TABLE).select('*').eq('id', filter.id).maybeSingle();
+        if (error) throw error;
+        return data;
+      }
+      return null;
     },
 
     findFirst: async (params: any = {}) => {
-      return dbDirect.user.findFirst(params);
+      const { data, error } = await supabaseServer.from(USERS_TABLE).select('*');
+      if (error) throw error;
+      const rows = Array.isArray(data) ? data : [];
+      const row = rows.find((item) => matchesWhere(item, params.where ?? params)) || null;
+      if (!row) return null;
+      return params.select ? pickUser(row, params.select) : row;
     },
 
     findMany: async (params: any = {}) => {
-      return dbDirect.user.findMany(params);
+      const { data, error } = await supabaseServer.from(USERS_TABLE).select('*');
+      if (error) throw error;
+      const rows = Array.isArray(data) ? data : [];
+      const filtered = rows.filter((item) => matchesWhere(item, params.where ?? params));
+      const sorted = sortRows(filtered, params.orderBy);
+      const limited = applyTake(sorted, params);
+      if (!params.select) return limited;
+      return limited.map((row) => pickUser(row, params.select));
     },
 
     create: async (params: any) => {
-      return dbDirect.user.create(params);
+      const data = params.data || params;
+      const { data: created, error } = await supabaseServer.from(USERS_TABLE).insert(data).select().maybeSingle();
+      if (error) throw error;
+      return created;
     },
 
     update: async (whereOrParams: any, dataArg?: any) => {
-      return dbDirect.user.update(whereOrParams, dataArg);
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error('Update requires an id-based where clause.');
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return await (supabaseServer.from(USERS_TABLE).select('*').eq('id', id).maybeSingle() as any);
+      }
+      const { data: updated, error } = await supabaseServer.from(USERS_TABLE).update(updateData).eq('id', id).select().maybeSingle();
+      if (error) throw error;
+      return updated;
     },
 
-    delete: async (whereOrParams: any) => {
-      return dbDirect.user.delete(whereOrParams);
+    delete: async (whereOrParams: { id?: string; where?: { id?: string } }) => {
+      const id = whereOrParams.id ?? whereOrParams.where?.id;
+      if (!id) throw new Error('Delete requires an id-based where clause.');
+      const { data, error } = await supabaseServer.from(USERS_TABLE).delete().eq('id', id).select().maybeSingle();
+      if (error) throw error;
+      return data;
     },
     count: async (params: any = {}) => {
-      return dbDirect.user.count(params);
+      const { data, error } = await supabaseServer.from(USERS_TABLE).select('*');
+      if (error) throw error;
+      const rows = Array.isArray(data) ? data : [];
+      return rows.filter((item) => matchesWhere(item, params.where ?? params)).length;
     },
   },
 
@@ -917,30 +958,106 @@ export const db = {
 
   notification: {
     findUnique: async (params: any) => {
+      const filter = params?.where ?? params;
+      if (filter?.id) {
+        const { data, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).select("*").eq("id", filter.id).single();
+        if (error) throw error;
+        return hydrateNotification(data);
+      }
       return dbDirect.notification.findUnique(params);
     },
 
-    findFirst: async (params: any) => {
+    findFirst: async (params: any = {}) => {
+      const filter = params.where ?? params;
+      if (filter?.id || filter?.recipient_id || filter?.is_read !== undefined) {
+        let query: any = supabaseServer.from(NOTIFICATIONS_TABLE).select("*");
+        if (filter.id) query = query.eq("id", filter.id);
+        if (filter.recipient_id) query = query.eq("recipient_id", filter.recipient_id);
+        if (filter.is_read !== undefined) query = query.eq("is_read", filter.is_read);
+        if (params.orderBy?.created_at) query = query.order("created_at", { ascending: params.orderBy.created_at === "asc" });
+        if (params.take ?? params.limit) query = query.limit(params.take ?? params.limit);
+        const { data, error } = await query.maybeSingle();
+        if (error) throw error;
+        return hydrateNotification(data);
+      }
       return dbDirect.notification.findFirst(params);
     },
 
     findMany: async (params: any = {}) => {
+      const filter = params.where ?? params;
+      if (filter?.id || filter?.recipient_id || filter?.is_read !== undefined) {
+        let query: any = supabaseServer.from(NOTIFICATIONS_TABLE).select("*");
+        if (filter.id) query = query.eq("id", filter.id);
+        if (filter.recipient_id) query = query.eq("recipient_id", filter.recipient_id);
+        if (filter.is_read !== undefined) query = query.eq("is_read", filter.is_read);
+        if (params.orderBy?.created_at) query = query.order("created_at", { ascending: params.orderBy.created_at === "asc" });
+        if (params.take ?? params.limit) query = query.limit(params.take ?? params.limit);
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []).map(hydrateNotification);
+      }
       return dbDirect.notification.findMany(params);
     },
 
     count: async (params: any = {}) => {
+      const filter = params.where ?? params;
+      if (filter?.id || filter?.recipient_id || filter?.is_read !== undefined) {
+        let query: any = supabaseServer.from(NOTIFICATIONS_TABLE).select("id", { count: "exact", head: false });
+        if (filter.id) query = query.eq("id", filter.id);
+        if (filter.recipient_id) query = query.eq("recipient_id", filter.recipient_id);
+        if (filter.is_read !== undefined) query = query.eq("is_read", filter.is_read);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
       return dbDirect.notification.count(params);
     },
 
     create: async (params: any) => {
-      return dbDirect.notification.create(params);
+      const data = params.data || params;
+      const payload = {
+        id: data.id || uuid(),
+        recipient_id: data.recipient_id,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        is_read: data.is_read ?? false,
+        link: data.link ?? null,
+        related_id: data.related_id ?? null,
+        resource_type: data.resource_type ?? null,
+        resource_id: data.resource_id ?? null,
+        created_at: new Date().toISOString(),
+      };
+      const { data: result, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      return hydrateNotification(result);
     },
 
     update: async (whereOrParams: any, dataArg?: any) => {
-      return dbDirect.notification.update(whereOrParams, dataArg);
+      const { id, data } = normalizeUpdateArgs(whereOrParams, dataArg);
+      if (!id) throw new Error("Update requires an id-based where clause.");
+      const updateData = isPlainObject(data) ? data : {};
+      if (!Object.keys(updateData).length) {
+        return dbDirect.notification.findUnique({ where: { id } });
+      }
+      const { data: result, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() }).eq("id", id).select().single();
+      if (error) throw error;
+      return hydrateNotification(result);
     },
 
     updateMany: async (params: any) => {
+      const filter = params.where ?? params;
+      const updateData = isPlainObject(params.data) ? params.data : {};
+      if (!Object.keys(updateData).length) return { count: 0 };
+      if (filter?.recipient_id || filter?.is_read !== undefined || filter?.id) {
+        let query: any = supabaseServer.from(NOTIFICATIONS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() });
+        if (filter.id) query = query.eq("id", filter.id);
+        if (filter.recipient_id) query = query.eq("recipient_id", filter.recipient_id);
+        if (filter.is_read !== undefined) query = query.eq("is_read", filter.is_read);
+        const { data, error } = await query.select("id");
+        if (error) throw error;
+        return { count: Array.isArray(data) ? data.length : 0 };
+      }
       return dbDirect.notification.updateMany(params);
     },
   },

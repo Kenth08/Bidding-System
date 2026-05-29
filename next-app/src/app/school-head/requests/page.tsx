@@ -87,13 +87,48 @@ export default function SchoolHeadRequests() {
         </table>
       </div>
 
-      <Modal isOpen={!!selected} onClose={() => { setSelected(null); setRemarks(""); setError(""); }} title="Review Request" subtitle={selected?.project_title}>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><span className="text-slate-400">Budget:</span> <span className="font-medium">₱{Number(selected?.budget || 0).toLocaleString()}</span></div>
-            <div><span className="text-slate-400">Status:</span> <StatusBadge status={selected?.status || ""} /></div>
-            <div><span className="text-slate-400">Deadline:</span> <span className="font-medium">{selected?.deadline ? new Date(selected.deadline).toLocaleDateString() : "—"}</span></div>
+      <Modal isOpen={!!selected} onClose={() => { setSelected(null); setRemarks(""); setError(""); }} title="Review Request" subtitle={selected?.project_title} size="lg">
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Budget</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">₱{Number(selected?.budget || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Status</p>
+              <div className="mt-1"><StatusBadge status={selected?.status || ""} /></div>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Procurement Type</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{selected?.procurement_type || "—"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Bidding Deadline</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{selected?.deadline ? new Date(selected.deadline).toLocaleDateString() : "—"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Procurement Schedule</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{selected?.procurement_schedule ? new Date(selected.procurement_schedule).toLocaleDateString() : "—"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Expected Delivery</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{selected?.delivery_period ? new Date(selected.delivery_period).toLocaleDateString() : "—"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Public Result Expiry</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{selected?.public_result_expiry_date ? new Date(selected.public_result_expiry_date).toLocaleDateString() : "—"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Requested By</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{selected?.created_by?.full_name || selected?.created_by?.email || "—"}</p>
+            </div>
           </div>
+          {selected?.technical_specifications && (
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Technical Specifications</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selected.technical_specifications}</p>
+            </div>
+          )}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">Remarks</label>
             <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="Add remarks (required for reject/revision)..." />

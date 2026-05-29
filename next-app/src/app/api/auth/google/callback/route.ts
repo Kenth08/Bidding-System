@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbDirect } from "@/lib/db-direct";
+import { db } from "@/lib/db";
 import { signAccessToken, signRefreshToken } from "@/lib/auth";
 
 const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const email = String(rawEmail).toLowerCase();
 
   // Check if user exists in our DB
-  const existingUser = await dbDirect.user.findUnique({ email });
+  const existingUser = await db.user.findUnique({ where: { email } });
 
   const hasRealAccount = Boolean(
     existingUser && (

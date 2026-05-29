@@ -165,7 +165,7 @@ export default function SupplierVerificationChecklist({
         <div className="divide-y divide-slate-200">
           {documents.map((document) => {
             const canApprove = document.uploaded && document.state !== "approved";
-            const canFlag = document.uploaded && document.state !== "approved";
+            const canFlag = document.state !== "approved";
             const draftReason = flagDrafts[document.id] ?? document.reason ?? "";
 
             return (
@@ -217,7 +217,7 @@ export default function SupplierVerificationChecklist({
                       }}
                       className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Flag
+                      {document.state === "missing" ? "Request Revision" : "Flag for Revision"}
                     </button>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export default function SupplierVerificationChecklist({
                     <input
                       value={draftReason}
                       onChange={(event) => setFlagDrafts((prev) => ({ ...prev, [document.id]: event.target.value }))}
-                      placeholder="Enter a reason before flagging"
+                      placeholder={document.state === "missing" ? "Enter a reason for revision" : "Enter a reason before flagging"}
                       className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300"
                     />
                   </div>

@@ -1,13 +1,23 @@
 import { Pool } from 'pg';
 import { v4 as uuid } from 'uuid';
 
-// Direct PostgreSQL connection (bypass Supabase API issues)
-const databaseUrl = process.env.DATABASE_URL || '';
+const isLocalMode = process.env.LOCAL_MODE === 'true' || process.env.NEXT_PUBLIC_LOCAL_MODE === 'true';
+const defaultLocalDatabaseUrl = 'postgresql://postgres:postgres@localhost:5433/bidding_system';
+const databaseUrl = isLocalMode
+  ? process.env.DATABASE_URL || defaultLocalDatabaseUrl
+  : process.env.DATABASE_URL || '';
+
+if (!databaseUrl) {
+  throw new Error(
+    'DATABASE_URL is not set. Add a local override in .env.local or set DATABASE_URL in your environment. For local development, set LOCAL_MODE=true and use a local Postgres URL.'
+  );
+}
+
 const useSsl = /supabase|aws|cloud/i.test(databaseUrl) && !/localhost|127\.0\.0\.1|\[::1\]/i.test(databaseUrl);
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: useSsl ? { rejectUnauthorized: false } : undefined
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
 const USERS_TABLE = 'public.users';

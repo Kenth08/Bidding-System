@@ -38,17 +38,49 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Recent Projects</h3><p className="text-xs text-slate-400 mt-0.5">Last 5 projects</p></div>
-          <table className="w-full">
-            <thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead>
-            <tbody className="divide-y divide-slate-50">
-              {projects.slice(0, 5).map((p) => (
-                <tr key={p.id} className="odd:bg-slate-50/40 transition-colors hover:bg-emerald-50/40"><td className="px-6 py-3 text-sm text-slate-700">{p.title}</td><td className="px-6 py-3 text-sm text-slate-600">{formatPeso(p.budget)}</td><td className="px-6 py-3 text-sm text-slate-600">{p.deadline ? new Date(p.deadline).toLocaleDateString() : "\u2014"}</td><td className="px-6 py-3"><StatusBadge status={p.status} /></td></tr>
-              ))}
-              {projects.length === 0 && <tr><td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-400">No projects yet</td></tr>}
-            </tbody>
-          </table>
-        </div>
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800">Recent Projects by Status</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Last 10 projects grouped by bidding status</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {[
+              { key: "active", title: "Active Bidding", description: "Open projects currently accepting bids" },
+              { key: "awarded", title: "Awarded", description: "Projects with a selected winner" },
+              { key: "closed", title: "Closed", description: "Projects that have finished bidding" },
+              { key: "draft", title: "Draft", description: "Projects still in draft" },
+            ].map((category) => {
+              const items = projects.filter((p) => p.status === category.key).slice(0, 4);
+              return (
+                <div key={category.key} className="px-6 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{category.title}</p>
+                      <p className="text-xs text-slate-400">{category.description}</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">{items.length}</span>
+                  </div>
+                  {items.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {items.map((p) => (
+                        <button key={p.id} onClick={() => router.push(`/admin/projects/${p.id}`)} className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-white">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 truncate">{p.title}</p>
+                            <p className="mt-1 text-xs text-slate-500 truncate">{formatPeso(p.budget)} · {p.deadline ? new Date(p.deadline).toLocaleDateString() : "No deadline"}</p>
+                          </div>
+                          <StatusBadge status={p.status} className="shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-slate-400">No {category.title.toLowerCase()} projects in the recent list.</p>
+                  )}
+                </div>
+              );
+            })}
+            {projects.length === 0 && (
+              <div className="px-6 py-8 text-center text-sm text-slate-400">No projects yet</div>
+            )}
+          </div>        </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Next Actions</h3>

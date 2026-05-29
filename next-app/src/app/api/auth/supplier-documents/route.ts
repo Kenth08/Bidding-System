@@ -47,7 +47,8 @@ export async function GET(request: Request) {
 
   const documents = SUPPLIER_DOCUMENT_DEFINITIONS.map((definition) => {
     const upload = latestByType.get(definition.id);
-    const uploaded = isDocumentUploaded(user as unknown as Record<string, unknown>, definition);
+    const hasUpload = Boolean(upload?.file);
+    const uploaded = isDocumentUploaded(user as unknown as Record<string, unknown>, definition) || hasUpload;
     const state = mapVerificationStatusToState(upload?.verification_status, uploaded);
     const userFile = normalizeDocumentFile((user as any)[definition.userField]);
     const uploadFile = normalizeDocumentFile(upload?.file);

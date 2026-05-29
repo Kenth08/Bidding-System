@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
-import { dbDirect } from "@/lib/db-direct";
 import { logAudit, notifyAdmins } from "@/lib/actions";
 import { buildVerificationCodePayload, sendVerificationCodeEmail } from "@/lib/email-verification";
 import { writeFile, mkdir } from "fs/promises";
@@ -109,7 +108,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const existing = await dbDirect.user.findUnique({ where: { email } });
+  const existing = await db.user.findUnique({ where: { email } });
 
   const hasRealAccount = Boolean(
     existing && (

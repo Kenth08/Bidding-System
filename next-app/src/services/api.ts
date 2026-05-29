@@ -93,7 +93,6 @@ export const suppliersAPI = {
   getDocumentWorkflow: (id: string) => api.get(`/auth/suppliers/${id}/documents`),
   reviewDocument: (id: string, documentType: string, action: "approve" | "flag", reason?: string) =>
     api.patch(`/auth/suppliers/${id}/documents`, { documentType, action, reason }),
-  getWorkflowDebug: (id: string) => api.get(`/auth/suppliers/${id}/workflow-debug`),
   notifyFlagged: (id: string) => api.post(`/auth/suppliers/${id}/notify-flagged`),
   approveAllUnlock: (id: string) => api.post(`/auth/suppliers/${id}/approve-all-unlock`),
   getMyDocumentWorkflow: () => api.get("/auth/supplier-documents"),

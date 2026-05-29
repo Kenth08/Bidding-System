@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbDirect } from "@/lib/db-direct";
+import { db } from "@/lib/db";
 import { verifyToken, signAccessToken } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const payload = await verifyToken(refreshToken);
   if (!payload?.sub) return NextResponse.json({ error: "Invalid or expired refresh token." }, { status: 401 });
 
-  const user = await dbDirect.user.findUnique({ id: payload.sub });
+  const user = await db.user.findUnique({ where: { id: payload.sub } });
   if (!user) return NextResponse.json({ error: "User not found." }, { status: 401 });
 
   const access = await signAccessToken({

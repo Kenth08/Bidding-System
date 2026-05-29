@@ -265,6 +265,24 @@ function RegisterPageContent() {
       nextFileErrors.representativeAuthorizationDocument = "Please upload your representative authorization document (SPA).";
     }
 
+    // Validate numeric fields
+    if (form.phone && !/^[0-9]+$/.test(String(form.phone).trim())) {
+      nextErrors.phone = "Phone number must contain digits only.";
+    }
+    if (form.tin && !/^[0-9]+$/.test(String(form.tin).trim())) {
+      nextErrors.tin = "TIN must contain digits only.";
+    }
+    if (form.auditedFinancialStatements && !String(form.financialStatementYear).trim()) {
+      nextErrors.financialStatementYear = "Please enter the financial statement year.";
+    }
+    if (String(form.financialStatementYear).trim()) {
+      const year = Number(String(form.financialStatementYear).trim());
+      const currentYear = new Date().getFullYear();
+      if (!/^[0-9]{4}$/.test(String(form.financialStatementYear).trim()) || Number.isNaN(year) || year < 1900 || year > currentYear) {
+        nextErrors.financialStatementYear = `Enter a valid year between 1900 and ${currentYear}.`;
+      }
+    }
+
     // Validate mayor's permit expiry
     if (form.mayorsPmExpiry && new Date(form.mayorsPmExpiry as string) < new Date()) {
       nextErrors.mayorsPmExpiry = "Mayor's Permit has expired. Please upload a valid permit.";
@@ -532,7 +550,7 @@ function RegisterPageContent() {
                 {[
                   { key: "companyName", label: "Company Name", span: true },
                   { key: "companyAddress", label: "Company Address", span: true },
-                  { key: "phone", label: "Phone Number" },
+                  { key: "phone", label: "Phone Number", number: true },
                   {
                     key: "businessType",
                       label: "Business Type",
@@ -540,8 +558,8 @@ function RegisterPageContent() {
                       options: FALLBACK_BUSINESS_TYPES,
                     },
                   { key: "representativeName", label: "Representative Name", span: true },
-                  { key: "tin", label: "TIN (Tax Identification Number)" },
-                ].map(({ key, label, span, select, options }) => (
+                  { key: "tin", label: "TIN (Tax Identification Number)", number: true },
+                ].map(({ key, label, span, select, options, number }) => (
                   <label key={key} className={span ? "md:col-span-2" : ""}>
                     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {label}
@@ -568,6 +586,16 @@ function RegisterPageContent() {
                         </div>
                         {validationErrors.businessTypeIds ? <p className="mt-2 text-xs text-red-600">{validationErrors.businessTypeIds}</p> : null}
                       </div>
+                    ) : number ? (
+                      <>
+                        <StrictNumberInput
+                          value={form[key] as string}
+                          onChange={(value) => updateForm(key, value)}
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors[key] ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
+                          helperText="Numbers only."
+                        />
+                        {validationErrors[key] ? <p className="mt-1 text-xs text-red-600">{validationErrors[key]}</p> : null}
+                      </>
                     ) : (
                       <>
                         <input
@@ -624,7 +652,16 @@ function RegisterPageContent() {
                       {validationErrors.taxClearanceExpiry ? <p className="text-xs text-red-600">{validationErrors.taxClearanceExpiry}</p> : null}
                       <label>
                         <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Financial Statement Year</span>
-                        <StrictNumberInput min="2020" max={new Date().getFullYear()} value={form.financialStatementYear as string} onChange={(value) => updateForm("financialStatementYear", value)} placeholder={`e.g. ${new Date().getFullYear()}`} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" helperText="Numbers only. Enter the year as digits." />
+                        <StrictNumberInput
+                          min="2020"
+                          max={new Date().getFullYear()}
+                          value={form.financialStatementYear as string}
+                          onChange={(value) => updateForm("financialStatementYear", value)}
+                          placeholder={`e.g. ${new Date().getFullYear()}`}
+                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.financialStatementYear ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
+                          helperText="Numbers only. Enter the year as digits."
+                        />
+                        {validationErrors.financialStatementYear ? <p className="mt-1 text-xs text-red-600">{validationErrors.financialStatementYear}</p> : null}
                       </label>
                     </div>
                   </div>

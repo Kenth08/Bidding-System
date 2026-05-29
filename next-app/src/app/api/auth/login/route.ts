@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { dbDirect } from "@/lib/db-direct";
+import { db } from "@/lib/db";
+import { supabaseServer } from "@/lib/supabase-server";
 import { signAccessToken, signRefreshToken } from "@/lib/auth";
 import { logAudit } from "@/lib/actions";
 
@@ -13,9 +14,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter your email and password." }, { status: 400 });
   }
 
-  let user = await dbDirect.user.findUnique({ email });
+  let user = await db.user.findUnique({ where: { email } });
   if (!user && email === "head@gmail.com") {
-    user = await dbDirect.user.findUnique({ email: "schoolhead@gmail.com" });
+    user = await db.user.findUnique({ where: { email: "schoolhead@gmail.com" } });
   }
   if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
@@ -40,18 +41,20 @@ export async function POST(request: Request) {
 
   if (user.role === "supplier") {
     try {
-      const workflow = await dbDirect.query(
-        `SELECT account_locked FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
-        [user.id]
-      );
-      const isLocked = Boolean(workflow.rows[0]?.account_locked);
+      const { data: workflow, error } = await supabaseServer
+        .from("supplier_document_workflows")
+        .select("account_locked")
+        .eq("supplier_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      const isLocked = Boolean(workflow?.account_locked);
       if (isLocked) {
         return NextResponse.json({
           error: "Your account is temporarily locked. Please revise and resubmit flagged documents from your profile.",
         }, { status: 403 });
       }
     } catch {
-      // Local demo mode may not have the workflow table populated yet.
+      // Ignore if the workflow table is not available in this environment.
     }
   }
 

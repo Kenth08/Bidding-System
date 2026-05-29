@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       technical_specifications: body.technical_specifications || "",
       procurement_schedule: body.procurement_schedule || "",
       delivery_period: body.delivery_period || "",
-      status: "Pending Review",
+      status: "Draft",
       created_by_id: user!.id,
     },
   });

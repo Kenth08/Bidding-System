@@ -53,7 +53,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const docs = SUPPLIER_DOCUMENT_DEFINITIONS.map((definition) => {
     const upload = latestByType.get(definition.id);
-    const uploaded = isDocumentUploaded(supplier as unknown as Record<string, unknown>, definition);
+    const hasUpload = Boolean(upload?.file);
+    const uploaded = isDocumentUploaded(supplier as unknown as Record<string, unknown>, definition) || hasUpload;
     const state = mapVerificationStatusToState(upload?.verification_status, uploaded);
     const userFile = normalizeDocumentFile((supplier as any)[definition.userField]);
     const uploadFile = normalizeDocumentFile(upload?.file);

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { suppliersAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
@@ -22,11 +22,6 @@ export default function AdminSuppliers() {
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isWorkflowBusy, setIsWorkflowBusy] = useState(false);
   const [workflow, setWorkflow] = useState<{ documents: any[]; accountLocked: boolean; notifSent: boolean; activityLog: any[] } | null>(null);
-  const [isDebugLoading, setIsDebugLoading] = useState(false);
-  const [isDebugOpen, setIsDebugOpen] = useState(false);
-  const [debugPayload, setDebugPayload] = useState<any>(null);
-  const [debugFetchedAt, setDebugFetchedAt] = useState<string | null>(null);
-  const debugFetchInFlightRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
@@ -53,41 +48,6 @@ export default function AdminSuppliers() {
       setWorkflow({ documents: [], accountLocked: false, notifSent: false, activityLog: [] });
     }
   }
-
-  async function fetchWorkflowDebugData(supplierId: string) {
-    if (debugFetchInFlightRef.current) return false;
-    debugFetchInFlightRef.current = true;
-    setIsDebugLoading(true);
-    try {
-      const response = await suppliersAPI.getWorkflowDebug(supplierId);
-      setDebugPayload(response.data ?? null);
-      setDebugFetchedAt(new Date().toISOString());
-      return true;
-    } catch (error: any) {
-      const message = error?.response?.data?.error || "Failed to load debug payload.";
-      setDebugPayload({ error: message });
-      setDebugFetchedAt(new Date().toISOString());
-      setToast({ message, type: "error" });
-      return false;
-    } finally {
-      setIsDebugLoading(false);
-      debugFetchInFlightRef.current = false;
-    }
-  }
-
-  async function openWorkflowDebug() {
-    if (!viewing?.id) return;
-    await fetchWorkflowDebugData(viewing.id);
-    setIsDebugOpen(true);
-  }
-
-  useEffect(() => {
-    if (!isDebugOpen || !viewing?.id) return;
-    const timer = setInterval(() => {
-      fetchWorkflowDebugData(viewing.id);
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [isDebugOpen, viewing?.id]);
 
   const filtered = useMemo(() => suppliers.filter((s) => {
     const statusMatch = filter === "All" || s.status === filter;
@@ -175,24 +135,97 @@ export default function AdminSuppliers() {
 
       <Modal isOpen={Boolean(viewing)} onClose={() => setViewing(null)} title="Supplier Details" size="lg">
         {viewing && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: "Full Name", value: viewing.full_name },
-                { label: "Phone", value: viewing.phone || "\u2014" },
-                { label: "Company Name", value: viewing.company_name || "\u2014" },
-                { label: "Company Address", value: viewing.company_address || "\u2014" },
-                { label: "Business Type", value: viewing.business_type || "\u2014" },
-                { label: "Status", value: viewing.status },
-                { label: "Qualification Status", value: viewing.verification_status || "pending" },
-                { label: "Email Verified", value: viewing.email_verified ? "Verified" : "Not Verified" },
-                { label: "Registered", value: viewing.created_at ? new Date(viewing.created_at).toLocaleDateString() : "\u2014" },
-                { label: "Email Verified At", value: viewing.email_verified_at ? new Date(viewing.email_verified_at).toLocaleDateString() : "\u2014" },
-                { label: "Verified At", value: viewing.verified_at ? new Date(viewing.verified_at).toLocaleDateString() : "\u2014" },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
-              ))}
+          <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
+            {/* Basic Information */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Basic Information</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Full Name", value: viewing.full_name },
+                  { label: "Email", value: viewing.email },
+                  { label: "Phone", value: viewing.phone || "\u2014" },
+                  { label: "Company Name", value: viewing.company_name || "\u2014" },
+                  { label: "Company Address", value: viewing.company_address || "\u2014" },
+                  { label: "Business Type", value: viewing.business_type || "\u2014" },
+                  { label: "TIN", value: viewing.tin || "\u2014" },
+                  { label: "Representative", value: viewing.representative_name || "\u2014" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
+                ))}
+              </div>
             </div>
+
+            {/* Company Profile */}
+            {viewing.company_profile && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Company Profile</p>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewing.company_profile}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Track Record */}
+            {viewing.track_record_description && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Track Record</p>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewing.track_record_description}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Status & Dates */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Account Status</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Status", value: viewing.status },
+                  { label: "Qualification Status", value: viewing.verification_status || "pending" },
+                  { label: "Email Verified", value: viewing.email_verified ? "Verified" : "Not Verified" },
+                  { label: "Registered", value: viewing.created_at ? new Date(viewing.created_at).toLocaleDateString() : "\u2014" },
+                  { label: "Blacklisting Declaration", value: viewing.not_blacklisted_declaration ? "Confirmed" : "Not Confirmed" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
+                ))}
+              </div>
+            </div>
+
+            {/* Uploaded Documents */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Uploaded Documents</p>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { label: "SEC / DTI Certificate", path: viewing.sec_dti_certificate },
+                  { label: "Mayor's Permit / Business Permit", path: viewing.mayors_permit, expiry: viewing.mayors_permit_expiry },
+                  { label: "PhilGEPS Registration", path: viewing.philgeps_registration },
+                  { label: "Valid ID", path: viewing.valid_id },
+                  { label: "Tax Clearance", path: viewing.tax_clearance, expiry: viewing.tax_clearance_expiry },
+                  { label: "Audited Financial Statements", path: viewing.audited_financial_statements },
+                  { label: "Bank Reference Document", path: viewing.bank_reference_document },
+                  { label: "Performance Certificates", path: viewing.performance_certificates },
+                  { label: "Past Contracts Document", path: viewing.past_contracts_document },
+                  { label: "Representative Authorization", path: viewing.representative_authorization_document },
+                  { label: "Blacklisting Declaration Document", path: viewing.blacklisting_declaration_document },
+                  { label: "BIR Form 2303", path: viewing.bir_form_2303 },
+                  { label: "ISO Certificate", path: viewing.iso_certificate },
+                  { label: "Supporting Documents", path: viewing.supporting_documents },
+                ].filter(d => d.path).map(({ label, path, expiry }) => (
+                  <div key={label} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{label}</p>
+                      {expiry && <p className="text-xs text-slate-400">Expires: {new Date(expiry).toLocaleDateString()}</p>}
+                    </div>
+                    <a href={path} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100 transition-colors">View File</a>
+                  </div>
+                ))}
+                {![viewing.sec_dti_certificate, viewing.mayors_permit, viewing.philgeps_registration, viewing.valid_id, viewing.tax_clearance, viewing.audited_financial_statements, viewing.bank_reference_document].some(Boolean) && (
+                  <p className="text-sm text-slate-400 py-2">No documents uploaded.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Document Verification Workflow */}
             <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Qualification Documents</p>
               <SupplierVerificationChecklist
@@ -257,13 +290,6 @@ export default function AdminSuppliers() {
               />
             </div>
             <div className="flex gap-3 pt-2">
-              <button
-                onClick={openWorkflowDebug}
-                disabled={isDebugLoading || !viewing?.id}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isDebugLoading ? "Loading Debug..." : "Debug Workflow"}
-              </button>
               {viewing.status === "pending" && (
                 <>
                   <button onClick={() => { setViewing(null); setConfirmAction({ id: viewing.id, name: viewing.company_name || viewing.full_name, action: "approved" }); }} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors">Approve Supplier</button>
@@ -279,47 +305,6 @@ export default function AdminSuppliers() {
             </div>
           </div>
         )}
-      </Modal>
-
-      <Modal isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} title="Workflow Debug Payload" size="xl">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">
-              Last fetched: {debugFetchedAt ? new Date(debugFetchedAt).toLocaleString() : "Not yet fetched"}
-            </p>
-            <p className="text-xs text-slate-400">Auto-refresh: every 15s</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!viewing?.id) return;
-                  await fetchWorkflowDebugData(viewing.id);
-                }}
-                disabled={isDebugLoading || !viewing?.id}
-                className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isDebugLoading ? "Refreshing..." : "Refresh"}
-              </button>
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(JSON.stringify(debugPayload ?? {}, null, 2));
-                  setToast({ message: "Debug JSON copied.", type: "success" });
-                } catch {
-                  setToast({ message: "Unable to copy debug JSON.", type: "error" });
-                }
-              }}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              Copy JSON
-            </button>
-            </div>
-          </div>
-          <pre className="max-h-[60vh] overflow-auto rounded-xl bg-slate-900 p-4 text-xs text-slate-100">
-            {JSON.stringify(debugPayload ?? {}, null, 2)}
-          </pre>
-        </div>
       </Modal>
 
       <ConfirmDialog isOpen={Boolean(confirmAction)} onClose={() => setConfirmAction(null)} onConfirm={handleStatusChange} 

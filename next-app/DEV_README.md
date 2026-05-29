@@ -9,16 +9,16 @@ cd next-app
 docker compose up -d
 ```
 
-This starts a Postgres container named `bidding-db` with DB `bidding_system` and user `postgres`/`postgres` bound to port 5432.
+This starts a Postgres container named `bidding-db` with DB `bidding_system` and user `postgres`/`postgres` bound to host port 5433.
 
 2) Verify DB is reachable
 
 ```powershell
 # quick Node check
-node -e "const {Pool}=require('pg');const p=new Pool({connectionString:process.env.DATABASE_URL||'postgresql://postgres:postgres@localhost:5432/bidding_system'});p.connect().then(c=>{console.log('connected');c.release();process.exit(0)}).catch(e=>{console.error(e);process.exit(1)})"
+node -e "const {Pool}=require('pg');const p=new Pool({connectionString:process.env.DATABASE_URL||'postgresql://postgres:postgres@localhost:5433/bidding_system'});p.connect().then(c=>{console.log('connected');c.release();process.exit(0)}).catch(e=>{console.error(e);process.exit(1)})"
 
 # or use psql if installed
-psql "postgresql://postgres:postgres@localhost:5432/bidding_system" -c "SELECT 1;"
+psql "postgresql://postgres:postgres@localhost:5433/bidding_system" -c "SELECT 1;"
 ```
 
 3) Install deps, run migrations and seed
