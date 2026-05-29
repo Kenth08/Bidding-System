@@ -1058,5 +1058,31 @@ export const dbDirect = {
         client.release();
       }
     }
+    ,
+    updateMany: async (params: any) => {
+      const where = params?.where || {};
+      const data = params?.data || params || {};
+      const client = await pool.connect();
+      try {
+        const res = await client.query('SELECT * FROM projects_project');
+        const rows = res.rows.filter((row) => matchesWhere(row, where));
+        if (!rows.length) return { count: 0 };
+
+        const entries = Object.entries(data || {});
+        if (!entries.length) return { count: rows.length };
+
+        // build assignment clause once
+        const assignments = entries.map(([k], i) => `"${k}" = $${i + 2}`).join(', ');
+        const values = entries.map(([, v]) => v);
+
+        for (const row of rows) {
+          await client.query(`UPDATE projects_project SET ${assignments}, updated_at = NOW() WHERE id = $1`, [row.id, ...values]);
+        }
+
+        return { count: rows.length };
+      } finally {
+        client.release();
+      }
+    }
   }
 };
