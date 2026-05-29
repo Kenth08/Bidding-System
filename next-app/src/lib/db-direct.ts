@@ -388,6 +388,15 @@ export const dbDirect = {
         client.release();
       }
     }
+    ,
+    aggregate: async (params: any = {}) => {
+      const rows = await dbDirect.blockchainRecord.findMany({ where: params.where });
+      const sum = rows.reduce((acc, r) => {
+        const value = r?.bid?.bid_amount ?? r?.bid_amount ?? 0;
+        return acc + (Number(value) || 0);
+      }, 0);
+      return { _sum: { bid_amount: sum } };
+    }
   },
 
   notification: {
@@ -1080,6 +1089,39 @@ export const dbDirect = {
         }
 
         return { count: rows.length };
+      } finally {
+        client.release();
+      }
+    }
+    ,
+    groupBy: async (params: any) => {
+      const where = params?.where || {};
+      const by: string[] = params?.by || [];
+      const orderBy = params?.orderBy || undefined;
+      const client = await pool.connect();
+      try {
+        const res = await client.query('SELECT * FROM projects_project');
+        const rows = res.rows.filter((row) => matchesWhere(row, where));
+
+        const groups = new Map<string, any>();
+        for (const row of rows) {
+          const key = JSON.stringify(by.map((field) => row?.[field] ?? null));
+          if (!groups.has(key)) {
+            const group: Record<string, any> = {};
+            for (const field of by) group[field] = row?.[field] ?? null;
+            group._count = { id: 0 };
+            groups.set(key, group);
+          }
+          groups.get(key)._count.id += 1;
+        }
+
+        let result = Array.from(groups.values());
+        if (orderBy && by.length === 1) {
+          const field = Object.keys(orderBy)[0];
+          const dir = (orderBy as any)[field] === 'asc' ? 1 : -1;
+          result = result.sort((a, b) => (a[field] < b[field] ? -dir : a[field] > b[field] ? dir : 0));
+        }
+        return result;
       } finally {
         client.release();
       }
