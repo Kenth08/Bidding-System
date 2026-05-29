@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { procurementAPI } from '@/services/api';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
@@ -25,6 +26,7 @@ const FALLBACK_PROCUREMENT_TYPES = [
 const EMPTY_FORM = { projectTitle: '', budget: '', deadline: '', publicResultExpiryDate: '', procurementType: '', technicalSpecifications: '', procurementSchedule: '', deliveryPeriod: '' };
 
 export default function AdminProcurement() {
+  const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
   const [procurementTypes, setProcurementTypes] = useState<string[]>(FALLBACK_PROCUREMENT_TYPES);
   const [loading, setLoading] = useState(true);
@@ -89,6 +91,10 @@ export default function AdminProcurement() {
     }
   };
 
+  const goToProjects = () => {
+    router.push('/admin/projects');
+  };
+
   const filtered = requests.filter((r: any) => r.project_title?.toLowerCase().includes(search.toLowerCase()));
   if (loading) return <div className="p-6"><SkeletonTable /></div>;
 
@@ -128,7 +134,13 @@ export default function AdminProcurement() {
                         <button onClick={() => openEdit(r)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50">Edit</button>
                       )}
                       {['Draft', 'Revision Required'].includes(r.status) && (
-                        <button onClick={() => submitForReview(r)} disabled={isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">Submit for Approval</button>
+                        <button onClick={() => submitForReview(r)} disabled={isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">Ready for Head Approval</button>
+                      )}
+                      {r.status === 'Pending Review' && (
+                        <button type="button" disabled className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">Waiting for Head Approval</button>
+                      )}
+                      {r.status === 'Approved' && (
+                        <button type="button" onClick={goToProjects} className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700">Go to Publish Project</button>
                       )}
                     </div>
                   </td>

@@ -140,6 +140,36 @@ async function loadBidWithInclude(row: any, include?: Record<string, any>) {
   return result;
 }
 
+async function loadProjectWithInclude(row: any, include?: Record<string, any>) {
+  if (!row || !include) return row;
+
+  const result: Record<string, any> = { ...row };
+
+  if (include.bids) {
+    const bidInclude = include.bids.include;
+    const client = await pool.connect();
+    try {
+      const bidResult = await client.query('SELECT * FROM bids_bid WHERE project_id = $1', [row.id]);
+      const filteredBids = bidResult.rows.filter((bidRow) => matchesWhere(bidRow, include.bids.where ?? include.bids));
+      const sortedBids = sortRows(filteredBids, include.bids.orderBy);
+      const limitedBids = applyTake(sortedBids, include.bids);
+
+      if (bidInclude) {
+        result.bids = [] as any[];
+        for (const bidRow of limitedBids) {
+          result.bids.push(await loadBidWithInclude(bidRow, bidInclude));
+        }
+      } else {
+        result.bids = limitedBids;
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  return result;
+}
+
 function hydrateProcurement(row: any) {
   if (!row) return row;
   return {
@@ -1213,13 +1243,20 @@ export const dbDirect = {
       }
     },
 
-    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number } = {}) => {
+    findMany: async (params: { where?: Record<string, any>; orderBy?: any; take?: number; limit?: number; include?: Record<string, any> } = {}) => {
       const client = await pool.connect();
       try {
         const result = await client.query('SELECT * FROM projects_project');
         let rows = result.rows.filter((row) => matchesWhere(row, params.where ?? params));
         rows = sortRows(rows, params.orderBy);
         rows = applyTake(rows, params);
+        if (params.include) {
+          const mapped = [] as any[];
+          for (const row of rows) {
+            mapped.push(await loadProjectWithInclude(row, params.include));
+          }
+          return mapped;
+        }
         return rows;
       } finally {
         client.release();

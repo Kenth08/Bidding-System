@@ -47,37 +47,68 @@ function hydrateWorkflow(row: any): SupplierWorkflowRow {
   };
 }
 
+function createDefaultWorkflow(supplierId: string): SupplierWorkflowRow {
+  const now = new Date();
+  return {
+    id: supplierId,
+    supplier_id: supplierId,
+    account_locked: false,
+    notif_sent: false,
+    flagged_reasons: {},
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function isMissingWorkflowTableError(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      ("code" in error ? (error as { code?: string }).code === "42P01" : false)
+  );
+}
+
 export async function ensureSupplierWorkflow(supplierId: string): Promise<SupplierWorkflowRow> {
-  const result = await dbDirect.query(
-    `INSERT INTO supplier_document_workflows (id, supplier_id, account_locked, notif_sent, flagged_reasons, created_at, updated_at)
-     VALUES ($1, $2, false, false, '{}'::jsonb, NOW(), NOW())
-     ON CONFLICT (supplier_id) DO NOTHING
-     RETURNING *`,
-    [uuid(), supplierId]
-  );
+  try {
+    const result = await dbDirect.query(
+      `INSERT INTO supplier_document_workflows (id, supplier_id, account_locked, notif_sent, flagged_reasons, created_at, updated_at)
+       VALUES ($1, $2, false, false, '{}'::jsonb, NOW(), NOW())
+       ON CONFLICT (supplier_id) DO NOTHING
+       RETURNING *`,
+      [uuid(), supplierId]
+    );
 
-  if (result.rows[0]) return hydrateWorkflow(result.rows[0]);
+    if (result.rows[0]) return hydrateWorkflow(result.rows[0]);
 
-  const fallback = await dbDirect.query(
-    `SELECT * FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
-    [supplierId]
-  );
+    const fallback = await dbDirect.query(
+      `SELECT * FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
+      [supplierId]
+    );
 
-  if (!fallback.rows[0]) {
-    throw new Error("Failed to initialize supplier workflow record.");
+    if (!fallback.rows[0]) {
+      return createDefaultWorkflow(supplierId);
+    }
+
+    return hydrateWorkflow(fallback.rows[0]);
+  } catch (error) {
+    if (isMissingWorkflowTableError(error)) return createDefaultWorkflow(supplierId);
+    throw error;
   }
-
-  return hydrateWorkflow(fallback.rows[0]);
 }
 
 export async function getSupplierWorkflow(supplierId: string): Promise<SupplierWorkflowRow> {
-  const result = await dbDirect.query(
-    `SELECT * FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
-    [supplierId]
-  );
+  try {
+    const result = await dbDirect.query(
+      `SELECT * FROM supplier_document_workflows WHERE supplier_id = $1 LIMIT 1`,
+      [supplierId]
+    );
 
-  if (!result.rows[0]) return ensureSupplierWorkflow(supplierId);
-  return hydrateWorkflow(result.rows[0]);
+    if (!result.rows[0]) return ensureSupplierWorkflow(supplierId);
+    return hydrateWorkflow(result.rows[0]);
+  } catch (error) {
+    if (isMissingWorkflowTableError(error)) return createDefaultWorkflow(supplierId);
+    throw error;
+  }
 }
 
 export async function updateSupplierWorkflow(
@@ -96,22 +127,27 @@ export async function updateSupplierWorkflow(
     flaggedReasons: update.flaggedReasons ?? current.flagged_reasons,
   };
 
-  const result = await dbDirect.query(
-    `UPDATE supplier_document_workflows
-     SET account_locked = $2,
-         notif_sent = $3,
-         flagged_reasons = $4::jsonb,
-         updated_at = NOW()
-     WHERE supplier_id = $1
-     RETURNING *`,
-    [supplierId, next.accountLocked, next.notifSent, JSON.stringify(next.flaggedReasons)]
-  );
+  try {
+    const result = await dbDirect.query(
+      `UPDATE supplier_document_workflows
+       SET account_locked = $2,
+           notif_sent = $3,
+           flagged_reasons = $4::jsonb,
+           updated_at = NOW()
+       WHERE supplier_id = $1
+       RETURNING *`,
+      [supplierId, next.accountLocked, next.notifSent, JSON.stringify(next.flaggedReasons)]
+    );
 
-  if (!result.rows[0]) {
-    throw new Error("Failed to update supplier workflow.");
+    if (!result.rows[0]) {
+      return createDefaultWorkflow(supplierId);
+    }
+
+    return hydrateWorkflow(result.rows[0]);
+  } catch (error) {
+    if (isMissingWorkflowTableError(error)) return createDefaultWorkflow(supplierId);
+    throw error;
   }
-
-  return hydrateWorkflow(result.rows[0]);
 }
 
 export async function addSupplierWorkflowActivity(params: {
@@ -139,20 +175,25 @@ export async function addSupplierWorkflowActivity(params: {
 }
 
 export async function listSupplierWorkflowActivity(supplierId: string, limit = 30) {
-  const result = await dbDirect.query(
-    `SELECT id, event_type, message, tone, created_at
-     FROM supplier_document_workflow_activity
-     WHERE supplier_id = $1
-     ORDER BY created_at DESC
-     LIMIT $2`,
-    [supplierId, limit]
-  );
+  try {
+    const result = await dbDirect.query(
+      `SELECT id, event_type, message, tone, created_at
+       FROM supplier_document_workflow_activity
+       WHERE supplier_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [supplierId, limit]
+    );
 
-  return result.rows.map((row: any) => ({
-    id: row.id,
-    eventType: row.event_type,
-    message: row.message,
-    tone: row.tone,
-    createdAt: row.created_at,
-  }));
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      eventType: row.event_type,
+      message: row.message,
+      tone: row.tone,
+      createdAt: row.created_at,
+    }));
+  } catch (error) {
+    if (isMissingWorkflowTableError(error)) return [];
+    throw error;
+  }
 }

@@ -18,8 +18,8 @@ const SEED_USERS = [
     business_type: "",
   },
   {
-    email: "schoolhead@gmail.com",
-    password: "schoolhead123",
+    email: "head@gmail.com",
+    password: "head123",
     full_name: "Juan Dela Cruz",
     role: "school_head",
     status: "active",
