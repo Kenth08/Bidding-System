@@ -54,7 +54,6 @@ model User {
   tax_clearance            String?
   valid_id                 String?
   supporting_documents     String?
-  verification_status      String             @default("pending") @db.VarChar(20)
   email_verified           Boolean            @default(false)
   email_verified_at        DateTime?
   email_verification_code_hash String?
@@ -80,6 +79,9 @@ model User {
   projects                 Project[]          @relation("CreatedProjects")
   supplier_business_types  SupplierBusinessType[]
 
+  @@index([role, status])
+  @@index([role, created_at])
+  @@index([verification_status])
   @@map("users")
 }
 
@@ -101,6 +103,7 @@ model Project {
   archived_reason           String?            @db.VarChar(255)
   published_at              DateTime?
   awarded_at                DateTime?
+  open_to_all               Boolean            @default(true)
   created_by_id             String?            @db.Uuid
   created_at                DateTime           @default(now())
   updated_at                DateTime           @updatedAt
@@ -108,7 +111,10 @@ model Project {
   blockchain_records        BlockchainRecord[]
   created_by                User?              @relation("CreatedProjects", fields: [created_by_id], references: [id])
   procurement_request       Procurement?       @relation(fields: [procurement_request_id], references: [id])
+  project_business_types    ProjectBusinessType[]
 
+  @@index([status, deadline])
+  @@index([status, created_at])
   @@map("projects_project")
 }
 
@@ -170,6 +176,8 @@ model Bid {
   blockchain_records   BlockchainRecord[]
 
   @@unique([project_id, supplier_id])
+  @@index([supplier_id, submitted_at])
+  @@index([project_id, status])
   @@map("bids_bid")
 }
 
@@ -199,6 +207,8 @@ model AuditLog {
   created_at    DateTime @default(now())
   user          User?    @relation(fields: [user_id], references: [id])
 
+  @@index([user_id, created_at])
+  @@index([resource_type, resource_id])
   @@map("audit_logs")
 }
 
@@ -217,6 +227,7 @@ model DocumentUpload {
   updated_at          DateTime @updatedAt
   user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@index([user_id, document_type])
   @@map("document_uploads")
 }
 
@@ -234,6 +245,7 @@ model Notification {
   created_at    DateTime @default(now())
   recipient     User     @relation(fields: [recipient_id], references: [id], onDelete: Cascade)
 
+  @@index([recipient_id, is_read, created_at])
   @@map("notifications")
 }
 
@@ -245,6 +257,7 @@ model BusinessType {
   created_at  DateTime                  @default(now())
   updated_at  DateTime                  @updatedAt
   suppliers   SupplierBusinessType[]
+  projects    ProjectBusinessType[]
 
   @@map("business_types")
 }
@@ -259,4 +272,32 @@ model SupplierBusinessType {
 
   @@unique([supplier_id, business_type_id])
   @@map("supplier_business_types")
+}
+
+model ProjectBusinessType {
+  project_id       String           @db.Uuid
+  business_type_id String           @db.Uuid
+  created_at       DateTime         @default(now())
+
+  project          Project          @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  business_type    BusinessType     @relation(fields: [business_type_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, business_type_id])
+  @@map("project_business_types")
+}
+
+model BidActivityLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  project_id  String   @db.Uuid
+  bid_id      String?  @db.Uuid
+  supplier_id String?  @db.Uuid
+  user_id     String?  @db.Uuid
+  role        String   @default("system") @db.VarChar(30)
+  action      String   @db.VarChar(100)
+  description String   @default("")
+  created_at  DateTime @default(now())
+
+  @@index([project_id])
+  @@index([supplier_id])
+  @@map("bid_activity_logs")
 }

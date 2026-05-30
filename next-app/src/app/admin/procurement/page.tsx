@@ -37,10 +37,24 @@ export default function AdminProcurement() {
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [detailsRequest, setDetailsRequest] = useState<any>(null);
+  const [publishedProcurementIds, setPublishedProcurementIds] = useState<Set<string>>(new Set());
 
   const fetchRequests = () => {
     setLoading(true);
-    procurementAPI.getAll().then((res) => { setRequests(Array.isArray(res.data) ? res.data : res.data.results || []); setLoading(false); }).catch(() => setLoading(false));
+    Promise.all([
+      procurementAPI.getAll(),
+      fetch('/api/projects').then((r) => r.ok ? r.json() : []),
+    ]).then(([res, projects]) => {
+      setRequests(Array.isArray(res.data) ? res.data : res.data.results || []);
+      const projectList = Array.isArray(projects) ? projects : projects.results || [];
+      const published = new Set<string>(
+        projectList
+          .filter((p: any) => ['active', 'awarded'].includes(p.status) && p.procurement_request_id)
+          .map((p: any) => p.procurement_request_id)
+      );
+      setPublishedProcurementIds(published);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   };
 
   useEffect(() => { 
@@ -141,8 +155,11 @@ export default function AdminProcurement() {
                       {r.status === 'Pending Review' && (
                         <button type="button" disabled className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">Waiting for Head Approval</button>
                       )}
-                      {r.status === 'Approved' && (
+                      {r.status === 'Approved' && !publishedProcurementIds.has(r.id) && (
                         <button type="button" onClick={goToProjects} className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700">Go to Publish Project</button>
+                      )}
+                      {r.status === 'Approved' && publishedProcurementIds.has(r.id) && (
+                        <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">Published</span>
                       )}
                     </div>
                   </td>

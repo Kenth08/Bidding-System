@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expiringDocs, setExpiringDocs] = useState<any[]>([]);
+  const [projectFilter, setProjectFilter] = useState("All");
 
   useEffect(() => {
     Promise.all([
@@ -39,48 +40,30 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-800">Recent Projects by Status</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Last 10 projects grouped by bidding status</p>
+            <h3 className="text-sm font-semibold text-slate-800">Recent Projects</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Last 10 projects by status</p>
           </div>
-          <div className="divide-y divide-slate-100">
-            {[
-              { key: "active", title: "Active Bidding", description: "Open projects currently accepting bids" },
-              { key: "awarded", title: "Awarded", description: "Projects with a selected winner" },
-              { key: "closed", title: "Closed", description: "Projects that have finished bidding" },
-              { key: "draft", title: "Draft", description: "Projects still in draft" },
-            ].map((category) => {
-              const items = projects.filter((p) => p.status === category.key).slice(0, 4);
-              return (
-                <div key={category.key} className="px-6 py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{category.title}</p>
-                      <p className="text-xs text-slate-400">{category.description}</p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">{items.length}</span>
+          <div className="px-6 py-3 border-b border-slate-100 flex gap-1 flex-wrap">
+            {["All", "Draft", "Active", "Closed", "Awarded"].map((tab) => (
+              <button key={tab} onClick={() => setProjectFilter(tab)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${projectFilter === tab ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{tab}</button>
+            ))}
+          </div>
+          <div className="px-6 py-4 space-y-3 max-h-[400px] overflow-y-auto">
+            {(() => {
+              const filtered = projectFilter === "All" ? projects.slice(0, 10) : projects.filter((p) => p.status === projectFilter.toLowerCase()).slice(0, 10);
+              if (!filtered.length) return <p className="text-sm text-slate-400 py-4 text-center">No {projectFilter.toLowerCase()} projects found.</p>;
+              return filtered.map((p) => (
+                <button key={p.id} onClick={() => router.push(`/admin/projects`)} className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-white">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{p.title}</p>
+                    <p className="mt-1 text-xs text-slate-500 truncate">{formatPeso(p.budget)} · {p.deadline ? new Date(p.deadline).toLocaleDateString() : "No deadline"}</p>
                   </div>
-                  {items.length > 0 ? (
-                    <div className="mt-4 space-y-3">
-                      {items.map((p) => (
-                        <button key={p.id} onClick={() => router.push(`/admin/projects/${p.id}`)} className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-white">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate">{p.title}</p>
-                            <p className="mt-1 text-xs text-slate-500 truncate">{formatPeso(p.budget)} · {p.deadline ? new Date(p.deadline).toLocaleDateString() : "No deadline"}</p>
-                          </div>
-                          <StatusBadge status={p.status} className="shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-slate-400">No {category.title.toLowerCase()} projects in the recent list.</p>
-                  )}
-                </div>
-              );
-            })}
-            {projects.length === 0 && (
-              <div className="px-6 py-8 text-center text-sm text-slate-400">No projects yet</div>
-            )}
-          </div>        </div>
+                  <StatusBadge status={p.status} className="shrink-0" />
+                </button>
+              ));
+            })()}
+          </div>
+        </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Next Actions</h3>

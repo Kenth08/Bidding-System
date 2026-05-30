@@ -8,6 +8,7 @@ import SearchBar from "@/components/shared/SearchBar";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Toast from "@/components/shared/Toast";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import ViewFileButton from "@/components/shared/ViewFileButton";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 const TABS = ["All", "pending", "approved", "rejected"];
@@ -18,36 +19,15 @@ export default function AdminSuppliers() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<any>(null);
+  const [documentWorkflow, setDocumentWorkflow] = useState<any | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [detailBusy, setDetailBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" | "verify" | "reject_verification" } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
-  const [isWorkflowBusy, setIsWorkflowBusy] = useState(false);
-  const [workflow, setWorkflow] = useState<{ documents: any[]; accountLocked: boolean; notifSent: boolean; activityLog: any[] } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
   useEffect(() => { fetchData(); }, []);
-
-  useEffect(() => {
-    if (!viewing?.id) {
-      setWorkflow(null);
-      return;
-    }
-    fetchWorkflow(viewing.id);
-  }, [viewing]);
-
-  async function fetchWorkflow(supplierId: string) {
-    try {
-      const response = await suppliersAPI.getDocumentWorkflow(supplierId);
-      setWorkflow({
-        documents: response.data?.documents || [],
-        accountLocked: Boolean(response.data?.accountLocked),
-        notifSent: Boolean(response.data?.notifSent),
-        activityLog: Array.isArray(response.data?.activityLog) ? response.data.activityLog : [],
-      });
-    } catch {
-      setWorkflow({ documents: [], accountLocked: false, notifSent: false, activityLog: [] });
-    }
-  }
 
   const filtered = useMemo(() => suppliers.filter((s) => {
     const statusMatch = filter === "All" || s.status === filter;
@@ -70,8 +50,94 @@ export default function AdminSuppliers() {
         setToast({ message: `Supplier ${confirmAction.action}`, type: "success" });
       }
       fetchData();
-    } catch { setToast({ message: "Failed to update status", type: "error" }); }
-    finally { setIsConfirmLoading(false); setConfirmAction(null); }
+      if (viewing && confirmAction.id === viewing.id) {
+        setViewing(null);
+        setDocumentWorkflow(null);
+      }
+    } catch {
+      setToast({ message: "Failed to update status", type: "error" });
+    } finally {
+      setIsConfirmLoading(false);
+      setConfirmAction(null);
+    }
+  }
+
+  async function loadDocumentWorkflow(supplierId: string) {
+    setWorkflowLoading(true);
+    try {
+      const res = await suppliersAPI.getDocumentWorkflow(supplierId);
+      setDocumentWorkflow(res.data);
+    } catch {
+      setDocumentWorkflow(null);
+      setToast({ message: "Failed to load supplier documents.", type: "error" });
+    } finally {
+      setWorkflowLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!viewing) {
+      setDocumentWorkflow(null);
+      return;
+    }
+    loadDocumentWorkflow(viewing.id);
+  }, [viewing]);
+
+  async function handleApproveDocument(documentId: string) {
+    if (!viewing) return;
+    setDetailBusy(true);
+    try {
+      await suppliersAPI.reviewDocument(viewing.id, documentId, "approve");
+      setToast({ message: "Document approved.", type: "success" });
+      await loadDocumentWorkflow(viewing.id);
+    } catch {
+      setToast({ message: "Failed to approve document.", type: "error" });
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  async function handleFlagDocument(documentId: string, reason: string) {
+    if (!viewing) return;
+    setDetailBusy(true);
+    try {
+      await suppliersAPI.reviewDocument(viewing.id, documentId, "flag", reason);
+      setToast({ message: "Document flagged for revision.", type: "success" });
+      await loadDocumentWorkflow(viewing.id);
+    } catch {
+      setToast({ message: "Failed to flag document.", type: "error" });
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  async function handleNotifySupplier() {
+    if (!viewing) return;
+    setDetailBusy(true);
+    try {
+      await suppliersAPI.notifyFlagged(viewing.id);
+      setToast({ message: "Supplier notified of flagged documents.", type: "success" });
+      await loadDocumentWorkflow(viewing.id);
+    } catch {
+      setToast({ message: "Failed to notify supplier.", type: "error" });
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  async function handleApproveAllUnlock() {
+    if (!viewing) return;
+    setDetailBusy(true);
+    try {
+      await suppliersAPI.approveAllUnlock(viewing.id);
+      setToast({ message: "All required documents approved and supplier unlocked.", type: "success" });
+      await loadDocumentWorkflow(viewing.id);
+      fetchData();
+    } catch {
+      setToast({ message: "Failed to unlock supplier.", type: "error" });
+    } finally {
+      setDetailBusy(false);
+    }
   }
 
   if (loading) return <SkeletonTable />;
@@ -104,7 +170,7 @@ export default function AdminSuppliers() {
                 <tr key={s.id} className="hover:bg-slate-50/50">
                   <td className="px-6 py-4"><p className="text-sm font-medium text-slate-800">{s.company_name || "\u2014"}</p></td>
                   <td className="px-6 py-4 text-sm text-slate-600">{s.full_name}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{s.business_type || "\u2014"}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{s.supplier_business_types?.length ? s.supplier_business_types.map((sbt: any) => sbt.business_type?.name).join(", ") : s.business_type || "\u2014"}</td>
                   <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${s.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : s.verification_status === "verification_rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
@@ -133,7 +199,7 @@ export default function AdminSuppliers() {
         </div>
       )}
 
-      <Modal isOpen={Boolean(viewing)} onClose={() => setViewing(null)} title="Supplier Details" size="lg">
+      <Modal isOpen={Boolean(viewing)} onClose={() => setViewing(null)} title="Supplier Details" size="xlwide">
         {viewing && (
           <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
             {/* Basic Information */}
@@ -145,13 +211,25 @@ export default function AdminSuppliers() {
                   { label: "Email", value: viewing.email },
                   { label: "Phone", value: viewing.phone || "\u2014" },
                   { label: "Company Name", value: viewing.company_name || "\u2014" },
-                  { label: "Company Address", value: viewing.company_address || "\u2014" },
-                  { label: "Business Type", value: viewing.business_type || "\u2014" },
                   { label: "TIN", value: viewing.tin || "\u2014" },
                   { label: "Representative", value: viewing.representative_name || "\u2014" },
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-400 mb-0.5">{label}</p><p className="text-sm font-semibold text-slate-800">{value}</p></div>
                 ))}
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-xs text-slate-400 mb-2">Business Types</p>
+                <div className="flex flex-wrap gap-2">
+                  {viewing.supplier_business_types?.length ? (
+                    viewing.supplier_business_types.map((sbt: any) => (
+                      <span key={sbt.business_type?.id || sbt.business_type?.name} className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">{sbt.business_type?.name}</span>
+                    ))
+                  ) : viewing.business_type ? (
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">{viewing.business_type}</span>
+                  ) : (
+                    <span className="text-sm text-slate-500">No business type selected</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -216,7 +294,7 @@ export default function AdminSuppliers() {
                       <p className="text-sm font-medium text-slate-700">{label}</p>
                       {expiry && <p className="text-xs text-slate-400">Expires: {new Date(expiry).toLocaleDateString()}</p>}
                     </div>
-                    <a href={path} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100 transition-colors">View File</a>
+                    <ViewFileButton file={String(path)} label="View File" className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-wait" />
                   </div>
                 ))}
                 {![viewing.sec_dti_certificate, viewing.mayors_permit, viewing.philgeps_registration, viewing.valid_id, viewing.tax_clearance, viewing.audited_financial_statements, viewing.bank_reference_document].some(Boolean) && (
@@ -225,70 +303,26 @@ export default function AdminSuppliers() {
               </div>
             </div>
 
-            {/* Document Verification Workflow */}
-            <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Qualification Documents</p>
-              <SupplierVerificationChecklist
-                documents={workflow?.documents || []}
-                accountLocked={Boolean(workflow?.accountLocked)}
-                notifSent={Boolean(workflow?.notifSent)}
-                activityLog={workflow?.activityLog || []}
-                isBusy={isWorkflowBusy}
-                onApproveDocument={async (documentId) => {
-                  setIsWorkflowBusy(true);
-                  try {
-                    await suppliersAPI.reviewDocument(viewing.id, documentId, "approve");
-                    await fetchWorkflow(viewing.id);
-                    fetchData();
-                    setToast({ message: "Document approved.", type: "success" });
-                  } catch (error: any) {
-                    setToast({ message: error?.response?.data?.error || "Failed to approve document.", type: "error" });
-                  } finally {
-                    setIsWorkflowBusy(false);
-                  }
-                }}
-                onFlagDocument={async (documentId, reason) => {
-                  setIsWorkflowBusy(true);
-                  try {
-                    await suppliersAPI.reviewDocument(viewing.id, documentId, "flag", reason);
-                    await fetchWorkflow(viewing.id);
-                    fetchData();
-                    setToast({ message: "Document flagged for revision.", type: "success" });
-                  } catch (error: any) {
-                    setToast({ message: error?.response?.data?.error || "Failed to flag document.", type: "error" });
-                  } finally {
-                    setIsWorkflowBusy(false);
-                  }
-                }}
-                onNotifySupplier={async () => {
-                  if (!window.confirm("Send revision notification to this supplier now?")) return;
-                  setIsWorkflowBusy(true);
-                  try {
-                    await suppliersAPI.notifyFlagged(viewing.id);
-                    await fetchWorkflow(viewing.id);
-                    fetchData();
-                    setToast({ message: "Supplier notified of flagged documents.", type: "success" });
-                  } catch (error: any) {
-                    setToast({ message: error?.response?.data?.error || "Failed to notify supplier.", type: "error" });
-                  } finally {
-                    setIsWorkflowBusy(false);
-                  }
-                }}
-                onApproveAllUnlock={async () => {
-                  setIsWorkflowBusy(true);
-                  try {
-                    await suppliersAPI.approveAllUnlock(viewing.id);
-                    await fetchWorkflow(viewing.id);
-                    fetchData();
-                    setToast({ message: "Supplier fully approved and unlocked.", type: "success" });
-                  } catch (error: any) {
-                    setToast({ message: error?.response?.data?.error || "Unable to unlock supplier.", type: "error" });
-                  } finally {
-                    setIsWorkflowBusy(false);
-                  }
-                }}
-              />
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Document Review Workflow</p>
+              {workflowLoading ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">Loading document review workflow…</div>
+              ) : (
+                <SupplierVerificationChecklist
+                  documents={documentWorkflow?.documents ?? []}
+                  accountLocked={documentWorkflow?.accountLocked ?? false}
+                  notifSent={documentWorkflow?.notifSent ?? false}
+                  activityLog={documentWorkflow?.activityLog ?? []}
+                  onApproveDocument={handleApproveDocument}
+                  onFlagDocument={handleFlagDocument}
+                  onNotifySupplier={handleNotifySupplier}
+                  onApproveAllUnlock={handleApproveAllUnlock}
+                  isBusy={detailBusy}
+                />
+              )}
             </div>
+
+            {/* Action Buttons */}
             <div className="flex gap-3 pt-2">
               {viewing.status === "pending" && (
                 <>

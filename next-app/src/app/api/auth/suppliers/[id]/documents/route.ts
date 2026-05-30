@@ -74,6 +74,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       reviewedAt: upload?.verified_at || null,
       reason: state === "flagged" ? upload?.verification_notes || null : null,
       verification_status: upload?.verification_status || null,
+      expiryDate: definition.expiryField ? (supplier as any)[definition.expiryField] || null : null,
     };
   });
 

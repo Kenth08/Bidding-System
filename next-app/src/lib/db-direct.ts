@@ -479,7 +479,7 @@ export const dbDirect = {
     ,
     aggregate: async (params: any = {}) => {
       const rows = await dbDirect.blockchainRecord.findMany({ where: params.where });
-      const sum = rows.reduce((acc, r) => {
+      const sum = rows.reduce((acc: number, r: any) => {
         const value = r?.bid?.bid_amount ?? r?.bid_amount ?? 0;
         return acc + (Number(value) || 0);
       }, 0);

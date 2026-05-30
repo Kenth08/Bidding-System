@@ -11,11 +11,13 @@ function formatDateTime(value: unknown) { if (!value) return "\u2014"; const d =
 function safeStr(val: unknown) { return (val ?? "").toString().toLowerCase(); }
 
 interface ResultRecord { project_id: string; project_title: string; procurement_type?: string; budget: number; awarded_at?: string; public_result_expiry_date?: string; winner?: { supplier_name: string; bid_amount: number; submitted_at?: string }; }
+interface OpenProject { id: string; title: string; procurement_type?: string; budget: number; deadline?: string; created_at?: string; }
 interface VerifyResult { verified: boolean; message?: string; project_title?: string; winner_name?: string; winner_company?: string; bid_amount?: number; recorded_at?: string; project_ref_id?: string; }
 
 export default function PublicResultsPage() {
   const router = useRouter();
   const [records, setRecords] = useState<ResultRecord[]>([]);
+  const [openProjects, setOpenProjects] = useState<OpenProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -44,7 +46,14 @@ export default function PublicResultsPage() {
 
   async function loadResults() {
     setLoading(true); setError(null);
-    try { const res = await axios.get("/api/public/results"); setRecords(Array.isArray(res.data) ? res.data : []); }
+    try {
+      const [resResults, resOpen] = await Promise.all([
+        axios.get("/api/public/results"),
+        axios.get("/api/public/projects?section=open"),
+      ]);
+      setRecords(Array.isArray(resResults.data) ? resResults.data : []);
+      setOpenProjects(Array.isArray(resOpen.data) ? resOpen.data : []);
+    }
     catch { setError("Failed to load procurement results. Please try again."); }
     finally { setLoading(false); }
   }
@@ -100,9 +109,35 @@ export default function PublicResultsPage() {
 
         <div className="relative mb-5"><Search className="pointer-events-none absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-slate-400" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by project name or supplier..." className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20" /></div>
 
+        {/* Open Bidding Section */}
+        {!loading && !error && openProjects.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold text-slate-800 mb-3">Open for Bidding</h2>
+            <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+              <table className="w-full">
+                <thead><tr className="border-b border-slate-100 bg-slate-50/50">{["Project Title", "Type", "Budget (₱)", "Deadline", "Status"].map((h) => <th key={h} className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-50">
+                  {openProjects.filter((p) => { const q = safeStr(search); return !q || safeStr(p.title).includes(q); }).map((p) => (
+                    <tr key={p.id} className="transition-colors hover:bg-slate-50/50">
+                      <td className="px-6 py-4 text-sm font-medium text-slate-800">{p.title}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{p.procurement_type || "—"}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(p.budget)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{p.deadline ? new Date(p.deadline as string).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
+                      <td className="px-6 py-4"><span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-600">Open</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Awarded Results Section */}
+        {!loading && !error && filtered.length > 0 && <h2 className="text-lg font-bold text-slate-800 mb-3">Awarded Projects</h2>}
+
         {loading ? <div className="rounded-2xl border border-slate-100 bg-white p-6"><SkeletonTable rows={5} cols={4} /></div>
         : error ? <div className="flex flex-col items-center justify-center py-20 text-center"><div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50"><XCircle className="h-8 w-8 text-red-300" /></div><p className="mb-1 text-base font-semibold text-slate-700">Failed to load results</p><p className="mb-4 text-sm text-slate-400">{error}</p><button onClick={loadResults} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-50">Try again</button></div>
-        : filtered.length === 0 ? <div className="flex flex-col items-center justify-center py-20 text-center"><div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200"><Award className="h-10 w-10 text-slate-300" /></div><p className="mb-2 text-base font-bold text-slate-700">No awarded projects yet. Check back after procurement is completed.</p></div>
+        : filtered.length === 0 && openProjects.length === 0 ? <div className="flex flex-col items-center justify-center py-20 text-center"><div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200"><Award className="h-10 w-10 text-slate-300" /></div><p className="mb-2 text-base font-bold text-slate-700">No procurement projects yet. Check back later.</p></div>
         : (
           <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
             <table className="w-full">

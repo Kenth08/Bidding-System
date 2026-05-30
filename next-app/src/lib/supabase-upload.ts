@@ -20,7 +20,7 @@ async function ensureDocumentsBucket() {
     throw new Error(`Failed to list storage buckets: ${listError.message}`);
   }
 
-  const hasBucket = (buckets || []).some((b) => b.name === DOCUMENTS_BUCKET);
+  const hasBucket = (buckets || []).some((b: any) => b.name === DOCUMENTS_BUCKET);
   if (!hasBucket) {
     const { error: createError } = await supabaseServer.storage.createBucket(DOCUMENTS_BUCKET, {
       public: false,

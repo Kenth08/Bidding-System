@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Clock3, FileText, Flag, Lock, Upload, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
+import ViewFileButton from "@/components/shared/ViewFileButton";
 
 export type SupplierDocumentState = "missing" | "uploaded" | "flagged" | "revised" | "approved";
 
@@ -184,9 +185,7 @@ export default function SupplierVerificationChecklist({
                         {formatStatus(document)}
                       </span>
                       {isRenderableFileUrl(document.file) ? (
-                        <a href={document.file} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-600 hover:underline">
-                          View file
-                        </a>
+                        <ViewFileButton file={document.file} label="View file" />
                       ) : (
                         <span className="text-xs text-slate-400">No file preview available</span>
                       )}
@@ -209,11 +208,16 @@ export default function SupplierVerificationChecklist({
                     </button>
                     <button
                       type="button"
-                      disabled={!canFlag || isBusy}
-                      onClick={() => {
+                      disabled={!canFlag || isBusy || !draftReason.trim()}
+                      onClick={async () => {
                         const reason = draftReason.trim();
                         if (!reason) return;
-                        onFlagDocument(document.id, reason);
+                        try {
+                          await Promise.resolve(onFlagDocument(document.id, reason));
+                          setFlagDrafts((prev) => ({ ...prev, [document.id]: "" }));
+                        } catch {
+                          // Keep the draft reason so user can retry.
+                        }
                       }}
                       className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >

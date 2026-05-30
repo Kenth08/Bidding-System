@@ -16,6 +16,7 @@ export interface BidSupplierRef {
 
 export interface Bid {
   id: string;
+  project_id?: string;
   project: string | BidProjectRef;
   supplier: string | BidSupplierRef;
   company_name: string;

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifyUser } from "@/lib/actions";
+import { createBidLog } from "@/lib/bid-log";
 import { publishEvent } from "@/lib/sse";
 import { normalizeStatusCode, STATUS } from "@/lib/procurementStatus";
 
@@ -33,6 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   });
 
   await logAudit("UPDATE", user!.id, `Published project ${project.title}`, "project", id);
+  await createBidLog({ projectId: id, userId: user!.id, role: "admin", action: "PROJECT_PUBLISHED", description: `Bidding "${project.title}" was published and is now open for suppliers` });
 
   // Notify approved suppliers
   const suppliers = await db.user.findMany({ where: { role: "supplier", status: "approved", is_active: true } });

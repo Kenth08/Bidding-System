@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit } from "@/lib/actions";
+import { createBidLog } from "@/lib/bid-log";
 import { publishEvent } from "@/lib/sse";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await db.bid.update({ where: { id }, data: { status: "under_evaluation" } });
   await logAudit("UPDATE", user!.id, `Marked bid from ${bid.supplier.full_name} for ${bid.project.title} under review`, "bid", id);
+  await createBidLog({ projectId: bid.project_id, bidId: id, supplierId: bid.supplier_id, userId: user!.id, role: "admin", action: "BID_UNDER_REVIEW", description: `Bid from ${bid.supplier.full_name} marked under evaluation` });
 
   const updated = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } } });
   try {

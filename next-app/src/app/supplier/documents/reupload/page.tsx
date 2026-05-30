@@ -90,7 +90,7 @@ export default function SupplierDocumentReuploadPage() {
   const flaggedDocs = documents.filter((doc) => doc.state === "flagged");
   const pendingReviewDocs = documents.filter((doc) => doc.state === "revised");
   const approvedDocs = documents.filter((doc) => doc.state === "approved");
-  const readyToSubmit = flaggedDocs.every((doc) => doc.declarationOnly || Boolean(selectedFiles[doc.id]));
+  const readyToSubmit = flaggedDocs.length > 0 && flaggedDocs.every((doc) => doc.declarationOnly || Boolean(selectedFiles[doc.id]));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -154,13 +154,17 @@ export default function SupplierDocumentReuploadPage() {
           <LoadingButton
             type="button"
             isLoading={isSubmittingRevision}
-            disabled={!readyToSubmit || isSubmittingRevision}
+            disabled={flaggedDocs.length === 0 || !readyToSubmit || isSubmittingRevision}
             onClick={handleSubmitRevision}
             className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Submit all corrected documents
           </LoadingButton>
-          {!readyToSubmit ? (
+          {flaggedDocs.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-500">
+              There are no flagged documents to re-upload right now.
+            </p>
+          ) : !readyToSubmit ? (
             <p className="mt-2 text-xs text-slate-500">
               Choose a file for every flagged document, then submit once to upload them all for review.
             </p>

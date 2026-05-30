@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   }
 
   // User is valid — generate tokens
-  const access = await signAccessToken({ id: existingUser.id, email: existingUser.email, role: existingUser.role });
+  const access = await signAccessToken({ id: existingUser.id, email: existingUser.email, role: existingUser.role, status: existingUser.status });
   const refresh = await signRefreshToken(existingUser.id);
 
   const { password_hash, ...safeUser } = existingUser as any;

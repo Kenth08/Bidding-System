@@ -1,10 +1,11 @@
 "use client";
 import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle, FolderOpen, FileText, ShieldCheck, Signature, Trophy, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, ClipboardList, FolderOpen, FileText, ShieldCheck, Signature, Trophy, XCircle } from "lucide-react";
 import { bidsAPI, projectsAPI } from "@/services/api";
 import EmptyState from "@/components/shared/EmptyState";
 import BiddingLifecycleProgress from "@/components/shared/BiddingLifecycleProgress";
+import BidActivityLogModal from "@/components/shared/BidActivityLogModal";
 import Modal from "@/components/shared/Modal";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Toast from "@/components/shared/Toast";
@@ -103,6 +104,7 @@ function AdminBidEvaluationContent() {
   const [bidDetail, setBidDetail] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ProcurementCategory>("all");
+  const [showLogs, setShowLogs] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -303,7 +305,10 @@ function AdminBidEvaluationContent() {
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">{summaryStats.suppliers} suppliers competed</span>
               </div>
             </div>
-            <StatusBadge status={selectedProjectData.status} />
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowLogs(true)} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><ClipboardList className="h-3.5 w-3.5" />View Logs</button>
+              <StatusBadge status={selectedProjectData.status} />
+            </div>
           </div>
           <div className="mt-5">
             <BiddingLifecycleProgress
@@ -545,6 +550,7 @@ function AdminBidEvaluationContent() {
       <ConfirmDialog isOpen={Boolean(reviewConfirm)} onClose={() => setReviewConfirm(null)} onConfirm={handleMarkReview} title="Mark for Review" message={`Mark this bid from "${reviewConfirm?.supplier?.full_name || reviewConfirm?.company_name}" as under evaluation?`} confirmLabel="Mark for Review" isConfirmLoading={isConfirmLoading} />
       <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and finalize the award.`} confirmLabel="Select Winner" isConfirmLoading={isConfirmLoading} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
+      <BidActivityLogModal isOpen={showLogs} onClose={() => setShowLogs(false)} projectId={selectedProject} apiBase="admin" />
     </div>
   );
 }

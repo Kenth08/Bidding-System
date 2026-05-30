@@ -31,6 +31,8 @@ function pick<T extends Record<string, any>>(value: T, keys?: Record<string, boo
   return result as T;
 }
 
+const pickUser = pick;
+
 function hydrateUser(row: any) {
   if (!row) return row;
   return {
@@ -1040,7 +1042,7 @@ export const db = {
       if (!Object.keys(updateData).length) {
         return dbDirect.notification.findUnique({ where: { id } });
       }
-      const { data: result, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() }).eq("id", id).select().single();
+      const { data: result, error } = await supabaseServer.from(NOTIFICATIONS_TABLE).update({ ...updateData }).eq("id", id).select().single();
       if (error) throw error;
       return hydrateNotification(result);
     },
@@ -1050,7 +1052,7 @@ export const db = {
       const updateData = isPlainObject(params.data) ? params.data : {};
       if (!Object.keys(updateData).length) return { count: 0 };
       if (filter?.recipient_id || filter?.is_read !== undefined || filter?.id) {
-        let query: any = supabaseServer.from(NOTIFICATIONS_TABLE).update({ ...updateData, updated_at: new Date().toISOString() });
+        let query: any = supabaseServer.from(NOTIFICATIONS_TABLE).update({ ...updateData });
         if (filter.id) query = query.eq("id", filter.id);
         if (filter.recipient_id) query = query.eq("recipient_id", filter.recipient_id);
         if (filter.is_read !== undefined) query = query.eq("is_read", filter.is_read);

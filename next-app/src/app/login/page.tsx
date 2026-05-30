@@ -13,6 +13,7 @@ function LoginPageContent() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,7 +34,7 @@ function LoginPageContent() {
     else if (err === "inactive") setError("Your account is inactive.");
     else if (err === "auth_failed") setError("Google authentication failed. Please try again.");
     else if (err === "missing_code") setError("Google sign-in was interrupted. Please try again.");
-    else if (verified === "1") setError("Email verified successfully. You can now sign in.");
+    else if (verified === "1") setSuccessMsg("Email verified successfully. You can now sign in.");
 
     if (emailFromQuery) setEmail(emailFromQuery);
   }, [searchParams]);
@@ -45,7 +46,7 @@ function LoginPageContent() {
     setError("");
     try {
       const res = await authAPI.login(email, password);
-      const { access, refresh, user } = res.data;
+      const { access, refresh, user, redirectPath } = res.data;
       if (user?.status === "incomplete_registration") {
         router.push(`/register?email=${encodeURIComponent(user.email)}&from=google`);
         return;
@@ -55,19 +56,19 @@ function LoginPageContent() {
       const targetNext = nextPath || searchParams.get("next");
       // If there's a nextPath provided (user clicked an open bid), prefer redirecting there.
       if (targetNext) {
-        // If supplier but not approved, append account_status to let destination handle UI
         if (role === "supplier" && !["approved", "active"].includes(user?.status)) {
           const sep = targetNext.includes("?") ? "&" : "?";
-          router.push(`${targetNext}${sep}account_status=pending`);
+          window.location.href = `${targetNext}${sep}account_status=pending`;
           return;
         }
+        if (role === "supplier") { window.location.href = targetNext; return; }
         router.push(targetNext);
         return;
       }
 
       if (role === "admin") router.push("/admin");
       else if (role === "school_head") router.push("/school-head");
-      else if (role === "supplier") router.push("/supplier");
+      else if (role === "supplier") { window.location.href = redirectPath || "/supplier/dashboard"; return; }
       else router.push("/");
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { error?: string; incomplete?: boolean; user?: { email?: string } } } })?.response?.data;
@@ -138,6 +139,7 @@ function LoginPageContent() {
             </label>
             <LoadingButton type="submit" isLoading={isLoading} loadingText="Signing In..." className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600 active:scale-[0.98]">Sign In</LoadingButton>
             {error ? <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div> : null}
+            {successMsg ? <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-600">{successMsg}</div> : null}
             {isLocalMode ? <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs text-slate-500">Local mode is enabled. Google sign-in is disabled.</p> : null}
             {/* Keep login focused; show compact register link so users can create supplier accounts */}
             <p className="mt-4 text-center text-sm text-slate-500">

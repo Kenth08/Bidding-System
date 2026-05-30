@@ -114,6 +114,8 @@ export async function sendVerificationCodeEmail(params: { to: string; fullName?:
   }
 }
 
+export async function sendSupplierReuploadConfirmationEmail(_to: string) {}
+
 export const emailVerificationRules = {
   codeLength: CODE_LENGTH,
   codeExpiryMinutes: CODE_EXPIRY_MINUTES,

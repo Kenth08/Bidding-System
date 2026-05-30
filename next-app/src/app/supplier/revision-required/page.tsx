@@ -11,7 +11,7 @@ export default function RevisionRequiredPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
-    setMessage("Your supplier account is currently under admin review. Please re-upload the flagged documents to continue.");
+    setMessage("Some of your submitted documents have been flagged for revision. Please re-upload the corrected documents to regain full access to bidding.");
   }, []);
 
   return (
@@ -30,7 +30,7 @@ export default function RevisionRequiredPage() {
       </div>
 
       <div className="mt-8">
-        <p className="text-sm text-slate-600">While your account is in revision mode you will not be able to access bidding, procurement, auctions, or project participation until admin approves your documents.</p>
+        <p className="text-sm text-slate-600">You must complete supplier verification before participating in bidding. While your account is in revision mode you will not be able to access bidding, procurement, auctions, or project participation until admin approves your documents.</p>
       </div>
 
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />

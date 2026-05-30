@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifySuppliers, notifyUser } from "@/lib/actions";
+import { createBidLog } from "@/lib/bid-log";
 import { publishEvent } from "@/lib/sse";
 import hashlib from "crypto";
 
@@ -73,6 +74,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   await logAudit("SELECT_WINNER", user!.id, `Selected winner for ${bid.project.title}: ${bid.supplier.full_name}`, "bid", id);
+  await createBidLog({ projectId: bid.project_id, bidId: id, supplierId: bid.supplier_id, userId: user!.id, role: "admin", action: "WINNER_SELECTED", description: `${bid.supplier.full_name} selected as winner with bid of ₱${Number(bid.bid_amount).toLocaleString()}` });
 
   // Notify winner
   await notifyUser(bid.supplier_id, "bid_won", "Congratulations! Your Bid Won", `Your bid of ₱${Number(bid.bid_amount).toLocaleString()} was selected as the winner for ${bid.project.title}.`, "/supplier/bids", id);

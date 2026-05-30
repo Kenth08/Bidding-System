@@ -34,22 +34,21 @@ export async function POST(request: Request) {
 
   async function resolveBusinessTypeIds(items: string[]) {
     const resolved: string[] = [];
+    if (!db.businessType) return resolved;
     for (const item of items) {
-      // try by id first
-      let bt = null as any;
       try {
+        let bt = null as any;
         bt = item.match?.(/[0-9a-fA-F\-]{36}/) ? await db.businessType.findUnique({ where: { id: item } }) : null;
-      } catch (e) {
-        bt = null;
+        if (!bt) {
+          bt = await db.businessType.findFirst({ where: { name: { equals: item, mode: "insensitive" } } });
+        }
+        if (!bt) {
+          bt = await db.businessType.create({ data: { id: uuid(), name: item, description: "", is_active: true } });
+        }
+        if (bt) resolved.push(bt.id);
+      } catch {
+        // table may not exist — skip
       }
-      if (!bt) {
-        bt = await db.businessType.findFirst({ where: { name: { equals: item, mode: "insensitive" } } });
-      }
-      if (!bt) {
-        // create a new business type (admin can later edit)
-        bt = await db.businessType.create({ data: { id: uuid(), name: item, description: "", is_active: true } });
-      }
-      if (bt) resolved.push(bt.id);
     }
     return resolved;
   }
@@ -96,14 +95,27 @@ export async function POST(request: Request) {
     "representative_authorization_document",
   ] as const;
 
-  const hasMissingRequiredDocument = requiredDocumentKeys.some((key) => {
+  const documentLabels: Record<string, string> = {
+    sec_dti_certificate: "SEC or DTI Certificate",
+    mayors_permit: "Mayor's Permit / Business Permit",
+    philgeps_registration: "PhilGEPS Registration",
+    valid_id: "Valid ID (Government-Issued)",
+    tax_clearance: "Tax Clearance Certificate",
+    audited_financial_statements: "Audited Financial Statements",
+    bank_reference_document: "Bank Reference Letter or Credit Report",
+    representative_authorization_document: "Authorization Letter / SPA",
+  };
+
+  const missingDocs = requiredDocumentKeys.filter((key) => {
     const file = formData.get(key) as File | null;
     return !file || file.size <= 0;
-  }) || !not_blacklisted_declaration;
+  });
 
-  if (hasMissingRequiredDocument) {
+  if (missingDocs.length > 0 || !not_blacklisted_declaration) {
+    const missing = missingDocs.map((k) => documentLabels[k] || k);
+    if (!not_blacklisted_declaration) missing.push("Blacklisting Declaration (checkbox)");
     return NextResponse.json(
-      { error: "You must upload all required documents before registering." },
+      { error: `Missing required: ${missing.join(", ")}` },
       { status: 400 }
     );
   }
@@ -204,14 +216,18 @@ export async function POST(request: Request) {
     if (rawBusinessTypeIds.length > 0) {
       const resolved = await resolveBusinessTypeIds(rawBusinessTypeIds);
       if (resolved.length > 0) {
-        await db.supplierBusinessType.createMany({
-          data: resolved.map((btId) => ({ supplier_id: user.id, business_type_id: btId })),
-          skipDuplicates: true,
-        });
-        // keep legacy single string for quick reads
-        const firstBt = await db.businessType.findUnique({ where: { id: resolved[0] } });
-        if (firstBt) {
-          await db.user.update({ where: { id: user.id }, data: { business_type: firstBt.name } });
+        try {
+          await db.supplierBusinessType.createMany({
+            data: resolved.map((btId) => ({ supplier_id: user.id, business_type_id: btId })),
+            skipDuplicates: true,
+          });
+          const firstBt = await db.businessType.findUnique({ where: { id: resolved[0] } });
+          if (firstBt) {
+            await db.user.update({ where: { id: user.id }, data: { business_type: firstBt.name } });
+          }
+        } catch {
+          // business_types table may not exist — store as string instead
+          await db.user.update({ where: { id: user.id }, data: { business_type: rawBusinessTypeIds[0] } });
         }
       }
     }
@@ -356,25 +372,34 @@ export async function POST(request: Request) {
   if (rawBusinessTypeIds.length > 0) {
     finalBusinessTypeIds = await resolveBusinessTypeIds(rawBusinessTypeIds);
   } else if (business_type) {
-    // fallback to legacy single string
-    const bt = await db.businessType.findFirst({ where: { name: { equals: business_type, mode: "insensitive" } } });
-    if (bt) finalBusinessTypeIds = [bt.id];
-    else {
-      const nb = await db.businessType.create({ data: { id: uuid(), name: business_type, description: "", is_active: true } });
-      finalBusinessTypeIds = [nb.id];
+    try {
+      const bt = await db.businessType.findFirst({ where: { name: { equals: business_type, mode: "insensitive" } } });
+      if (bt) finalBusinessTypeIds = [bt.id];
+      else {
+        const nb = await db.businessType.create({ data: { id: uuid(), name: business_type, description: "", is_active: true } });
+        finalBusinessTypeIds = [nb.id];
+      }
+    } catch {
+      // table may not exist
     }
   }
 
-  if (finalBusinessTypeIds.length === 0) {
-    return NextResponse.json({ error: "Please select at least one business category." }, { status: 400 });
-  }
-
-  await db.supplierBusinessType.createMany({ data: finalBusinessTypeIds.map((btId) => ({ supplier_id: user.id, business_type_id: btId })), skipDuplicates: true });
-
-  // update legacy business_type text with first selection for compatibility
-  const firstBT = await db.businessType.findUnique({ where: { id: finalBusinessTypeIds[0] } });
-  if (firstBT) {
-    await db.user.update({ where: { id: user.id }, data: { business_type: firstBT.name } });
+  try {
+    if (finalBusinessTypeIds.length > 0) {
+      await db.supplierBusinessType.createMany({ data: finalBusinessTypeIds.map((btId) => ({ supplier_id: user.id, business_type_id: btId })), skipDuplicates: true });
+      const firstBT = await db.businessType.findUnique({ where: { id: finalBusinessTypeIds[0] } });
+      if (firstBT) {
+        await db.user.update({ where: { id: user.id }, data: { business_type: firstBT.name } });
+      }
+    } else {
+      // Store the raw business type name directly
+      const btName = rawBusinessTypeIds[0] || business_type || "Other";
+      await db.user.update({ where: { id: user.id }, data: { business_type: btName } });
+    }
+  } catch {
+    // business_types table may not exist — store as string
+    const btName = rawBusinessTypeIds[0] || business_type || "Other";
+    await db.user.update({ where: { id: user.id }, data: { business_type: btName } });
   }
 
   if (!isLocalMode && verification) {

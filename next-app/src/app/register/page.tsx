@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload, AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Shield, Upload, AlertCircle, FileText, X } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { Suspense, useState, ChangeEvent, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -7,110 +7,75 @@ import { authAPI } from "@/services/api";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
 
 const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
-
-// initial fallback; will be replaced by server list
-const FALLBACK_BUSINESS_TYPES = [
-  "IT Equipment",
-  "Office Supplies",
-  "Construction Materials",
-  "Medical Supplies",
-  "ICT Services",
-  "Electrical Supplies",
-  "Agricultural Supplies",
-  "Printing Services",
-  "Transportation",
-  "Consultancy",
-];
+const FALLBACK_BUSINESS_TYPES = ["IT Equipment","Office Supplies","Construction Materials","Medical Supplies","ICT Services","Electrical Supplies","Agricultural Supplies","Printing Services","Transportation","Consultancy"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const STEPS = ["Basic Info", "Documents", "Declaration", "Submit"];
 
-const REQUIRED_DOCUMENTS_SECTIONS = {
-  legal: [
-    { key: "secDtiCertificate", label: "SEC or DTI Certificate" },
-    { key: "mayorsPm", label: "Mayor's Permit / Business Permit" },
-    { key: "philGepsRegistration", label: "PhilGEPS Registration" },
-    { key: "validId", label: "Valid ID" },
-  ],
-  financial: [
-    { key: "taxClearance", label: "Tax Clearance Certificate" },
-    { key: "auditedFinancialStatements", label: "Audited Financial Statements (1-2 years)" },
-    { key: "bankReferenceDocument", label: "Bank Reference Letter or Credit Report" },
-  ],
-  qualifications: [
-    { key: "performanceCertificates", label: "Performance Certificates / ISO Certifications" },
-    { key: "pastContractsDocument", label: "Similar Past Contracts or Purchase Orders" },
-  ],
-};
-
-function FileUploadField({ label, file, error, onChange, onClear, optional = false, invalid = false }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; onClear?: () => void; optional?: boolean; invalid?: boolean }) {
-  const inputId = label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+function StepIndicator({ current, steps }: { current: number; steps: string[] }) {
   return (
-    <label htmlFor={inputId} className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label} {optional && <span className="text-slate-400 font-normal">(Optional)</span>}
-      </span>
-      <div className={`rounded-xl border bg-slate-50 px-4 py-3 transition-colors hover:bg-white ${invalid ? 'border-red-300 hover:border-red-400' : 'border-slate-200 hover:border-emerald-300'}`}>
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><Upload className="h-4 w-4" /></div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-700">Click to upload or drag and drop</p>
-            <p className="text-xs text-slate-400">PDF, JPG, PNG &middot; Max 5MB</p>
-            <div className="mt-1 flex items-center gap-3">
-              <p className="truncate text-xs text-slate-600">{file?.name || "No file selected"}</p>
-              {file ? (
-                <button type="button" onClick={(e) => { e.preventDefault(); onClear?.(); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
-              ) : null}
+    <div className="flex items-center gap-1 mb-8">
+      {steps.map((label, i) => (
+        <div key={label} className="flex items-center flex-1">
+          <div className="flex flex-col items-center flex-1">
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${i < current ? "bg-emerald-500 text-white" : i === current ? "bg-emerald-500 text-white ring-4 ring-emerald-100" : "bg-slate-200 text-slate-500"}`}>
+              {i < current ? <Check className="h-4 w-4" /> : i + 1}
             </div>
+            <span className={`mt-1.5 text-[11px] font-medium ${i <= current ? "text-emerald-700" : "text-slate-400"}`}>{label}</span>
           </div>
+          {i < steps.length - 1 && <div className={`h-0.5 w-full mx-1 mt-[-18px] ${i < current ? "bg-emerald-500" : "bg-slate-200"}`} />}
         </div>
+      ))}
+    </div>
+  );
+}
+
+function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-5 mb-5">
+      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function FileUploadBox({ label, file, error, onChange, onClear, optional = false, invalid = false, fieldKey }: { label: string; file: File | null; error?: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; onClear?: () => void; optional?: boolean; invalid?: boolean; fieldKey?: string }) {
+  const inputId = `file-${(fieldKey || label).replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  return (
+    <div data-field={fieldKey}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-semibold text-slate-700">{label}</span>
+        {optional ? <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span> : <span className="text-[10px] font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded">Required</span>}
+      </div>
+      <label htmlFor={inputId} className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed p-3 transition-colors hover:border-emerald-300 hover:bg-emerald-50/30 ${invalid ? "border-red-300 bg-red-50/30" : file ? "border-emerald-200 bg-emerald-50/20" : "border-slate-200 bg-slate-50/50"}`}>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${file ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+          {file ? <FileText className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          {file ? (
+            <p className="truncate text-sm font-medium text-slate-700">{file.name}</p>
+          ) : (
+            <p className="text-sm text-slate-500">Click to upload <span className="text-xs text-slate-400">· PDF, JPG, PNG · Max 5MB</span></p>
+          )}
+        </div>
+        {file && <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClear?.(); }} className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"><X className="h-3.5 w-3.5" /></button>}
         <input id={inputId} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={onChange} className="sr-only" />
-      </div>
-      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
-    </label>
-  );
-}
-
-function DateInputField({ label, value, onChange }: { label: string; value: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void }) {
-  return (
-    <label>
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={onChange}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20"
-      />
-    </label>
-  );
-}
-
-function CollapsibleSection({ title, description, defaultOpen = true, children }: { title: string; description?: string; defaultOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="md:col-span-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-            {description ? <p className="text-xs text-slate-500">{description}</p> : null}
-          </div>
-        </div>
-        <button type="button" onClick={() => setOpen((s) => !s)} className="text-slate-500">
-          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
-      </div>
-      {open ? <div className="mt-3">{children}</div> : null}
+      </label>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
 
-function SectionTitle({ title, description }: { title: string; description?: string }) {
+function TextInput({ label, value, onChange, error, required = true, type = "text", readOnly = false, placeholder, fieldKey }: { label: string; value: string; onChange: (v: string) => void; error?: string; required?: boolean; type?: string; readOnly?: boolean; placeholder?: string; fieldKey?: string }) {
   return (
-    <div className="md:col-span-2 mb-4">
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
-    </div>
+    <label data-field={fieldKey} className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-700">{label} {required && <span className="text-red-400">*</span>}</span>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} readOnly={readOnly} placeholder={placeholder} className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-2 ${error ? "border-red-300 focus:border-red-400 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} ${readOnly ? "cursor-not-allowed bg-slate-100 opacity-60" : "bg-white"}`} />
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </label>
   );
 }
+
 
 function RegisterPageContent() {
   const router = useRouter();
@@ -119,72 +84,24 @@ function RegisterPageContent() {
   const googleEmail = searchParams.get("email") || "";
   const isFromGoogle = searchParams.get("from") === "google";
   const noAccountMessage = searchParams.get("message") === "no_account";
+  const [step, setStep] = useState(0);
 
   const [form, setForm] = useState<Record<string, any>>({
-    fullName: "",
-    email: googleEmail,
-    password: "",
-    confirmPassword: "",
-    companyName: "",
-    companyAddress: "",
-    phone: "",
-    businessType: "",
-    businessTypeIds: [] as unknown as string[],
-    businessTypeCustom: "",
-    representativeName: "",
-    tin: "",
-    companyProfile: "",
-    
-    // Legal documents
-    secDtiCertificate: null,
-    mayorsPm: null,
-    mayorsPmExpiry: "",
-    philGepsRegistration: null,
-    validId: null,
-    
-    // Financial documents
-    taxClearance: null,
-    taxClearanceExpiry: "",
-    auditedFinancialStatements: null,
-    financialStatementYear: "",
+    fullName: "", email: googleEmail, password: "", confirmPassword: "",
+    companyName: "", companyAddress: "", phone: "", businessTypeIds: [] as string[],
+    representativeName: "", tin: "", companyProfile: "",
+    secDtiCertificate: null, mayorsPm: null, mayorsPmExpiry: "",
+    philgepsRegistration: null, validId: null,
+    taxClearance: null, taxClearanceExpiry: "",
+    auditedFinancialStatements: null, financialStatementYear: "",
     bankReferenceDocument: null,
-    
-    // Qualifications
-    performanceCertificates: null,
-    pastContractsDocument: null,
-    trackRecordDescription: "",
-    
-    // Representative authorization
+    performanceCertificates: null, pastContractsDocument: null, trackRecordDescription: "",
     representativeAuthorizationDocument: null,
-    
-    // Blacklisting declaration
-    notBlacklistedDeclaration: false,
-    blacklistingDeclarationDocument: null,
-    
-    // Legacy field for compatibility
+    notBlacklistedDeclaration: false, blacklistingDeclarationDocument: null,
     supportingDocuments: null,
   });
 
   const [availableBusinessTypes, setAvailableBusinessTypes] = useState<{ id: string; name: string }[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/public/business-types");
-        if (res.ok) {
-          const json = await res.json();
-          setAvailableBusinessTypes(json || []);
-        } else {
-          setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
-        }
-      } catch (e) {
-        setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
-      }
-    })();
-      const next = searchParams.get("next");
-      if (next) setNextPath(next);
-  }, []);
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -193,126 +110,69 @@ function RegisterPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
 
-  function updateForm(key: string, value: any) {
-    setForm((p) => ({ ...p, [key]: value }));
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/public/business-types");
+        if (res.ok) { const json = await res.json(); setAvailableBusinessTypes(json || []); }
+        else setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
+      } catch { setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n }))); }
+    })();
+    const next = searchParams.get("next");
+    if (next) setNextPath(next);
+  }, []);
+
+  function updateForm(key: string, value: any) { setForm((p) => ({ ...p, [key]: value })); }
+  function updateFile(key: string, file: File | undefined) {
+    if (file && file.size > MAX_FILE_SIZE) { setFileErrors((p) => ({ ...p, [key]: "File must be 5MB or smaller." })); updateForm(key, null); return; }
+    setFileErrors((p) => ({ ...p, [key]: "" })); updateForm(key, file || null);
   }
 
-  function updateFile(key: string, file: File | undefined) {
-    if (file && file.size > MAX_FILE_SIZE) {
-      setFileErrors((p) => ({ ...p, [key]: "File must be 5MB or smaller." }));
-      updateForm(key, null);
-      return;
+  function validateStep(s: number): boolean {
+    const errs: Record<string, string> = {};
+    const req = (key: string, msg: string) => { if (!String(form[key] || "").trim()) errs[key] = msg; };
+    const reqFile = (key: string, msg: string) => { if (!form[key]) errs[key] = msg; };
+
+    if (s === 0) {
+      req("fullName", "Full name is required."); req("email", "Email is required.");
+      req("companyName", "Company name is required."); req("companyAddress", "Company address is required.");
+      req("phone", "Phone number is required."); req("representativeName", "Representative name is required.");
+      req("tin", "TIN is required."); req("companyProfile", "Company profile is required.");
+      if (!(form.businessTypeIds as string[]).length) errs.businessTypeIds = "Select at least one business type.";
+      if (!isFromGoogle) {
+        if (!String(form.password || "").trim()) errs.password = "Password is required.";
+        else if (String(form.password).length < 6) errs.password = "Password must be at least 6 characters.";
+        if (!String(form.confirmPassword || "").trim()) errs.confirmPassword = "Confirm your password.";
+        else if (form.password !== form.confirmPassword) errs.confirmPassword = "Passwords do not match.";
+      }
+      if (form.phone && !/^[0-9]+$/.test(String(form.phone).trim())) errs.phone = "Digits only.";
+      if (form.tin && !/^[0-9]+$/.test(String(form.tin).trim())) errs.tin = "Digits only.";
+    } else if (s === 1) {
+      reqFile("secDtiCertificate", "SEC/DTI Certificate required."); reqFile("mayorsPm", "Mayor's Permit required.");
+      reqFile("philgepsRegistration", "PhilGEPS Registration required."); reqFile("validId", "Valid ID required.");
+      reqFile("taxClearance", "Tax Clearance required."); reqFile("auditedFinancialStatements", "Financial Statements required.");
+      reqFile("bankReferenceDocument", "Bank Reference required."); reqFile("representativeAuthorizationDocument", "Authorization document required.");
+      if (form.mayorsPmExpiry && new Date(form.mayorsPmExpiry as string) < new Date()) errs.mayorsPmExpiry = "Expired.";
+      if (form.taxClearanceExpiry && new Date(form.taxClearanceExpiry as string) < new Date()) errs.taxClearanceExpiry = "Expired.";
+      if (form.auditedFinancialStatements && !String(form.financialStatementYear).trim()) errs.financialStatementYear = "Year required.";
+    } else if (s === 2) {
+      if (!form.notBlacklistedDeclaration) errs.notBlacklistedDeclaration = "Declaration required.";
     }
-    setFileErrors((p) => ({ ...p, [key]: "" }));
-    updateForm(key, file || null);
+    setValidationErrors(errs);
+    if (Object.keys(errs).length) {
+      setTimeout(() => { const el = document.querySelector(`[data-field="${Object.keys(errs)[0]}"]`); el?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 100);
+      return false;
+    }
+    return true;
   }
+
+  function nextStep() { if (validateStep(step)) setStep((s) => Math.min(s + 1, 3)); }
+  function prevStep() { setStep((s) => Math.max(s - 1, 0)); }
+
 
   async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError("");
-    setValidationErrors({});
-
-    const nextErrors: Record<string, string> = {};
-    const nextFileErrors: Record<string, string> = {};
-
-    const requireField = (key: string, message: string) => {
-      if (!String(form[key] || "").trim()) nextErrors[key] = message;
-    };
-
-    const requireFile = (key: string, message: string) => {
-      if (!form[key]) {
-        nextErrors[key] = message;
-        nextFileErrors[key] = message;
-      }
-    };
-
-    // Validate basic fields
-    requireField("fullName", "Please enter your full name.");
-    requireField("email", "Please enter your email address.");
-    requireField("companyName", "Please enter your company name.");
-    requireField("companyAddress", "Please enter your company address.");
-    requireField("phone", "Please enter your phone number.");
-    requireField("representativeName", "Please enter your representative name.");
-    requireField("tin", "Please enter your TIN.");
-    requireField("companyProfile", "Please enter your company profile and capabilities.");
-    if (!(form.businessTypeIds as unknown as string[]).length) nextErrors.businessTypeIds = "Please select at least one business type.";
-
-    // Validate passwords
-    if (!isFromGoogle) {
-      if (!String(form.password || "").trim()) nextErrors.password = "Please enter a password.";
-      if (!String(form.confirmPassword || "").trim()) nextErrors.confirmPassword = "Please confirm your password.";
-    }
-
-    // Validate required legal documents
-    requireFile("secDtiCertificate", "Please upload your SEC or DTI Certificate.");
-    requireFile("mayorsPm", "Please upload your Mayor's Permit / Business Permit.");
-    requireFile("philgepsRegistration", "Please upload your PhilGEPS Registration.");
-    requireFile("validId", "Please upload your valid ID.");
-
-    // Validate required financial documents
-    requireFile("taxClearance", "Please upload your Tax Clearance Certificate.");
-    requireFile("auditedFinancialStatements", "Please upload your Audited Financial Statements.");
-    requireFile("bankReferenceDocument", "Please upload your Bank Reference Letter or Credit Report.");
-
-    // Validate blacklisting declaration
-    if (!form.notBlacklistedDeclaration) {
-      nextErrors.notBlacklistedDeclaration = "Please confirm the blacklisting declaration.";
-    }
-
-    // Validate representative authorization
-    if (!form.representativeAuthorizationDocument) {
-      nextErrors.representativeAuthorizationDocument = "Please upload your representative authorization document (SPA).";
-      nextFileErrors.representativeAuthorizationDocument = "Please upload your representative authorization document (SPA).";
-    }
-
-    // Validate numeric fields
-    if (form.phone && !/^[0-9]+$/.test(String(form.phone).trim())) {
-      nextErrors.phone = "Phone number must contain digits only.";
-    }
-    if (form.tin && !/^[0-9]+$/.test(String(form.tin).trim())) {
-      nextErrors.tin = "TIN must contain digits only.";
-    }
-    if (form.auditedFinancialStatements && !String(form.financialStatementYear).trim()) {
-      nextErrors.financialStatementYear = "Please enter the financial statement year.";
-    }
-    if (String(form.financialStatementYear).trim()) {
-      const year = Number(String(form.financialStatementYear).trim());
-      const currentYear = new Date().getFullYear();
-      if (!/^[0-9]{4}$/.test(String(form.financialStatementYear).trim()) || Number.isNaN(year) || year < 1900 || year > currentYear) {
-        nextErrors.financialStatementYear = `Enter a valid year between 1900 and ${currentYear}.`;
-      }
-    }
-
-    // Validate mayor's permit expiry
-    if (form.mayorsPmExpiry && new Date(form.mayorsPmExpiry as string) < new Date()) {
-      nextErrors.mayorsPmExpiry = "Mayor's Permit has expired. Please upload a valid permit.";
-    }
-
-    // Validate tax clearance expiry
-    if (form.taxClearanceExpiry && new Date(form.taxClearanceExpiry as string) < new Date()) {
-      nextErrors.taxClearanceExpiry = "Tax Clearance has expired. Please upload a valid certificate.";
-    }
-
-    if (!isFromGoogle) {
-      if (form.password !== form.confirmPassword) {
-        nextErrors.confirmPassword = "Passwords do not match.";
-      }
-      if (String(form.password).length < 6) {
-        nextErrors.password = "Password must be at least 6 characters.";
-      }
-    }
-
-    if (Object.keys(nextErrors).length) {
-      setValidationErrors(nextErrors);
-      setFileErrors((current) => ({ ...current, ...nextFileErrors }));
-      setError("Please fix the highlighted fields below.");
-      return;
-    }
-
-    setFileErrors((current) => ({ ...current, ...nextFileErrors }));
-
-    // No custom business types allowed during registration — only select from provided list
-
+    event.preventDefault(); setError("");
+    if (!validateStep(2)) { setStep(2); return; }
     setIsLoading(true);
     try {
       const payload = new FormData();
@@ -322,450 +182,295 @@ function RegisterPageContent() {
       payload.append("company_name", form.companyName as string);
       payload.append("company_address", form.companyAddress as string);
       payload.append("phone", form.phone as string);
-      // Attach selected business type ids or names. The server accepts repeated `business_type_ids` fields.
-      const selected = (form.businessTypeIds as unknown as string[]) || [];
-      for (const v of selected) {
-        payload.append("business_type_ids", v);
-      }
+      for (const v of (form.businessTypeIds as string[])) payload.append("business_type_ids", v);
       payload.append("representative_name", form.representativeName as string);
       payload.append("tin", form.tin as string);
       payload.append("company_profile", form.companyProfile as string);
-
-      // Legal documents
       if (form.secDtiCertificate) payload.append("sec_dti_certificate", form.secDtiCertificate as File);
       if (form.mayorsPm) payload.append("mayors_permit", form.mayorsPm as File);
       if (form.mayorsPmExpiry) payload.append("mayors_permit_expiry", form.mayorsPmExpiry as string);
-      if (form.philGepsRegistration) payload.append("philgeps_registration", form.philGepsRegistration as File);
+      if (form.philgepsRegistration) payload.append("philgeps_registration", form.philgepsRegistration as File);
       if (form.validId) payload.append("valid_id", form.validId as File);
-
-      // Financial documents
       if (form.taxClearance) payload.append("tax_clearance", form.taxClearance as File);
       if (form.taxClearanceExpiry) payload.append("tax_clearance_expiry", form.taxClearanceExpiry as string);
       if (form.auditedFinancialStatements) payload.append("audited_financial_statements", form.auditedFinancialStatements as File);
       if (form.financialStatementYear) payload.append("financial_statement_year", form.financialStatementYear as string);
       if (form.bankReferenceDocument) payload.append("bank_reference_document", form.bankReferenceDocument as File);
-
-      // Qualifications
       if (form.performanceCertificates) payload.append("performance_certificates", form.performanceCertificates as File);
       if (form.pastContractsDocument) payload.append("past_contracts_document", form.pastContractsDocument as File);
       if (form.trackRecordDescription) payload.append("track_record_description", form.trackRecordDescription as string);
-
-      // Representative authorization
       if (form.representativeAuthorizationDocument) payload.append("representative_authorization_document", form.representativeAuthorizationDocument as File);
-
-      // Blacklisting declaration
       payload.append("not_blacklisted_declaration", form.notBlacklistedDeclaration ? "true" : "false");
       if (form.blacklistingDeclarationDocument) payload.append("blacklisting_declaration_document", form.blacklistingDeclarationDocument as File);
-
-      // Legacy support
       if (form.supportingDocuments) payload.append("supporting_documents", form.supportingDocuments as File);
-
       if (isFromGoogle) payload.append("from_google", "true");
 
       await authAPI.register(payload);
-      // If user came from an open-bid click, forward them to login with next so they can sign in and continue
-      if (nextPath) {
-        router.push(`/login?next=${encodeURIComponent(nextPath)}&message=${encodeURIComponent("Registration successful. Please sign in to participate in bidding.")}`);
-        return;
-      }
+      if (nextPath) { router.push(`/login?next=${encodeURIComponent(nextPath)}&message=${encodeURIComponent("Registration successful. Please sign in to participate in bidding.")}`); return; }
       setSubmitted(true);
-    } catch (err: unknown) {
-      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Registration failed.");
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err: unknown) { setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Registration failed."); }
+    finally { setIsLoading(false); }
   }
+
+  const requiredDocs = ["secDtiCertificate","mayorsPm","philgepsRegistration","validId","taxClearance","auditedFinancialStatements","bankReferenceDocument","representativeAuthorizationDocument"];
+  const optionalDocs = ["performanceCertificates","pastContractsDocument","blacklistingDeclarationDocument","supportingDocuments"];
+  const requiredDocsCount = requiredDocs.filter((k) => form[k]).length;
+  const optionalDocsCount = optionalDocs.filter((k) => form[k]).length;
+
 
   return (
     <div className="relative min-h-screen bg-slate-50">
-      <div className="fixed left-0 top-0 hidden h-screen w-[480px] overflow-hidden bg-slate-900 lg:flex lg:flex-col px-12 py-10">
-        <div className="absolute -left-20 bottom-10 h-64 w-64 rounded-full bg-emerald-500/10" />
-        <div className="absolute -right-16 top-14 h-72 w-72 rounded-full bg-emerald-500/10" />
-        <button
-          type="button"
-          onClick={() => router.push("/login")}
-          className="relative z-10 mb-6 flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Login
-        </button>
+      {/* Left branding panel - desktop only */}
+      <div className="fixed left-0 top-0 hidden h-screen w-[420px] bg-slate-900 lg:flex lg:flex-col px-10 py-10 overflow-hidden">
+        <div className="absolute -left-16 bottom-10 h-56 w-56 rounded-full bg-emerald-500/10" />
+        <div className="absolute -right-12 top-14 h-60 w-60 rounded-full bg-emerald-500/10" />
+        <button type="button" onClick={() => router.push("/login")} className="relative z-10 mb-6 flex items-center gap-2 text-sm text-slate-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to Login</button>
         <div className="relative z-10 flex items-center gap-3 text-white">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500">
-            <Shield className="h-5 w-5" />
-          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500"><Shield className="h-5 w-5" /></div>
           <p className="text-base font-bold">Blockchain E-Procurement</p>
         </div>
         <div className="relative z-10 my-auto text-white">
-          <h2 className="text-3xl font-bold leading-tight">Join as a Supplier</h2>
-          <p className="mt-2 text-sm text-slate-300">Register your company and start bidding on procurement projects</p>
-          <div className="mt-8 space-y-3 text-left text-sm">
+          <h2 className="text-3xl font-bold leading-tight">Join as a<br/>Supplier</h2>
+          <p className="mt-3 text-sm text-slate-300 leading-relaxed">Register your company and start bidding on procurement projects with full transparency.</p>
+          <div className="mt-8 space-y-4">
             {["Fair evaluation process", "Blockchain-verified results", "Secure bid submission"].map((f) => (
-              <p key={f} className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-emerald-400" />
-                {f}
-              </p>
+              <div key={f} className="flex items-center gap-3"><div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20"><Check className="h-3.5 w-3.5 text-emerald-400" /></div><span className="text-sm text-slate-200">{f}</span></div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="flex min-h-screen flex-1 items-center justify-center bg-white px-4 py-8 lg:ml-[480px] lg:px-12">
-        <div className="w-full max-w-3xl rounded-2xl border border-slate-100 bg-white p-8">
-          <button
-            type="button"
-            onClick={() => router.push("/login")}
-            className="mb-4 flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-slate-600 lg:hidden"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Login
-          </button>
+      {/* Main content */}
+      <div className="min-h-screen lg:ml-[420px]">
+        <div className="mx-auto max-w-3xl px-4 py-8 lg:px-10 lg:py-12">
+          {/* Mobile header */}
+          <div className="mb-6 flex items-center justify-between lg:hidden">
+            <button type="button" onClick={() => router.push("/login")} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700"><ArrowLeft className="h-4 w-4" />Login</button>
+            <div className="flex items-center gap-2"><div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500"><Shield className="h-3.5 w-3.5 text-white" /></div><span className="text-sm font-bold text-slate-800">E-Procurement</span></div>
+          </div>
 
           {submitted ? (
-            <div className="py-8 text-center">
-              <div className="mx-auto w-fit rounded-full border border-emerald-100 bg-emerald-50 p-3 text-emerald-600">
-                <CheckCircle2 className="h-8 w-8" />
-              </div>
-              <h1 className="mt-4 text-2xl font-bold text-emerald-700">Registration Submitted!</h1>
-              <p className="mt-2 text-sm text-slate-500">
-                {isLocalMode
-                  ? "Your account is ready for local sign-in and is pending admin approval."
-                  : "Your account is pending admin approval.\nVerify your email first using the code sent to your inbox."}
-              </p>
-              <p className="mt-3 text-sm text-slate-500">
-                Registered Email: <span className="font-semibold text-slate-700">{form.email as string}</span>
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                {!isLocalMode ? (
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/verify-email?email=${encodeURIComponent(String(form.email || ""))}`)}
-                    className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600"
-                  >
-                    Verify Email Now
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => router.push("/login")}
-                  className="rounded-xl border border-emerald-100 px-4 py-2.5 text-sm font-semibold text-emerald-600 transition-all duration-150 hover:bg-emerald-50"
-                >
-                  Back to Login
-                </button>
+            <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center">
+              <div className="mx-auto w-fit rounded-full bg-emerald-50 p-4"><CheckCircle2 className="h-10 w-10 text-emerald-500" /></div>
+              <h1 className="mt-5 text-2xl font-bold text-slate-900">Registration Submitted!</h1>
+              <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">{isLocalMode ? "Your account is ready. Pending admin approval." : "Verify your email using the code sent to your inbox. Your account is pending admin approval."}</p>
+              <p className="mt-3 text-sm text-slate-500">Email: <span className="font-semibold text-slate-700">{form.email as string}</span></p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                {!isLocalMode && <button type="button" onClick={() => router.push(`/verify-email?email=${encodeURIComponent(String(form.email || ""))}`)} className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Verify Email Now</button>}
+                <button type="button" onClick={() => router.push("/login")} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to Login</button>
               </div>
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-slate-900">Supplier Registration</h1>
-              <p className="mt-1 text-sm text-slate-500">Complete all sections to register your company</p>
+              <div className="mb-2">
+                <h1 className="text-2xl font-bold text-slate-900">Supplier Registration</h1>
+                <p className="mt-1 text-sm text-slate-500">Complete your company profile and upload required documents for admin verification.</p>
+              </div>
 
-              {noAccountMessage && (
-                <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
-                  No account found for this email. Please complete the registration below.
-                </div>
-              )}
+              {noAccountMessage && <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">No account found. Please complete registration below.</div>}
 
-              {Object.keys(validationErrors).length > 0 ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  <p className="font-semibold">Please fix these fields:</p>
-                  <ul className="mt-2 space-y-1 text-xs">
-                    {Object.entries(validationErrors).map(([key, message]) => (
-                      <li key={key}>• {message}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+              <StepIndicator current={step} steps={STEPS} />
 
-              <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* Basic Information */}
-                <SectionTitle title="Basic Information" />
 
-                {[
-                  { key: "fullName", label: "Full Name", span: true },
-                  { key: "email", label: "Email Address", span: true, type: "email", readOnly: isFromGoogle },
-                ].map(({ key, label, span, type, readOnly }) => (
-                  <label key={key} className={span ? "md:col-span-2" : ""}>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {label}
-                    </span>
-                    <input
-                      type={type || "text"}
-                      value={form[key] as string}
-                      onChange={(e) => updateForm(key, e.target.value)}
-                      readOnly={readOnly}
-                      className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 focus:ring-emerald-400/20 ${validationErrors[key] ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"} ${
-                        readOnly ? "cursor-not-allowed opacity-60" : ""
-                      }`}
-                    />
-                    {validationErrors[key] ? <p className="mt-1 text-xs text-red-600">{validationErrors[key]}</p> : null}
-                  </label>
-                ))}
-
-                {!isFromGoogle && (
-                  <>
-                    <label>
-                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Password
-                      </span>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          value={form.password as string}
-                          onChange={(e) => updateForm("password", e.target.value)}
-                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.password ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((p) => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
+              <form onSubmit={handleSubmit}>
+                {/* Step 0: Basic Info */}
+                {step === 0 && (
+                  <div className="space-y-5">
+                    <SectionCard title="Account Information" description="Your login credentials">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="md:col-span-2"><TextInput label="Full Name" value={form.fullName as string} onChange={(v) => updateForm("fullName", v)} error={validationErrors.fullName} fieldKey="fullName" /></div>
+                        <div className="md:col-span-2"><TextInput label="Email Address" value={form.email as string} onChange={(v) => updateForm("email", v)} error={validationErrors.email} type="email" readOnly={isFromGoogle} fieldKey="email" /></div>
+                        {!isFromGoogle && (<>
+                          <label data-field="password" className="block">
+                            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Password <span className="text-red-400">*</span></span>
+                            <div className="relative">
+                              <input type={showPassword ? "text" : "password"} value={form.password as string} onChange={(e) => updateForm("password", e.target.value)} className={`w-full rounded-lg border px-3.5 py-2.5 pr-10 text-sm outline-none transition-all focus:ring-2 ${validationErrors.password ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} />
+                              <button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                            </div>
+                            {validationErrors.password && <p className="mt-1 text-xs text-red-600">{validationErrors.password}</p>}
+                          </label>
+                          <label data-field="confirmPassword" className="block">
+                            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Confirm Password <span className="text-red-400">*</span></span>
+                            <div className="relative">
+                              <input type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword as string} onChange={(e) => updateForm("confirmPassword", e.target.value)} className={`w-full rounded-lg border px-3.5 py-2.5 pr-10 text-sm outline-none transition-all focus:ring-2 ${validationErrors.confirmPassword ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} />
+                              <button type="button" onClick={() => setShowConfirmPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                            </div>
+                            {validationErrors.confirmPassword && <p className="mt-1 text-xs text-red-600">{validationErrors.confirmPassword}</p>}
+                          </label>
+                        </>)}
                       </div>
-                      {validationErrors.password ? <p className="mt-1 text-xs text-red-600">{validationErrors.password}</p> : null}
-                    </label>
-                    <label>
-                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Confirm Password
-                      </span>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={form.confirmPassword as string}
-                          onChange={(e) => updateForm("confirmPassword", e.target.value)}
-                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 pr-10 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.confirmPassword ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword((p) => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
+                    </SectionCard>
+
+                    <SectionCard title="Company Details" description="Your business information">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="md:col-span-2"><TextInput label="Company Name" value={form.companyName as string} onChange={(v) => updateForm("companyName", v)} error={validationErrors.companyName} fieldKey="companyName" /></div>
+                        <div className="md:col-span-2"><TextInput label="Company Address" value={form.companyAddress as string} onChange={(v) => updateForm("companyAddress", v)} error={validationErrors.companyAddress} fieldKey="companyAddress" /></div>
+                        <label data-field="phone" className="block">
+                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">Phone Number <span className="text-red-400">*</span></span>
+                          <StrictNumberInput value={form.phone as string} onChange={(v) => updateForm("phone", v)} className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-2 ${validationErrors.phone ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} helperText="Numbers only." />
+                          {validationErrors.phone && <p className="mt-1 text-xs text-red-600">{validationErrors.phone}</p>}
+                        </label>
+                        <label data-field="tin" className="block">
+                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">TIN <span className="text-red-400">*</span></span>
+                          <StrictNumberInput value={form.tin as string} onChange={(v) => updateForm("tin", v)} className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-2 ${validationErrors.tin ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} helperText="Numbers only." />
+                          {validationErrors.tin && <p className="mt-1 text-xs text-red-600">{validationErrors.tin}</p>}
+                        </label>
+                        <div className="md:col-span-2"><TextInput label="Representative Name" value={form.representativeName as string} onChange={(v) => updateForm("representativeName", v)} error={validationErrors.representativeName} fieldKey="representativeName" /></div>
+                        <div className="md:col-span-2" data-field="businessTypeIds">
+                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">Business Type <span className="text-red-400">*</span></span>
+                          <div className={`rounded-lg border p-3 ${validationErrors.businessTypeIds ? "border-red-300" : "border-slate-200"}`}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-44 overflow-y-auto">
+                              {availableBusinessTypes.map((bt) => (
+                                <label key={bt.id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors ${(form.businessTypeIds as string[]).includes(bt.id) ? "bg-emerald-50" : "hover:bg-slate-50"}`}>
+                                  <input type="checkbox" checked={(form.businessTypeIds as string[]).includes(bt.id)} onChange={(e) => { const ids = new Set(form.businessTypeIds as string[]); if (e.target.checked) ids.add(bt.id); else ids.delete(bt.id); updateForm("businessTypeIds", Array.from(ids)); }} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                                  <span className="text-sm text-slate-700">{bt.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          {validationErrors.businessTypeIds && <p className="mt-1 text-xs text-red-600">{validationErrors.businessTypeIds}</p>}
+                        </div>
+                        <div className="md:col-span-2">
+                          <label data-field="companyProfile"><span className="mb-1.5 block text-xs font-semibold text-slate-700">Company Profile & Capabilities <span className="text-red-400">*</span></span>
+                            <textarea rows={3} value={form.companyProfile as string} onChange={(e) => updateForm("companyProfile", e.target.value)} placeholder="Brief company background and capability statement" className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-2 ${validationErrors.companyProfile ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} />
+                          </label>
+                          {validationErrors.companyProfile && <p className="mt-1 text-xs text-red-600">{validationErrors.companyProfile}</p>}
+                        </div>
                       </div>
-                      {validationErrors.confirmPassword ? <p className="mt-1 text-xs text-red-600">{validationErrors.confirmPassword}</p> : null}
-                    </label>
-                  </>
+                    </SectionCard>
+
+                    <div className="flex justify-end"><button type="button" onClick={nextStep} className="rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Next: Documents →</button></div>
+                  </div>
                 )}
 
-                {[
-                  { key: "companyName", label: "Company Name", span: true },
-                  { key: "companyAddress", label: "Company Address", span: true },
-                  { key: "phone", label: "Phone Number", number: true },
-                  {
-                    key: "businessType",
-                      label: "Business Type",
-                      select: true,
-                      options: FALLBACK_BUSINESS_TYPES,
-                    },
-                  { key: "representativeName", label: "Representative Name", span: true },
-                  { key: "tin", label: "TIN (Tax Identification Number)", number: true },
-                ].map(({ key, label, span, select, options, number }) => (
-                  <label key={key} className={span ? "md:col-span-2" : ""}>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {label}
-                    </span>
-                    {select ? (
-                      // Multi-select checkboxes sourced from the server
-                      <div className={`w-full rounded-xl border bg-slate-50 px-4 py-3 text-sm ${validationErrors.businessTypeIds ? 'border-red-300' : 'border-slate-200'}`}>
-                        <div className="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto">
-                          {availableBusinessTypes.map((bt) => (
-                            <label key={bt.id} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={(form.businessTypeIds as unknown as string[]).includes(bt.id)}
-                                onChange={(e) => {
-                                  const ids = new Set(form.businessTypeIds as unknown as string[]);
-                                  if (e.target.checked) ids.add(bt.id); else ids.delete(bt.id);
-                                  updateForm("businessTypeIds", Array.from(ids));
-                                }}
-                                className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                              />
-                              <span className="text-sm text-slate-700">{bt.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                        {validationErrors.businessTypeIds ? <p className="mt-2 text-xs text-red-600">{validationErrors.businessTypeIds}</p> : null}
+
+                {/* Step 1: Documents */}
+                {step === 1 && (
+                  <div className="space-y-5">
+                    <SectionCard title="Legal Documents" description="Required for company registration and compliance">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FileUploadBox label="SEC or DTI Certificate" file={form.secDtiCertificate as File | null} error={fileErrors.secDtiCertificate || validationErrors.secDtiCertificate} invalid={Boolean(validationErrors.secDtiCertificate)} onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])} onClear={() => updateFile("secDtiCertificate", undefined)} fieldKey="secDtiCertificate" />
+                        <FileUploadBox label="Mayor's Permit / Business Permit" file={form.mayorsPm as File | null} error={fileErrors.mayorsPm || validationErrors.mayorsPm} invalid={Boolean(validationErrors.mayorsPm)} onChange={(e) => updateFile("mayorsPm", e.target.files?.[0])} onClear={() => updateFile("mayorsPm", undefined)} fieldKey="mayorsPm" />
+                        <FileUploadBox label="PhilGEPS Registration Certificate" file={form.philgepsRegistration as File | null} error={fileErrors.philgepsRegistration || validationErrors.philgepsRegistration} invalid={Boolean(validationErrors.philgepsRegistration)} onChange={(e) => updateFile("philgepsRegistration", e.target.files?.[0])} onClear={() => updateFile("philgepsRegistration", undefined)} fieldKey="philgepsRegistration" />
+                        <FileUploadBox label="Valid ID (Government-Issued)" file={form.validId as File | null} error={fileErrors.validId || validationErrors.validId} invalid={Boolean(validationErrors.validId)} onChange={(e) => updateFile("validId", e.target.files?.[0])} onClear={() => updateFile("validId", undefined)} fieldKey="validId" />
+                        <label className="block">
+                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">Mayor&apos;s Permit Expiry</span>
+                          <input type="date" value={form.mayorsPmExpiry as string} onChange={(e) => updateForm("mayorsPmExpiry", e.target.value)} className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
+                          {validationErrors.mayorsPmExpiry && <p className="mt-1 text-xs text-red-600">{validationErrors.mayorsPmExpiry}</p>}
+                        </label>
                       </div>
-                    ) : number ? (
-                      <>
-                        <StrictNumberInput
-                          value={form[key] as string}
-                          onChange={(value) => updateForm(key, value)}
-                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors[key] ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
-                          helperText="Numbers only."
-                        />
-                        {validationErrors[key] ? <p className="mt-1 text-xs text-red-600">{validationErrors[key]}</p> : null}
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={form[key] as string}
-                          onChange={(e) => updateForm(key, e.target.value)}
-                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors[key] ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
-                        />
-                        {validationErrors[key] ? <p className="mt-1 text-xs text-red-600">{validationErrors[key]}</p> : null}
-                      </>
-                    )}
-                  </label>
-                ))}
+                    </SectionCard>
 
-                <label className="md:col-span-2">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Company Profile & Capabilities
-                  </span>
-                  <textarea
-                    rows={4}
-                    value={form.companyProfile as string}
-                    onChange={(e) => updateForm("companyProfile", e.target.value)}
-                    className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.companyProfile ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
-                    placeholder="Brief company background and capability statement"
-                  />
-                  {validationErrors.companyProfile ? <p className="mt-1 text-xs text-red-600">{validationErrors.companyProfile}</p> : null}
-                </label>
+                    <SectionCard title="Financial Documents" description="Required to verify financial capacity">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FileUploadBox label="Tax Clearance Certificate" file={form.taxClearance as File | null} error={fileErrors.taxClearance || validationErrors.taxClearance} invalid={Boolean(validationErrors.taxClearance)} onChange={(e) => updateFile("taxClearance", e.target.files?.[0])} onClear={() => updateFile("taxClearance", undefined)} fieldKey="taxClearance" />
+                        <FileUploadBox label="Audited Financial Statements" file={form.auditedFinancialStatements as File | null} error={fileErrors.auditedFinancialStatements || validationErrors.auditedFinancialStatements} invalid={Boolean(validationErrors.auditedFinancialStatements)} onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])} onClear={() => updateFile("auditedFinancialStatements", undefined)} fieldKey="auditedFinancialStatements" />
+                        <FileUploadBox label="Bank Reference Letter" file={form.bankReferenceDocument as File | null} error={fileErrors.bankReferenceDocument || validationErrors.bankReferenceDocument} invalid={Boolean(validationErrors.bankReferenceDocument)} onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])} onClear={() => updateFile("bankReferenceDocument", undefined)} fieldKey="bankReferenceDocument" />
+                        <label className="block" data-field="taxClearanceExpiry">
+                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">Tax Clearance Expiry</span>
+                          <input type="date" value={form.taxClearanceExpiry as string} onChange={(e) => updateForm("taxClearanceExpiry", e.target.value)} className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
+                          {validationErrors.taxClearanceExpiry && <p className="mt-1 text-xs text-red-600">{validationErrors.taxClearanceExpiry}</p>}
+                        </label>
+                        <label className="block" data-field="financialStatementYear">
+                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">Financial Statement Year</span>
+                          <StrictNumberInput min="2020" max={new Date().getFullYear()} value={form.financialStatementYear as string} onChange={(v) => updateForm("financialStatementYear", v)} placeholder={`e.g. ${new Date().getFullYear()}`} className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" helperText="Year digits only." />
+                          {validationErrors.financialStatementYear && <p className="mt-1 text-xs text-red-600">{validationErrors.financialStatementYear}</p>}
+                        </label>
+                      </div>
+                    </SectionCard>
 
-                {/* Legal Documents */}
-                <CollapsibleSection title="Legal Documents" description="Required for company registration and compliance">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-4">
-                      <FileUploadField label="SEC or DTI Certificate" file={form.secDtiCertificate as File | null} error={fileErrors["secDtiCertificate"]} invalid={Boolean(validationErrors.secDtiCertificate || fileErrors.secDtiCertificate)} onChange={(e) => updateFile("secDtiCertificate", e.target.files?.[0])} onClear={() => updateFile("secDtiCertificate", undefined)} />
-                      <FileUploadField label="PhilGEPS Registration Certificate" file={form.philgepsRegistration as File | null} error={fileErrors["philgepsRegistration"]} invalid={Boolean(validationErrors.philgepsRegistration || fileErrors.philgepsRegistration)} onChange={(e) => updateFile("philgepsRegistration", e.target.files?.[0])} onClear={() => updateFile("philgepsRegistration", undefined)} />
-                    </div>
-                    <div className="space-y-4">
-                      <FileUploadField label="Mayor's Permit / Business Permit" file={form.mayorsPm as File | null} error={fileErrors["mayorsPm"]} invalid={Boolean(validationErrors.mayorsPm || fileErrors.mayorsPm)} onChange={(e) => updateFile("mayorsPm", e.target.files?.[0])} onClear={() => updateFile("mayorsPm", undefined)} />
-                      <DateInputField label="Mayor's Permit Expiry Date" value={form.mayorsPmExpiry as string} onChange={(e) => updateForm("mayorsPmExpiry", e.target.value)} />
-                      {validationErrors.mayorsPmExpiry ? <p className="text-xs text-red-600">{validationErrors.mayorsPmExpiry}</p> : null}
-                      <FileUploadField label="Valid ID (Government-Issued)" file={form.validId as File | null} error={fileErrors["validId"]} invalid={Boolean(validationErrors.validId || fileErrors.validId)} onChange={(e) => updateFile("validId", e.target.files?.[0])} onClear={() => updateFile("validId", undefined)} />
+                    <SectionCard title="Qualifications & Track Record" description="Optional — demonstrate experience">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FileUploadBox label="Performance Certificates / ISO" file={form.performanceCertificates as File | null} error={fileErrors.performanceCertificates} onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])} onClear={() => updateFile("performanceCertificates", undefined)} optional />
+                        <FileUploadBox label="Past Contracts / Purchase Orders" file={form.pastContractsDocument as File | null} error={fileErrors.pastContractsDocument} onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])} onClear={() => updateFile("pastContractsDocument", undefined)} optional />
+                      </div>
+                      <div className="mt-4">
+                        <label><span className="mb-1.5 block text-xs font-semibold text-slate-700">Track Record Description <span className="text-slate-400 font-normal">(Optional)</span></span>
+                          <textarea rows={2} value={form.trackRecordDescription as string} onChange={(e) => updateForm("trackRecordDescription", e.target.value)} placeholder="Brief description of similar projects" className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
+                        </label>
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard title="Representative Authorization" description="Required authorization document">
+                      <FileUploadBox label="Authorization Letter / SPA" file={form.representativeAuthorizationDocument as File | null} error={fileErrors.representativeAuthorizationDocument || validationErrors.representativeAuthorizationDocument} invalid={Boolean(validationErrors.representativeAuthorizationDocument)} onChange={(e) => updateFile("representativeAuthorizationDocument", e.target.files?.[0])} onClear={() => updateFile("representativeAuthorizationDocument", undefined)} fieldKey="representativeAuthorizationDocument" />
+                    </SectionCard>
+
+                    <div className="flex justify-between">
+                      <button type="button" onClick={prevStep} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">← Back</button>
+                      <button type="button" onClick={nextStep} className="rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Next: Declaration →</button>
                     </div>
                   </div>
-                </CollapsibleSection>
+                )}
 
-                {/* Financial Documents */}
-                <CollapsibleSection title="Financial Documents" description="Required to verify financial capacity and stability">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-4">
-                      <FileUploadField label="Tax Clearance Certificate" file={form.taxClearance as File | null} error={fileErrors["taxClearance"]} invalid={Boolean(validationErrors.taxClearance || fileErrors.taxClearance)} onChange={(e) => updateFile("taxClearance", e.target.files?.[0])} onClear={() => updateFile("taxClearance", undefined)} />
-                      <FileUploadField label="Audited Financial Statements (Latest 1-2 years)" file={form.auditedFinancialStatements as File | null} error={fileErrors["auditedFinancialStatements"]} invalid={Boolean(validationErrors.auditedFinancialStatements || fileErrors.auditedFinancialStatements)} onChange={(e) => updateFile("auditedFinancialStatements", e.target.files?.[0])} onClear={() => updateFile("auditedFinancialStatements", undefined)} />
-                    </div>
-                    <div className="space-y-4">
-                      <DateInputField label="Tax Clearance Expiry" value={form.taxClearanceExpiry as string} onChange={(e) => updateForm("taxClearanceExpiry", e.target.value)} />
-                      {validationErrors.taxClearanceExpiry ? <p className="text-xs text-red-600">{validationErrors.taxClearanceExpiry}</p> : null}
-                      <label>
-                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Financial Statement Year</span>
-                        <StrictNumberInput
-                          min="2020"
-                          max={new Date().getFullYear()}
-                          value={form.financialStatementYear as string}
-                          onChange={(value) => updateForm("financialStatementYear", value)}
-                          placeholder={`e.g. ${new Date().getFullYear()}`}
-                          className={`w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:bg-white focus:ring-2 ${validationErrors.financialStatementYear ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20'}`}
-                          helperText="Numbers only. Enter the year as digits."
-                        />
-                        {validationErrors.financialStatementYear ? <p className="mt-1 text-xs text-red-600">{validationErrors.financialStatementYear}</p> : null}
-                      </label>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <FileUploadField label="Bank Reference Letter or Credit Report" file={form.bankReferenceDocument as File | null} error={fileErrors["bankReferenceDocument"]} invalid={Boolean(validationErrors.bankReferenceDocument || fileErrors.bankReferenceDocument)} onChange={(e) => updateFile("bankReferenceDocument", e.target.files?.[0])} onClear={() => updateFile("bankReferenceDocument", undefined)} />
-                  </div>
-                </CollapsibleSection>
 
-                {/* Qualifications & Track Record */}
-                <CollapsibleSection title="Qualifications & Track Record" description="Demonstrate your company's experience and capabilities">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FileUploadField label="Performance Certificates / ISO Certifications" file={form.performanceCertificates as File | null} error={fileErrors["performanceCertificates"]} invalid={Boolean(validationErrors.performanceCertificates || fileErrors.performanceCertificates)} onChange={(e) => updateFile("performanceCertificates", e.target.files?.[0])} onClear={() => updateFile("performanceCertificates", undefined)} optional={true} />
-                    <FileUploadField label="Similar Past Contracts or Purchase Orders" file={form.pastContractsDocument as File | null} error={fileErrors["pastContractsDocument"]} invalid={Boolean(validationErrors.pastContractsDocument || fileErrors.pastContractsDocument)} onChange={(e) => updateFile("pastContractsDocument", e.target.files?.[0])} onClear={() => updateFile("pastContractsDocument", undefined)} optional={true} />
-                  </div>
-                  <div className="mt-3">
-                    <label>
-                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Track Record Description (Optional)</span>
-                      <textarea rows={3} value={form.trackRecordDescription as string} onChange={(e) => updateForm("trackRecordDescription", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="Brief description of similar projects completed in the last 5 years" />
-                    </label>
-                  </div>
-                </CollapsibleSection>
+                {/* Step 2: Declaration */}
+                {step === 2 && (
+                  <div className="space-y-5">
+                    <SectionCard title="Good Standing Declaration" description="Confirm your company's standing">
+                      <div data-field="notBlacklistedDeclaration" className={`flex items-start gap-3 rounded-lg border p-4 ${validationErrors.notBlacklistedDeclaration ? "border-red-300 bg-red-50/50" : "border-slate-200 bg-slate-50/50"}`}>
+                        <input type="checkbox" checked={form.notBlacklistedDeclaration as boolean} onChange={(e) => updateForm("notBlacklistedDeclaration", e.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">I declare that our company is not blacklisted by any government agency or private corporation.</p>
+                          <p className="mt-1 text-xs text-slate-500">By checking this, you certify that your company has no record of blacklisting or debarment.</p>
+                          {validationErrors.notBlacklistedDeclaration && <p className="mt-2 text-xs text-red-600">{validationErrors.notBlacklistedDeclaration}</p>}
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <FileUploadBox label="Sworn Statement / Affidavit" file={form.blacklistingDeclarationDocument as File | null} error={fileErrors.blacklistingDeclarationDocument} onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])} onClear={() => updateFile("blacklistingDeclarationDocument", undefined)} optional />
+                      </div>
+                    </SectionCard>
 
-                {/* Representative Authorization */}
-                <CollapsibleSection title="Representative Authorization">
-                  <FileUploadField label="Authorization Letter or Special Power of Attorney (SPA)" file={form.representativeAuthorizationDocument as File | null} error={fileErrors["representativeAuthorizationDocument"]} onChange={(e) => updateFile("representativeAuthorizationDocument", e.target.files?.[0])} onClear={() => updateFile("representativeAuthorizationDocument", undefined)} />
-                </CollapsibleSection>
+                    <SectionCard title="Additional Documents" description="Any other supporting documents">
+                      <FileUploadBox label="Other Supporting Documents" file={form.supportingDocuments as File | null} error={fileErrors.supportingDocuments} onChange={(e) => updateFile("supportingDocuments", e.target.files?.[0])} onClear={() => updateFile("supportingDocuments", undefined)} optional />
+                    </SectionCard>
 
-                {/* Good Standing Declaration */}
-                <CollapsibleSection title="Good Standing Declaration">
-                  <label>
-                    
-                  </label>
-                </CollapsibleSection>
-
-                <label className="md:col-span-2">
-                  <div className={`flex items-start gap-3 rounded-xl bg-slate-50 p-4 ${validationErrors.notBlacklistedDeclaration ? 'border border-red-300' : 'border border-slate-200'}`}>
-                    <input
-                      type="checkbox"
-                      checked={form.notBlacklistedDeclaration as boolean}
-                      onChange={(e) => updateForm("notBlacklistedDeclaration", e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">
-                        I declare that our company is not blacklisted by any government agency or private corporation
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        By checking this, you certify that your company has no record of blacklisting or debarment
-                      </p>
-                      {validationErrors.notBlacklistedDeclaration ? <p className="mt-2 text-xs text-red-600">{validationErrors.notBlacklistedDeclaration}</p> : null}
+                    <div className="flex justify-between">
+                      <button type="button" onClick={prevStep} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">← Back</button>
+                      <button type="button" onClick={nextStep} className="rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Next: Review →</button>
                     </div>
                   </div>
-                </label>
+                )}
 
-                <FileUploadField label="Sworn Statement / Affidavit (Optional)" file={form.blacklistingDeclarationDocument as File | null} error={fileErrors["blacklistingDeclarationDocument"]} invalid={Boolean(validationErrors.blacklistingDeclarationDocument || fileErrors.blacklistingDeclarationDocument)} onChange={(e) => updateFile("blacklistingDeclarationDocument", e.target.files?.[0])} onClear={() => updateFile("blacklistingDeclarationDocument", undefined)} optional={true} />
+                {/* Step 3: Review & Submit */}
+                {step === 3 && (
+                  <div className="space-y-5">
+                    <SectionCard title="Review & Submit" description="Verify your information before submitting">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                          <p className="text-2xl font-bold text-emerald-600">{requiredDocsCount}/{requiredDocs.length}</p>
+                          <p className="text-xs text-slate-500 mt-1">Required docs uploaded</p>
+                        </div>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                          <p className="text-2xl font-bold text-slate-700">{optionalDocsCount}</p>
+                          <p className="text-xs text-slate-500 mt-1">Optional docs uploaded</p>
+                        </div>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                          <p className="text-sm font-semibold text-amber-600 mt-1">Pending Review</p>
+                          <p className="text-xs text-slate-500 mt-1">Status after submission</p>
+                        </div>
+                      </div>
 
-                {/* Other Documents */}
-                <CollapsibleSection title="Additional Documents">
-                  <FileUploadField label="Other Supporting Documents" file={form.supportingDocuments as File | null} error={fileErrors["supportingDocuments"]} onChange={(e) => updateFile("supportingDocuments", e.target.files?.[0])} onClear={() => updateFile("supportingDocuments", undefined)} optional={true} />
-                </CollapsibleSection>
+                      <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 flex gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-blue-600 mt-0.5" />
+                        <div className="text-xs text-blue-700 space-y-1">
+                          <p>• All files must be 5MB or smaller (PDF, JPG, PNG)</p>
+                          <p>• Your account will be pending admin verification after submission</p>
+                          <p>• You must complete all required documents to submit bids</p>
+                        </div>
+                      </div>
+                    </SectionCard>
 
-                {/* Info Box */}
-                <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 flex gap-3">
-                  <AlertCircle className="h-5 w-5 shrink-0 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">Document Requirements</p>
-                    <ul className="mt-1 text-xs text-blue-700 space-y-1">
-                      <li>• All files must be 5MB or smaller (PDF, JPG, PNG)</li>
-                      <li>• After registration, your account will be pending admin verification</li>
-                      <li>• You must complete all required documents to submit bids</li>
-                      <li>• Expiry dates will be verified; please ensure documents are current</li>
-                    </ul>
+                    {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex gap-2"><AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />{error}</div>}
+
+                    <div className="flex justify-between">
+                      <button type="button" onClick={prevStep} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">← Back</button>
+                      <LoadingButton type="submit" isLoading={isLoading} loadingText="Submitting..." className="rounded-xl bg-emerald-500 px-8 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">Submit Registration</LoadingButton>
+                    </div>
                   </div>
-                </div>
-
-                {/* Error Message */}
-                {error ? (
-                  <div className="md:col-span-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600 flex gap-2">
-                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                    {error}
-                  </div>
-                ) : null}
-
-                {/* Submit Button */}
-                <LoadingButton
-                  type="submit"
-                  isLoading={isLoading}
-                  loadingText="Registering..."
-                  className="md:col-span-2 mt-2 w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all duration-150 hover:bg-emerald-600"
-                >
-                  Submit Registration
-                </LoadingButton>
+                )}
               </form>
 
-              <p className="mt-5 text-center text-sm text-slate-400">
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => router.push("/login")}
-                  className="font-medium text-emerald-600 hover:text-emerald-700"
-                >
-                  Sign In
-                </button>
-              </p>
+              <p className="mt-6 text-center text-sm text-slate-400">Already have an account? <button type="button" onClick={() => router.push("/login")} className="font-medium text-emerald-600 hover:text-emerald-700">Sign In</button></p>
             </>
           )}
         </div>

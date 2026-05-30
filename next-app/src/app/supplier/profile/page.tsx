@@ -7,6 +7,7 @@ import { User } from "@/types/user";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import Toast from "@/components/shared/Toast";
 import LoadingButton from "@/components/ui/LoadingButton";
+import ViewFileButton from "@/components/shared/ViewFileButton";
 
 const FIELDS = [
   { key: "full_name", label: "Full Name", type: "text" },
@@ -169,9 +170,7 @@ export default function SupplierProfile() {
                         {doc.state === "flagged" ? "Flagged" : "Revised - re-review"}
                       </span>
                       {isRenderableFileUrl(doc.file) ? (
-                        <a href={doc.file} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-600 hover:underline">
-                          View current file
-                        </a>
+                        <ViewFileButton file={doc.file} label="View current file" />
                       ) : (
                         <span className="text-xs text-slate-400">No file preview available</span>
                       )}

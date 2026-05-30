@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifyUser } from "@/lib/actions";
+import { createBidLog } from "@/lib/bid-log";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireRole(request, "school_head");
@@ -60,6 +61,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       : await db.project.create({ data: { id: uuid(), procurement_request_id: id, ...projectData } });
 
     await logAudit("APPROVE", user!.id, `Approved procurement request ${procurement.project_title}`, "procurement", id);
+    await createBidLog({ projectId: project.id, userId: user!.id, role: "school_head", action: "PROJECT_CREATED", description: `Bidding "${procurement.project_title}" was approved and created` });
     if (procurement.created_by_id) {
       await notifyUser(procurement.created_by_id, "request_approved", "Procurement Request Approved", `School Head approved your procurement request: ${procurement.project_title}. Publish it when ready.`, "/admin/projects", id);
     }

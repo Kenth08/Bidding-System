@@ -36,7 +36,11 @@ export default function VerificationStatusPage() {
       {user?.verification_status !== 'verified' && (
         <div className={`mb-8 p-4 border rounded-lg flex items-center gap-3 ${current.banner}`}>
           <AlertCircle className="shrink-0" />
-          <p className="font-medium">Your supplier account is still under verification review. Bidding access is restricted.</p>
+          <p className="font-medium">
+            {user?.verification_status === 'flagged'
+              ? "You must complete supplier verification before participating in bidding."
+              : "Your supplier account is currently under admin review."}
+          </p>
         </div>
       )}
 

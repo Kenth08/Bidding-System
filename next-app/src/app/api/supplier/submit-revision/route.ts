@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { getSupplierWorkflow, updateSupplierWorkflow, addSupplierWorkflowActivity } from "@/lib/supplier-workflow-db";
-import { SUPPLIER_DOCUMENT_DEFINITIONS } from "@/lib/supplier-documents";
 import { sendReuploadConfirmationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
@@ -10,15 +9,11 @@ export async function POST(request: Request) {
 
   const supplierId = user!.id;
   const workflow = await getSupplierWorkflow(supplierId);
-  const requiredDocIds = new Set(
-    SUPPLIER_DOCUMENT_DEFINITIONS.filter((d) => d.required).map((d) => d.id)
-  );
-
-  const flaggedRequiredDocIds = Object.keys(workflow.flagged_reasons || {}).filter((id) => requiredDocIds.has(id));
-  if (flaggedRequiredDocIds.length > 0) {
+  const flaggedDocIds = Object.keys(workflow.flagged_reasons || {});
+  if (flaggedDocIds.length > 0) {
     return json({
-      error: "Please re-upload all flagged required documents before submitting.",
-      pending: flaggedRequiredDocIds,
+      error: "Please re-upload all flagged documents before submitting.",
+      pending: flaggedDocIds,
     }, 400);
   }
 
