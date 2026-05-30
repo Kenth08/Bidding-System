@@ -177,7 +177,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
 
     // mark supplier account as requiring revision
-    await db.user.update({ where: { id }, data: { status: "revision_required" } });
+    await db.user.update({ where: { id }, data: { status: "revision_required", verification_status: "revision_required" } });
 
     // send a document-level rejection email
     try {

@@ -8,7 +8,6 @@ import SearchBar from "@/components/shared/SearchBar";
 import StatusBadge from "@/components/shared/StatusBadge";
 import Toast from "@/components/shared/Toast";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
-import ViewFileButton from "@/components/shared/ViewFileButton";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 const TABS = ["All", "pending", "approved", "rejected"];
@@ -102,10 +101,10 @@ export default function AdminSuppliers() {
     setDetailBusy(true);
     try {
       await suppliersAPI.reviewDocument(viewing.id, documentId, "flag", reason);
-      setToast({ message: "Document flagged for revision.", type: "success" });
+      setToast({ message: "Document marked for revision.", type: "success" });
       await loadDocumentWorkflow(viewing.id);
     } catch {
-      setToast({ message: "Failed to flag document.", type: "error" });
+      setToast({ message: "Failed to mark document for revision.", type: "error" });
     } finally {
       setDetailBusy(false);
     }
@@ -269,40 +268,7 @@ export default function AdminSuppliers() {
               </div>
             </div>
 
-            {/* Uploaded Documents */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Uploaded Documents</p>
-              <div className="grid grid-cols-1 gap-2">
-                {[
-                  { label: "SEC / DTI Certificate", path: viewing.sec_dti_certificate },
-                  { label: "Mayor's Permit / Business Permit", path: viewing.mayors_permit, expiry: viewing.mayors_permit_expiry },
-                  { label: "PhilGEPS Registration", path: viewing.philgeps_registration },
-                  { label: "Valid ID", path: viewing.valid_id },
-                  { label: "Tax Clearance", path: viewing.tax_clearance, expiry: viewing.tax_clearance_expiry },
-                  { label: "Audited Financial Statements", path: viewing.audited_financial_statements },
-                  { label: "Bank Reference Document", path: viewing.bank_reference_document },
-                  { label: "Performance Certificates", path: viewing.performance_certificates },
-                  { label: "Past Contracts Document", path: viewing.past_contracts_document },
-                  { label: "Representative Authorization", path: viewing.representative_authorization_document },
-                  { label: "Blacklisting Declaration Document", path: viewing.blacklisting_declaration_document },
-                  { label: "BIR Form 2303", path: viewing.bir_form_2303 },
-                  { label: "ISO Certificate", path: viewing.iso_certificate },
-                  { label: "Supporting Documents", path: viewing.supporting_documents },
-                ].filter(d => d.path).map(({ label, path, expiry }) => (
-                  <div key={label} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-slate-700">{label}</p>
-                      {expiry && <p className="text-xs text-slate-400">Expires: {new Date(expiry).toLocaleDateString()}</p>}
-                    </div>
-                    <ViewFileButton file={String(path)} label="View File" className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-wait" />
-                  </div>
-                ))}
-                {![viewing.sec_dti_certificate, viewing.mayors_permit, viewing.philgeps_registration, viewing.valid_id, viewing.tax_clearance, viewing.audited_financial_statements, viewing.bank_reference_document].some(Boolean) && (
-                  <p className="text-sm text-slate-400 py-2">No documents uploaded.</p>
-                )}
-              </div>
-            </div>
-
+            {/* Document Review Workflow */}
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Document Review Workflow</p>
               {workflowLoading ? (

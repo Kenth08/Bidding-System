@@ -36,8 +36,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   await logAudit("UPDATE", user!.id, `Published project ${project.title}`, "project", id);
   await createBidLog({ projectId: id, userId: user!.id, role: "admin", action: "PROJECT_PUBLISHED", description: `Bidding "${project.title}" was published and is now open for suppliers` });
 
-  // Notify approved suppliers
-  const suppliers = await db.user.findMany({ where: { role: "supplier", status: "approved", is_active: true } });
+  // Notify verified suppliers
+  const suppliers = await db.user.findMany({ where: { role: "supplier", verification_status: "verified", is_active: true } });
   for (const supplier of suppliers) {
     await notifyUser(supplier.id, "project_published", "New Bidding Opportunity", `A new project "${project.title}" is now open for bidding.`, "/supplier/projects", id);
   }

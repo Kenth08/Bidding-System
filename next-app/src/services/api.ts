@@ -64,6 +64,7 @@ export const projectsAPI = {
   archive: (id: string, reason: string) => api.patch(`/projects/${id}/archive`, { reason }),
   unarchive: (id: string) => api.patch(`/projects/${id}/unarchive`),
   getHistory: () => api.get("/projects/history"),
+  closeBidding: (id: string) => api.post(`/admin/projects/${id}/close-bidding`),
 };
 
 export const dashboardAPI = {

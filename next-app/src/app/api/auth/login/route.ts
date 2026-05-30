@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { supabaseServer } from "@/lib/supabase-server";
 import { signAccessToken, signRefreshToken } from "@/lib/auth";
 import { logAudit } from "@/lib/actions";
 
@@ -26,19 +25,6 @@ export async function POST(request: Request) {
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-  if (process.env.NODE_ENV === "development") {
-    console.log("[login debug]", {
-      emailFound: !!user,
-      hasPasswordHash: !!user?.password_hash,
-      hashLooksValid: user?.password_hash?.startsWith("$2"),
-      passwordValid: isPasswordValid,
-      role: user?.role,
-      status: user?.status,
-      verificationStatus: user?.verification_status,
-    });
-  }
-
   if (!isPasswordValid) return NextResponse.json({ error: "Wrong email or password." }, { status: 401 });
 
   // --- From here on, password is valid. Use 403 for account restrictions. ---
@@ -47,16 +33,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please verify your email before signing in.", email_verification_required: true, email: user.email }, { status: 403 });
   }
 
-  // Supplier verification status gate
+  // Supplier verification_status gate — single source of truth
   if (user.role === "supplier") {
-    // Determine effective verification status.
-    // If status is "approved" or "active", treat as verified (admin already approved).
-    const approvedStatuses = ["approved", "active", "verified"];
-    const vs = approvedStatuses.includes(user.status)
-      ? (user.verification_status === "verified" ? "verified" : "verified")
-      : (user.verification_status || user.status);
+    const vs = user.verification_status;
 
-    if (vs === "waiting_admin_approval" || vs === "pending") {
+    if (vs === "waiting_admin_approval") {
       return NextResponse.json({ error: "Your supplier account is currently under admin review." }, { status: 403 });
     }
     if (vs === "waiting_admin_review") {
@@ -65,28 +46,8 @@ export async function POST(request: Request) {
     if (vs === "rejected") {
       return NextResponse.json({ error: "Your registration has been rejected." }, { status: 403 });
     }
-    // revision_required and verified: allow login (redirect handled by frontend)
-  }
-
-  // Workflow lock check (Supabase table)
-  if (user.role === "supplier") {
-    try {
-      const { data: workflow, error } = await supabaseServer
-        .from("supplier_document_workflows")
-        .select("account_locked")
-        .eq("supplier_id", user.id)
-        .maybeSingle();
-      if (error) throw error;
-      const isLocked = Boolean(workflow?.account_locked);
-
-      if (isLocked && user.status !== "revision_required" && !["approved", "active", "verified"].includes(user.status)) {
-        return NextResponse.json({
-          error: "Your account is temporarily locked. Please revise and resubmit flagged documents from your profile.",
-        }, { status: 403 });
-      }
-    } catch {
-      // Ignore if the workflow table is not available in this environment.
-    }
+    // revision_required: allow login (limited access enforced by middleware/layout)
+    // verified: allow full login
   }
 
   if (!user.is_active || user.status === "inactive") {
@@ -94,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   // --- Issue token ---
-  const access = await signAccessToken({ id: user.id, email: user.email, role: user.role, status: user.status });
+  const access = await signAccessToken({ id: user.id, email: user.email, role: user.role, status: user.verification_status, session_version: user.session_version });
   const refresh = await signRefreshToken(user.id);
 
   await logAudit("LOGIN", user.id, `${user.full_name} logged in`, "auth", user.id).catch(() => {});
@@ -102,7 +63,7 @@ export async function POST(request: Request) {
   // Determine redirect path for supplier based on verification_status
   let redirectPath: string | undefined;
   if (user.role === "supplier") {
-    if (user.verification_status === "revision_required" || user.status === "revision_required") {
+    if (user.verification_status === "revision_required") {
       redirectPath = "/supplier/revision-required";
     } else {
       redirectPath = "/supplier/dashboard";

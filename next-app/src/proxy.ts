@@ -10,12 +10,12 @@ const protectedPaths: Record<string, string[]> = {
   "/school-head": ["school_head"],
 };
 
-const ALLOWED_WHEN_RESTRICTED = [
+const ALLOWED_WHEN_REVISION_REQUIRED = [
   "/supplier/revision-required",
-  "/supplier/verification",
   "/supplier/verification-status",
   "/supplier/profile",
   "/supplier/notifications",
+  "/supplier/documents/reupload",
   "/supplier/documents",
 ];
 
@@ -44,27 +44,34 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    // Supplier access control based on JWT status claim (no DB call needed)
+    // Supplier access control based on verification_status in JWT
     if (role === "supplier" && pathname.startsWith("/supplier")) {
       if (status === "waiting_admin_approval" || status === "waiting_admin_review") {
-        return NextResponse.redirect(new URL("/login?error=under_review", request.url));
+        const res = NextResponse.redirect(new URL("/login?error=under_review", request.url));
+        res.cookies.delete("access_token");
+        res.cookies.delete("refresh_token");
+        return res;
       }
 
       if (status === "revision_required") {
-        const isAllowed = ALLOWED_WHEN_RESTRICTED.some((p) => pathname.startsWith(p));
+        const isAllowed = ALLOWED_WHEN_REVISION_REQUIRED.some((p) => pathname.startsWith(p));
         if (!isAllowed) {
           return NextResponse.redirect(new URL("/supplier/revision-required", request.url));
         }
       }
-      // For approved/verified/active suppliers, allow all routes
+      // verified: allow all supplier routes
     }
 
     return NextResponse.next();
   } catch (err: any) {
     if (err?.code === "ERR_JWT_EXPIRED") {
+      // Let the page load; client-side will handle refresh
       return NextResponse.next();
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    const res = NextResponse.redirect(new URL("/login", request.url));
+    res.cookies.delete("access_token");
+    res.cookies.delete("refresh_token");
+    return res;
   }
 }
 

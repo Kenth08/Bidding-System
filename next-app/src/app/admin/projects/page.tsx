@@ -12,19 +12,10 @@ import LoadingButton from "@/components/ui/LoadingButton";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
 
+import { BUSINESS_TYPES } from "@/lib/business-types";
+
 const TABS = ["All", "draft", "active", "closed", "awarded"];
-const FALLBACK_PROCUREMENT_TYPES = [
-  "IT Equipment",
-  "Office Supplies",
-  "Construction Materials",
-  "Medical Supplies",
-  "ICT Services",
-  "Electrical Supplies",
-  "Agricultural Supplies",
-  "Printing Services",
-  "Transportation",
-  "Consultancy",
-];
+const FALLBACK_PROCUREMENT_TYPES = BUSINESS_TYPES as unknown as string[];
 const EMPTY_FORM = { title: "", budget: "", deadline: "", procurement_type: "", technical_specifications: "", delivery_period: "", procurement_schedule: "", public_result_expiry_date: "" };
 const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20";
 

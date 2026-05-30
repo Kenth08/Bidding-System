@@ -27,16 +27,21 @@ function VerifyEmailPageContent() {
     setError("");
     setMessage("");
 
-    if (!email.trim() || !code.trim()) {
+    const cleanCode = code.replace(/\D/g, "");
+    if (!email.trim() || !cleanCode) {
       setError("Enter your email and verification code.");
+      return;
+    }
+    if (cleanCode.length !== 6) {
+      setError("Please enter a valid 6-digit code.");
       return;
     }
 
     setIsVerifying(true);
     try {
-      await authAPI.verifyEmail(email.trim().toLowerCase(), code.trim());
-      setMessage("Email verified successfully. You can now sign in.");
-      setTimeout(() => router.push(`/login?verified=1&email=${encodeURIComponent(email.trim().toLowerCase())}`), 900);
+      const res = await authAPI.verifyEmail(email.trim().toLowerCase(), cleanCode);
+      setMessage(res.data?.message || "Email verified successfully.");
+      setTimeout(() => router.push(`/login?verified=1&email=${encodeURIComponent(email.trim().toLowerCase())}`), 1500);
     } catch (err: any) {
       setError(err?.response?.data?.error || "Failed to verify email.");
     } finally {
@@ -55,8 +60,9 @@ function VerifyEmailPageContent() {
 
     setIsResending(true);
     try {
-      const res = await authAPI.resendVerificationCode(email.trim().toLowerCase());
-      setMessage(res.data?.message || "Verification code sent.");
+      await authAPI.resendVerificationCode(email.trim().toLowerCase());
+      setCode("");
+      setMessage("A new verification code has been sent to your email.");
     } catch (err: any) {
       setError(err?.response?.data?.error || "Failed to resend code.");
     } finally {
@@ -81,8 +87,8 @@ function VerifyEmailPageContent() {
             <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm tracking-[0.35em] outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20" placeholder="123456" />
           </label>
 
-          {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p> : null}
-          {message ? <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{message}</p> : null}
+          {error && <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
+          {message && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{message}</p>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <LoadingButton type="button" isLoading={isResending} onClick={handleResend} loadingText="Sending..." className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Resend Code</LoadingButton>

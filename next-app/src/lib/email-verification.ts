@@ -1,27 +1,24 @@
-import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 
 const CODE_LENGTH = 6;
-const CODE_EXPIRY_MINUTES = 10;
+const CODE_EXPIRY_MINUTES = 15;
 const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
 
 export function generateVerificationCode() {
-  const min = 10 ** (CODE_LENGTH - 1);
-  const max = 10 ** CODE_LENGTH - 1;
-  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export function hashVerificationCode(email: string, code: string) {
-  const secret = process.env.EMAIL_VERIFICATION_SECRET || process.env.JWT_SECRET || "default-verification-secret";
-  return crypto.createHash("sha256").update(`${email.toLowerCase()}:${code}:${secret}`).digest("hex");
+export async function hashVerificationCode(_email: string, code: string) {
+  return bcrypt.hash(code, 10);
 }
 
-export function buildVerificationCodePayload(email: string) {
+export async function buildVerificationCodePayload(email: string) {
   const code = generateVerificationCode();
-  const codeHash = hashVerificationCode(email, code);
-  const expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000);
+  const codeHash = await hashVerificationCode(email, code);
+  const expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
   return { code, codeHash, expiresAt };
 }
 
@@ -102,7 +99,7 @@ export async function sendVerificationCodeEmail(params: { to: string; fullName?:
   `;
 
   try {
-    await transporter.sendMail({
+    await transporter!.sendMail({
       from: `${fromName} <${fromEmail}>`,
       to: params.to,
       subject,
@@ -114,7 +111,10 @@ export async function sendVerificationCodeEmail(params: { to: string; fullName?:
   }
 }
 
-export async function sendSupplierReuploadConfirmationEmail(_to: string) {}
+export async function sendSupplierReuploadConfirmationEmail(to: string) {
+  const { sendReuploadConfirmationEmail } = await import("@/lib/email");
+  await sendReuploadConfirmationEmail({ to, supplierName: "Supplier" });
+}
 
 export const emailVerificationRules = {
   codeLength: CODE_LENGTH,

@@ -14,15 +14,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const bid = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: true } });
   if (!bid) return json({ error: "Bid not found" }, 404);
 
-  // Allow selecting a winner only when the bid is qualified (technical_compliance)
-  // or when the supplier account is verified. Qualification is the preferred
-  // gate for awarding; supplier verification is an alternate path.
-  if (!(bid.technical_compliance || bid.supplier?.verification_status === "verified")) {
-    return json({ error: "Cannot select winner. The bid must be qualified or the supplier must be verified before selecting a winner." }, 400);
+  // Allow selecting a winner only when the bid is qualified (technical_compliance=true).
+  // Unqualified bids cannot be selected as winner.
+  if (!bid.technical_compliance) {
+    return json({ error: "Cannot select winner. The bid must be qualified (technically compliant) before selecting a winner." }, 400);
   }
 
   // Only allow selecting a winner after bidding has closed.
-  if (bid.project.status !== "closed") {
+  // Auto-close the project if the deadline has passed but status wasn't updated yet.
+  if (bid.project.status === "active") {
+    const deadline = new Date(bid.project.deadline);
+    deadline.setHours(0, 0, 0, 0);
+    if (deadline < new Date()) {
+      await db.project.update({ where: { id: bid.project_id }, data: { status: "closed" } });
+    } else {
+      return json({ error: "Winner selection is only allowed after bidding is closed." }, 400);
+    }
+  } else if (bid.project.status !== "closed") {
     return json({ error: "Winner selection is only allowed after bidding is closed." }, 400);
   }
 

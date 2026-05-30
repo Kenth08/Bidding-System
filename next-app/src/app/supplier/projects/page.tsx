@@ -340,7 +340,7 @@ export default function SupplierProjects() {
   );
 
   if (!projects.length) {
-    return <EmptyState title="No matching procurement opportunities" subtitle="There are currently no available projects that match your registered business type." actionLabel="Update profile" onAction={() => router.push("/supplier/profile")} />;
+    return <EmptyState title="No matching procurement opportunities" subtitle="There are currently no available bidding projects that match your registered business type." actionLabel="Update profile" onAction={() => router.push("/supplier/profile")} />;
   }
 
   const FILTERS = [

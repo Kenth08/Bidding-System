@@ -105,6 +105,8 @@ function AdminBidEvaluationContent() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ProcurementCategory>("all");
   const [showLogs, setShowLogs] = useState(false);
+  const [closeBiddingConfirm, setCloseBiddingConfirm] = useState(false);
+  const [isClosingBidding, setIsClosingBidding] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -222,11 +224,24 @@ function AdminBidEvaluationContent() {
   async function handleSelectWinner() {
     if (!winnerConfirm) return;
     setIsConfirmLoading(true);
-    try { await bidsAPI.selectWinner(winnerConfirm.id); setToast({ message: "Winner selected!", type: "success" }); setWinnerConfirm(null); refreshBids(); } catch (e: any) { setToast({ message: e?.response?.data?.error || "Failed", type: "error" }); setWinnerConfirm(null); }
+    try { await bidsAPI.selectWinner(winnerConfirm.id); setToast({ message: "Winner selected!", type: "success" }); setWinnerConfirm(null); refreshBids(); projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {}); } catch (e: any) { setToast({ message: e?.response?.data?.error || "Failed", type: "error" }); setWinnerConfirm(null); }
     finally { setIsConfirmLoading(false); }
   }
 
   function refreshBids() { bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setBids([])); }
+
+  async function handleCloseBidding() {
+    if (!selectedProject) return;
+    setIsClosingBidding(true);
+    try {
+      await projectsAPI.closeBidding(selectedProject);
+      setToast({ message: "Bidding has been closed. You can now select a winner.", type: "success" });
+      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
+      refreshBids();
+    } catch (e: any) {
+      setToast({ message: e?.response?.data?.error || "Failed to close bidding", type: "error" });
+    } finally { setIsClosingBidding(false); setCloseBiddingConfirm(false); }
+  }
 
   if (loading) return <SkeletonTable />;
 
@@ -307,6 +322,9 @@ function AdminBidEvaluationContent() {
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowLogs(true)} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><ClipboardList className="h-3.5 w-3.5" />View Logs</button>
+              {selectedProjectData.status === "active" && currentBids.length > 0 && !currentBids.some((b: any) => b.status === "won") && (
+                <button onClick={() => setCloseBiddingConfirm(true)} className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"><ShieldCheck className="h-3.5 w-3.5" />Close Bidding &amp; Start Evaluation</button>
+              )}
               <StatusBadge status={selectedProjectData.status} />
             </div>
           </div>
@@ -390,8 +408,11 @@ function AdminBidEvaluationContent() {
                                 {isExpanded ? "Close" : "Evaluate"}
                               </button>
                             )}
-                            {b.technical_compliance && selectedProjectData?.status === "closed" && b.status !== "won" && b.status !== "lost" && (
+                            {b.technical_compliance && b.status !== "won" && b.status !== "lost" && !currentBids.some((cb: any) => cb.status === "won") && (
                               <button onClick={() => setWinnerConfirm(b)} className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100">Select Winner</button>
+                            )}
+                            {b.technical_compliance && b.status !== "won" && b.status !== "lost" && currentBids.some((cb: any) => cb.status === "won") && (
+                              <span className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-400">Winner already selected</span>
                             )}
                           </div>
                         )}
@@ -548,7 +569,8 @@ function AdminBidEvaluationContent() {
       </Modal>
 
       <ConfirmDialog isOpen={Boolean(reviewConfirm)} onClose={() => setReviewConfirm(null)} onConfirm={handleMarkReview} title="Mark for Review" message={`Mark this bid from "${reviewConfirm?.supplier?.full_name || reviewConfirm?.company_name}" as under evaluation?`} confirmLabel="Mark for Review" isConfirmLoading={isConfirmLoading} />
-      <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winner" message={`Select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner with a bid of ${formatPeso(winnerConfirm?.bid_amount)}? This will mark all other bids as lost and finalize the award.`} confirmLabel="Select Winner" isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={Boolean(winnerConfirm)} onClose={() => setWinnerConfirm(null)} onConfirm={handleSelectWinner} title="Select Winning Supplier?" message={`Are you sure you want to select "${winnerConfirm?.supplier?.full_name || winnerConfirm?.company_name}" as the winner for this project? This action will mark the bid as the winning bid.`} confirmLabel="Confirm Winner" isConfirmLoading={isConfirmLoading} />
+      <ConfirmDialog isOpen={closeBiddingConfirm} onClose={() => setCloseBiddingConfirm(false)} onConfirm={handleCloseBidding} title="Close Bidding?" message="This will stop suppliers from submitting new bids and move the project to bid evaluation." confirmLabel="Close Bidding" isConfirmLoading={isClosingBidding} />
       <Toast message={toast?.message || ""} type={toast?.type || "success"} isVisible={Boolean(toast)} onClose={() => setToast(null)} />
       <BidActivityLogModal isOpen={showLogs} onClose={() => setShowLogs(false)} projectId={selectedProject} apiBase="admin" />
     </div>

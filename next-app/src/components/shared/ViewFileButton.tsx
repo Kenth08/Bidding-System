@@ -11,22 +11,17 @@ export default function ViewFileButton({ file, label = "View File", className }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleClick() {
+  function handleClick() {
+    if (!file) {
+      setError("No file available.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
     setLoading(true);
     setError("");
-    try {
-      const url = `/api/files/preview?file=${encodeURIComponent(file)}`;
-      const res = await fetch(url, { method: "HEAD", redirect: "follow" }).catch(() => null);
-      if (res && !res.ok && res.status !== 302 && res.status !== 301) {
-        throw new Error("File not available");
-      }
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch {
-      setError("Unable to open file. Please try again.");
-      setTimeout(() => setError(""), 3000);
-    } finally {
-      setLoading(false);
-    }
+    const url = `/api/files/preview?file=${encodeURIComponent(file)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => setLoading(false), 1000);
   }
 
   return (

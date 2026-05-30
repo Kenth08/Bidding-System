@@ -282,7 +282,7 @@ export async function POST(request: Request) {
   }
 
   const password_hash = await bcrypt.hash(password, 12);
-  const verification = isLocalMode ? null : buildVerificationCodePayload(email);
+  const verification = isLocalMode ? null : await buildVerificationCodePayload(email);
 
   const user = await db.user.create({
     data: {

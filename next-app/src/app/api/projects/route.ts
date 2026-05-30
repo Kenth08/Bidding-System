@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   let where: Record<string, unknown> = { is_archived: false };
 
   if (user!.role === "supplier") {
-    if (!["approved", "active"].includes(user!.status)) return json([]);
+    if (user!.verification_status !== "verified") return json([]);
     where = { ...where, status: "active" };
   }
 

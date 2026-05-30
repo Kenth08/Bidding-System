@@ -6,8 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { authAPI } from "@/services/api";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
 
+import { BUSINESS_TYPES } from "@/lib/business-types";
+
 const isLocalMode = process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
-const FALLBACK_BUSINESS_TYPES = ["IT Equipment","Office Supplies","Construction Materials","Medical Supplies","ICT Services","Electrical Supplies","Agricultural Supplies","Printing Services","Transportation","Consultancy"];
+const FALLBACK_BUSINESS_TYPES = BUSINESS_TYPES as unknown as string[];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const STEPS = ["Basic Info", "Documents", "Declaration", "Submit"];
 
@@ -114,7 +116,7 @@ function RegisterPageContent() {
     (async () => {
       try {
         const res = await fetch("/api/public/business-types");
-        if (res.ok) { const json = await res.json(); setAvailableBusinessTypes(json || []); }
+        if (res.ok) { const json = await res.json(); setAvailableBusinessTypes(json?.length ? json : FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n }))); }
         else setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
       } catch { setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n }))); }
     })();
@@ -317,18 +319,19 @@ function RegisterPageContent() {
                         </label>
                         <div className="md:col-span-2"><TextInput label="Representative Name" value={form.representativeName as string} onChange={(v) => updateForm("representativeName", v)} error={validationErrors.representativeName} fieldKey="representativeName" /></div>
                         <div className="md:col-span-2" data-field="businessTypeIds">
-                          <span className="mb-1.5 block text-xs font-semibold text-slate-700">Business Type <span className="text-red-400">*</span></span>
-                          <div className={`rounded-lg border p-3 ${validationErrors.businessTypeIds ? "border-red-300" : "border-slate-200"}`}>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-44 overflow-y-auto">
+                          <span className="mb-1 block text-xs font-semibold text-slate-700">Business Type <span className="text-red-400">*</span></span>
+                          <p className="mb-2 text-xs text-slate-500">Select all business categories that apply to your company.</p>
+                          <div className={`rounded-lg border p-3 ${validationErrors.businessTypeIds ? "border-red-300 bg-red-50/30" : "border-slate-200"}`}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                               {availableBusinessTypes.map((bt) => (
-                                <label key={bt.id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors ${(form.businessTypeIds as string[]).includes(bt.id) ? "bg-emerald-50" : "hover:bg-slate-50"}`}>
+                                <label key={bt.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer border transition-all ${(form.businessTypeIds as string[]).includes(bt.id) ? "border-emerald-400 bg-emerald-50" : "border-transparent hover:bg-slate-50"}`}>
                                   <input type="checkbox" checked={(form.businessTypeIds as string[]).includes(bt.id)} onChange={(e) => { const ids = new Set(form.businessTypeIds as string[]); if (e.target.checked) ids.add(bt.id); else ids.delete(bt.id); updateForm("businessTypeIds", Array.from(ids)); }} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                                   <span className="text-sm text-slate-700">{bt.name}</span>
                                 </label>
                               ))}
                             </div>
                           </div>
-                          {validationErrors.businessTypeIds && <p className="mt-1 text-xs text-red-600">{validationErrors.businessTypeIds}</p>}
+                          {validationErrors.businessTypeIds && <p className="mt-1 text-xs text-red-600">Please select at least one business type.</p>}
                         </div>
                         <div className="md:col-span-2">
                           <label data-field="companyProfile"><span className="mb-1.5 block text-xs font-semibold text-slate-700">Company Profile & Capabilities <span className="text-red-400">*</span></span>

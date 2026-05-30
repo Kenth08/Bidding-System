@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     return json({ error: `Bidding is closed. The deadline was ${project.deadline}.` }, 403);
   }
   if (project.status !== "active") {
-    return json({ project: "Bidding is closed for this project." }, 403);
+    return json({ error: "Submission is closed for this project." }, 403);
   }
 
   // Business type eligibility check

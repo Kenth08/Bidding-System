@@ -285,7 +285,15 @@ async function loadProjectWithInclude(project: any, include?: any) {
     result.procurement_request = procurement;
   }
   if (include.bids) {
-    result.bids = await fetchBidsByWhere({ project_id: project.id });
+    const bidsWhere: Record<string, any> = { project_id: project.id };
+    if (typeof include.bids === "object" && include.bids.where) {
+      Object.assign(bidsWhere, include.bids.where);
+    }
+    let bids = await fetchBidsByWhere(bidsWhere);
+    if (typeof include.bids === "object" && include.bids.select) {
+      bids = bids.map((b: any) => pick(b, include.bids.select));
+    }
+    result.bids = bids;
   }
   return result;
 }

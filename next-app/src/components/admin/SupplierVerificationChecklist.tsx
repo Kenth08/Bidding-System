@@ -48,10 +48,10 @@ function Dot({ tone }: { tone: SupplierActivityLogItem["tone"] }) {
 
 function formatStatus(document: SupplierReviewDocument) {
   if (document.state === "approved") return "Approved";
-  if (document.state === "flagged") return "Flagged";
-  if (document.state === "revised") return "Revised - re-review";
-  if (document.state === "uploaded") return "Uploaded";
-  return document.required ? "Not uploaded - Required" : "Not uploaded";
+  if (document.state === "flagged") return "Need Revision";
+  if (document.state === "revised") return "Re-uploaded - Pending Review";
+  if (document.state === "uploaded") return "Pending Review";
+  return document.required ? "Not Uploaded - Required" : "Not Uploaded";
 }
 
 function statusPillClass(state: SupplierDocumentState) {
@@ -82,7 +82,7 @@ function getOverallStatus(documents: SupplierReviewDocument[]) {
   const allRequiredUploaded = required.every((doc) => doc.uploaded);
 
   if (allRequiredApproved) return { label: "Approved", className: "bg-emerald-100 text-emerald-700" };
-  if (hasFlagged) return { label: "Documents Flagged", className: "bg-red-100 text-red-700" };
+  if (hasFlagged) return { label: "Needs Revision", className: "bg-red-100 text-red-700" };
   if (!missingRequired && allRequiredUploaded) return { label: "Pending", className: "bg-blue-100 text-blue-700" };
   return { label: "Incomplete", className: "bg-amber-100 text-amber-700" };
 }
@@ -139,7 +139,7 @@ export default function SupplierVerificationChecklist({
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatCard label="Uploaded" value={`${stats.uploaded}/${stats.total}`} tone="slate" />
         <StatCard label="Expiring Soon" value={String(stats.expiringSoon)} tone="amber" />
-        <StatCard label="Flagged" value={String(stats.flagged)} tone="red" />
+        <StatCard label="Need Revision" value={String(stats.flagged)} tone="red" />
         <StatCard label="Approved" value={String(stats.approved)} tone="green" />
       </div>
 
@@ -192,7 +192,7 @@ export default function SupplierVerificationChecklist({
                     </div>
                     {document.state === "flagged" && document.reason ? (
                       <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                        <span className="font-semibold">Flag reason:</span> {document.reason}
+                        <span className="font-semibold">Revision reason:</span> {document.reason}
                       </div>
                     ) : null}
                   </div>
@@ -221,7 +221,7 @@ export default function SupplierVerificationChecklist({
                       }}
                       className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {document.state === "missing" ? "Request Revision" : "Flag for Revision"}
+                      {document.state === "missing" ? "Request Revision" : "Need Revision"}
                     </button>
                   </div>
                 </div>
@@ -231,7 +231,7 @@ export default function SupplierVerificationChecklist({
                     <input
                       value={draftReason}
                       onChange={(event) => setFlagDrafts((prev) => ({ ...prev, [document.id]: event.target.value }))}
-                      placeholder={document.state === "missing" ? "Enter a reason for revision" : "Enter a reason before flagging"}
+                      placeholder={document.state === "missing" ? "Enter a reason for revision" : "Enter a reason before marking for revision"}
                       className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300"
                     />
                   </div>

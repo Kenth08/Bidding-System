@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
-import { notifyAdmins } from "@/lib/actions";
 import { SUPPLIER_DOCUMENT_LOOKUP } from "@/lib/supplier-documents";
 import { addSupplierWorkflowActivity, getSupplierWorkflow, updateSupplierWorkflow } from "@/lib/supplier-workflow-db";
 import { mkdir, writeFile } from "fs/promises";
@@ -30,16 +29,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!documentType) return json({ error: "Document type is required." }, 400);
   if (!file || file.size <= 0) return json({ error: "Please choose a file before re-uploading." }, 400);
 
+  // Validate file type
+  const ext = path.extname(file.name).toLowerCase();
+  if (![".pdf", ".jpg", ".jpeg", ".png"].includes(ext)) {
+    return json({ error: "Only PDF, JPG, and PNG files are allowed." }, 400);
+  }
+  // Validate file size (10MB max)
+  if (file.size > 10 * 1024 * 1024) {
+    return json({ error: "File size must not exceed 10MB." }, 400);
+  }
+
   const definition = SUPPLIER_DOCUMENT_LOOKUP.get(documentType);
   if (!definition) return json({ error: "Unknown document type." }, 400);
   if (definition.declarationOnly) return json({ error: "This declaration cannot be re-uploaded as a file." }, 400);
 
   const filePath = await saveFile(file, "documents");
+
+  // Update user's document field
   await db.user.update({
     where: { id },
     data: { [definition.userField]: filePath },
   });
 
+  // Update or create DocumentUpload record with pending_review status
   const existing = await db.documentUpload.findFirst({
     where: { user_id: id, document_type: documentType },
     orderBy: { updated_at: "desc" },
@@ -52,7 +64,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         file: filePath,
         file_name: file.name,
         file_size: file.size,
-        verification_status: "Pending",
+        verification_status: "pending_review",
         verification_notes: null,
         verified_at: null,
         verified_by_id: null,
@@ -66,73 +78,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         file_name: file.name,
         file: filePath,
         file_size: file.size,
-        verification_status: "Pending",
-        verification_notes: null,
+        verification_status: "pending_review",
       },
     });
   }
 
+  // Remove this document from flagged_reasons but keep account locked
   const workflow = await getSupplierWorkflow(id);
   const nextFlaggedReasons = { ...workflow.flagged_reasons };
   delete nextFlaggedReasons[documentType];
 
   await updateSupplierWorkflow(id, {
-    accountLocked: false,
-    notifSent: false,
+    accountLocked: true, // Keep locked until submit-revision
     flaggedReasons: nextFlaggedReasons,
   });
-
-  await notifyAdmins(
-    "supplier_document_resubmitted",
-    "Supplier Submitted Corrected Verification Documents",
-    "Supplier submitted corrected verification documents.",
-    "/admin/suppliers",
-    id
-  ).catch(() => {});
 
   await addSupplierWorkflowActivity({
     supplierId: id,
     actorId: id,
     eventType: "SUPPLIER_DOCUMENT_RESUBMITTED",
-    message: `Supplier submitted corrected verification documents: ${definition.name}.`,
+    message: `Re-uploaded: ${definition.name}`,
     tone: "blue",
     metadata: { documentType, file: filePath },
   }).catch(() => {});
 
-  // mark supplier account as waiting for admin review and invalidate sessions
-  const supplier = await db.user.findUnique({ where: { id } });
-  const nextSessionVersion = ((supplier?.session_version as number) || 0) + 1;
-  try {
-    await db.user.update({
-      where: { id },
-      data: { status: "waiting_admin_review", session_version: nextSessionVersion },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/session_version/i.test(message) || !/does not exist|undefined/.test(message)) {
-      throw error;
-    }
-
-    await db.user.update({
-      where: { id },
-      data: { status: "waiting_admin_review" },
-    });
-  }
-
-  // send confirmation email to supplier
-  try {
-    const { sendSupplierReuploadConfirmationEmail } = await import("@/lib/email-verification");
-    await sendSupplierReuploadConfirmationEmail(String(supplier?.email || ""));
-  } catch (e) {}
+  // Check if all flagged docs are now reuploaded (no remaining flagged_reasons)
+  const allReuploaded = Object.keys(nextFlaggedReasons).length === 0;
 
   return json({
     success: true,
     documentType,
     file: filePath,
-    state: "pending",
-    accountLocked: false,
-    notifSent: false,
-    forceLogout: true,
-    message: "Your corrected documents have been submitted successfully. Please wait for admin approval.",
+    state: "pending_review",
+    allFlaggedReuploaded: allReuploaded,
   });
 }

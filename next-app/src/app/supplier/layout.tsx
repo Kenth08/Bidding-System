@@ -6,17 +6,18 @@ import SupplierSidebar from "@/components/supplier/SupplierSidebar";
 import SupplierProfileModal from "@/components/supplier/SupplierProfileModal";
 import SupplierSettingsModal from "@/components/supplier/SupplierSettingsModal";
 import { useAuthStore } from "@/stores/auth";
-import { notificationsAPI, suppliersAPI } from "@/services/api";
+import { notificationsAPI } from "@/services/api";
 
-const PATH_TO_PAGE: Record<string, string> = { "": "dashboard", "projects": "available-projects", "bids": "my-bids", "results": "results", "profile": "profile", "verification-status": "verification-status" };
-const PAGE_TO_PATH: Record<string, string> = { "dashboard": "", "available-projects": "projects", "my-bids": "bids", "results": "results", "profile": "profile", "verification-status": "verification-status" };
+const PATH_TO_PAGE: Record<string, string> = { "": "dashboard", "dashboard": "dashboard", "projects": "available-projects", "bids": "my-bids", "results": "results", "profile": "profile", "verification-status": "verification-status" };
+const PAGE_TO_PATH: Record<string, string> = { "dashboard": "dashboard", "available-projects": "projects", "my-bids": "bids", "results": "results", "profile": "profile", "verification-status": "verification-status" };
 
 function isAllowedWhenRestricted(path: string) {
   return (
     path.startsWith("/supplier/profile") ||
     path.startsWith("/supplier/verification-status") ||
     path.startsWith("/supplier/documents/reupload") ||
-    path.startsWith("/supplier/revision-required")
+    path.startsWith("/supplier/revision-required") ||
+    path.startsWith("/supplier/notifications")
   );
 }
 
@@ -51,34 +52,17 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     }
   }, [user, router]);
 
-  // Check document verification access — once on mount, then every 60s
+  // Derive access state from user's verification_status
   useEffect(() => {
     if (!user || user.role !== "supplier") return;
-
-    let timer: ReturnType<typeof setInterval> | undefined;
-    let isMounted = true;
-
-    const syncAccess = async () => {
-      if (!isMounted) return;
-      try {
-        const response = await suppliersAPI.getMyDocumentWorkflow();
-        if (!isMounted) return;
-        const access = String(response.data?.accessState || "restricted");
-        const vState = String(response.data?.verificationState || "pending");
-        setAccessState(access === "verified" ? "verified" : "restricted");
-        setVerificationState(vState);
-      } catch {
-        // ignore
-      }
-    };
-
-    const initialTimeout = setTimeout(syncAccess, 300);
-    timer = setInterval(syncAccess, 60000);
-    return () => {
-      isMounted = false;
-      clearTimeout(initialTimeout);
-      if (timer) clearInterval(timer);
-    };
+    const vs = user.verification_status || user.status;
+    if (vs === "verified") {
+      setAccessState("verified");
+      setVerificationState("verified");
+    } else {
+      setAccessState("restricted");
+      setVerificationState(vs === "revision_required" ? "flagged" : vs || "pending");
+    }
   }, [user]);
 
   // Handle redirect based on accessState + pathname (separate from the fetch)

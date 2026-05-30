@@ -49,6 +49,15 @@ export async function requireRole(request: Request, ...roles: UserRole[]) {
   return { user: user!, error: null };
 }
 
+export async function requireSupplierAuth(request: Request) {
+  const { user, error } = await requireAuth(request);
+  if (error) return { user: null, error };
+  if (user!.role !== "supplier") {
+    return { user: null, error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
+  }
+  return { user: user!, error: null };
+}
+
 export function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }

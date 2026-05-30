@@ -15,7 +15,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       created_by: { select: { id: true, full_name: true, email: true } },
       procurement_request: true,
       project_business_types: { include: { business_type: true } },
-      bids: true,
+      bids: user!.role === "supplier"
+        ? { where: { supplier_id: user!.id }, select: { id: true, status: true, submitted_at: true, bid_amount: true } }
+        : true,
     },
   });
   if (!project) return json({ error: "Not found." }, 404);
