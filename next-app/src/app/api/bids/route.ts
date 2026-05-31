@@ -156,7 +156,7 @@ export async function POST(request: Request) {
     ]);
     const supplierBTNames = supplierBTs.map((s: any) => s.business_type?.name).filter(Boolean);
     const projectBTNames = projectBTs.map((p: any) => p.business_type?.name).filter(Boolean);
-    if (!canSupplierAccessProject(supplierBTNames, projectBTNames, false)) {
+    if (!canSupplierAccessProject(supplierBTNames, projectBTNames, false, project.procurement_type)) {
       return json({ error: "You are not eligible to submit a bid for this project." }, 403);
     }
   }

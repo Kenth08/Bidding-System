@@ -12,6 +12,7 @@ export const BUSINESS_TYPES = [
   "Repair and Maintenance Services",
   "Security Services",
   "Transportation Services",
+  "Agricultural Supplies",
   "Other",
 ] as const;
 

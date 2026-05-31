@@ -11,6 +11,7 @@ async function ensureAllBusinessTypes() {
     const existing = await (dbDirect as any).businessType.findMany({ select: { name: true } });
     const existingNames = new Set(existing.map((b: any) => b.name.toLowerCase()));
     const missing = BUSINESS_TYPES.filter((name) => !existingNames.has(name.toLowerCase()));
+    if (missing.length === 0) { seeded = true; return; }
     for (const name of missing) {
       await (dbDirect as any).businessType.upsert({
         where: { name },
@@ -20,8 +21,7 @@ async function ensureAllBusinessTypes() {
     }
     seeded = true;
   } catch {
-    // If upsert fails, mark seeded to avoid retrying every request
-    seeded = true;
+    // If upsert fails, don't mark seeded so it retries next request
   }
 }
 

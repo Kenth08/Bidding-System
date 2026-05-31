@@ -17,7 +17,6 @@ const FIELDS = [
   { key: "phone", label: "Phone", type: "tel" },
   { key: "company_name", label: "Company Name", type: "text" },
   { key: "company_address", label: "Company Address", type: "text" },
-  { key: "business_type", label: "Business Type", type: "text" },
 ] as const;
 
 type FormData = Pick<User, "full_name" | "email" | "representative_name" | "tin" | "phone" | "company_name" | "company_address" | "business_type" | "company_profile">;
@@ -44,6 +43,9 @@ export default function SupplierProfile() {
   const [verificationState, setVerificationState] = useState<string>("pending");
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
   const [isResubmitting, setIsResubmitting] = useState<Record<string, boolean>>({});
+  const [businessTypeNames, setBusinessTypeNames] = useState<string[]>([]);
+  const [availableBusinessTypes, setAvailableBusinessTypes] = useState<{ id: string; name: string }[]>([]);
+  const [selectedBTIds, setSelectedBTIds] = useState<string[]>([]);
 
   async function loadDocumentWorkflow() {
     try {
@@ -59,9 +61,21 @@ export default function SupplierProfile() {
   }
 
   useEffect(() => {
-    authAPI.me().then((r) => {
+    Promise.all([
+      authAPI.me(),
+      fetch("/api/public/business-types").then((r) => r.ok ? r.json() : []),
+    ]).then(([r, btList]) => {
       const u = r.data;
       setForm({ full_name: u.full_name, email: u.email, representative_name: u.representative_name || "", tin: u.tin || "", phone: u.phone || "", company_name: u.company_name || "", company_address: u.company_address || "", business_type: u.business_type || "", company_profile: u.company_profile || "" });
+
+      const items = Array.isArray(btList) ? btList : [];
+      setAvailableBusinessTypes(items.map((b: any) => ({ id: b.id, name: b.name })));
+
+      const sbt = u.supplier_business_types || [];
+      const names = sbt.map((s: any) => s.business_type?.name).filter(Boolean);
+      setBusinessTypeNames(names.length ? names : u.business_type ? [u.business_type] : []);
+      const ids = sbt.map((s: any) => s.business_type_id || s.business_type?.id).filter(Boolean);
+      setSelectedBTIds(ids);
     }).catch(() => {}).finally(() => setLoading(false));
 
     loadDocumentWorkflow();
@@ -70,8 +84,17 @@ export default function SupplierProfile() {
   async function handleConfirmSave() {
     setIsConfirmLoading(true);
     try {
-      const res = await authAPI.updateProfile(form);
+      const payload: any = { ...form };
+      if (selectedBTIds.length > 0) payload.business_type_ids = selectedBTIds;
+      const res = await authAPI.updateProfile(payload);
       setUser(res.data);
+      // Refresh business type names from updated data
+      try {
+        const meRes = await authAPI.me();
+        const sbt = meRes.data.supplier_business_types || [];
+        const names = sbt.map((s: any) => s.business_type?.name).filter(Boolean);
+        if (names.length) setBusinessTypeNames(names);
+      } catch {}
       setToast({ message: "Profile updated successfully.", type: "success" });
     } catch {
       setToast({ message: "Failed to update profile.", type: "error" });
@@ -142,6 +165,35 @@ export default function SupplierProfile() {
               <input type={f.type} value={String(form[f.key] ?? "")} onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />
             </div>
           ))}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Business Type</label>
+            {availableBusinessTypes.length > 0 ? (
+              <>
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {businessTypeNames.length > 0 ? businessTypeNames.map((name) => (
+                    <span key={name} className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{name}</span>
+                  )) : <span className="text-xs text-slate-400">No business type selected</span>}
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-xs text-slate-500">Select all that apply:</p>
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {availableBusinessTypes.map((bt) => (
+                      <label key={bt.id} className="flex items-center gap-2 text-xs text-slate-700">
+                        <input type="checkbox" checked={selectedBTIds.includes(bt.id)} onChange={(e) => { const s = new Set(selectedBTIds); if (e.target.checked) s.add(bt.id); else s.delete(bt.id); setSelectedBTIds(Array.from(s)); }} className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200" />
+                        {bt.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {businessTypeNames.length > 0 ? businessTypeNames.map((name) => (
+                  <span key={name} className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{name}</span>
+                )) : <span className="text-xs text-slate-400">No business type selected</span>}
+              </div>
+            )}
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-700">Company Profile</label>
             <textarea value={String(form.company_profile ?? "")} onChange={(e) => setForm((prev) => ({ ...prev, company_profile: e.target.value }))} rows={4} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100" />

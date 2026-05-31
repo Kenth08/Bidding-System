@@ -6,6 +6,18 @@ export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
   const { password_hash, ...safeUser } = user! as any;
+
+  if (safeUser.role === "supplier") {
+    try {
+      safeUser.supplier_business_types = await db.supplierBusinessType.findMany({
+        where: { supplier_id: safeUser.id },
+        include: { business_type: true },
+      });
+    } catch {
+      safeUser.supplier_business_types = [];
+    }
+  }
+
   return json(safeUser);
 }
 

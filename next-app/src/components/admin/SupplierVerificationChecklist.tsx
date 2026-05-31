@@ -99,40 +99,60 @@ export default function SupplierVerificationChecklist({
   isBusy = false,
 }: SupplierVerificationChecklistProps) {
   const [flagDrafts, setFlagDrafts] = useState<Record<string, string>>({});
+  const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+  const [optimisticApproved, setOptimisticApproved] = useState<Set<string>>(new Set());
+
+  // Merge optimistic approvals into documents for display
+  const effectiveDocuments = useMemo(() => documents.map((doc) =>
+    optimisticApproved.has(doc.id) ? { ...doc, state: "approved" as SupplierDocumentState } : doc
+  ), [documents, optimisticApproved]);
+
+  async function handleApproveOptimistic(documentId: string) {
+    setApprovingIds((prev) => new Set(prev).add(documentId));
+    setOptimisticApproved((prev) => new Set(prev).add(documentId));
+    try {
+      await Promise.resolve(onApproveDocument(documentId));
+    } catch {
+      // Revert optimistic update on failure
+      setOptimisticApproved((prev) => { const next = new Set(prev); next.delete(documentId); return next; });
+    } finally {
+      setApprovingIds((prev) => { const next = new Set(prev); next.delete(documentId); return next; });
+    }
+  }
 
   const stats = useMemo(() => {
-    const total = documents.length;
-    const uploaded = documents.filter((doc) => doc.uploaded).length;
-    const approved = documents.filter((doc) => doc.state === "approved").length;
-    const flagged = documents.filter((doc) => doc.state === "flagged").length;
+    const total = effectiveDocuments.length;
+    const uploaded = effectiveDocuments.filter((doc) => doc.uploaded).length;
+    const approved = effectiveDocuments.filter((doc) => doc.state === "approved").length;
+    const flagged = effectiveDocuments.filter((doc) => doc.state === "flagged").length;
 
     const now = Date.now();
     const soonLimit = now + 30 * 24 * 60 * 60 * 1000;
-    const expiringSoon = documents.filter((doc) => {
+    const expiringSoon = effectiveDocuments.filter((doc) => {
       if (!doc.expiryDate) return false;
       const expiresAt = new Date(doc.expiryDate).getTime();
       return expiresAt >= now && expiresAt <= soonLimit;
     }).length;
 
     return { total, uploaded, approved, flagged, expiringSoon };
-  }, [documents]);
+  }, [effectiveDocuments]);
 
   const flaggedDocuments = useMemo(
-    () => documents.filter((doc) => doc.state === "flagged"),
-    [documents]
+    () => effectiveDocuments.filter((doc) => doc.state === "flagged"),
+    [effectiveDocuments]
   );
   const flaggedRequiredDocuments = useMemo(
-    () => documents.filter((doc) => doc.required && doc.state === "flagged"),
-    [documents]
+    () => effectiveDocuments.filter((doc) => doc.required && doc.state === "flagged"),
+    [effectiveDocuments]
   );
 
   const canNotifySupplier = flaggedRequiredDocuments.length > 0 && !notifSent;
   const canApproveAllUnlock = useMemo(() => {
-    const required = documents.filter((doc) => doc.required);
+    const required = effectiveDocuments.filter((doc) => doc.required);
     return required.length > 0 && required.every((doc) => doc.state === "approved");
-  }, [documents]);
+  }, [effectiveDocuments]);
 
-  const overall = getOverallStatus(documents);
+  const overall = getOverallStatus(effectiveDocuments);
 
   return (
     <div className="space-y-4">
@@ -164,10 +184,11 @@ export default function SupplierVerificationChecklist({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <div className="divide-y divide-slate-200">
-          {documents.map((document) => {
+          {effectiveDocuments.map((document) => {
             const canApprove = document.uploaded && document.state !== "approved";
             const canFlag = document.state !== "approved";
             const draftReason = flagDrafts[document.id] ?? document.reason ?? "";
+            const isApproving = approvingIds.has(document.id);
 
             return (
               <div key={document.id} className="px-4 py-3">
@@ -200,11 +221,13 @@ export default function SupplierVerificationChecklist({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      disabled={!canApprove || isBusy}
-                      onClick={() => onApproveDocument(document.id)}
+                      disabled={!canApprove || isApproving}
+                      onClick={() => handleApproveOptimistic(document.id)}
                       className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Approve
+                      {isApproving ? (
+                        <span className="inline-flex items-center gap-1"><svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Approving</span>
+                      ) : "Approve"}
                     </button>
                     <button
                       type="button"

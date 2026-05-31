@@ -25,16 +25,18 @@ export async function GET(request: Request) {
     }
 
     const newAdmin = await db.user.create({
-      id: uuid(),
-      full_name: "System Administrator",
-      email: "admin@gmail.com",
-      password_hash,
-      role: "admin",
-      status: "active",
-      company_name: "System",
-      is_active: true,
-      is_staff: true,
-      is_superuser: true
+      data: {
+        id: uuid(),
+        full_name: "System Administrator",
+        email: "admin@gmail.com",
+        password_hash,
+        role: "admin",
+        status: "active",
+        company_name: "System",
+        is_active: true,
+        is_staff: true,
+        is_superuser: true,
+      },
     });
 
     return NextResponse.json({ message: "Admin created successfully", admin: { email: newAdmin.email, role: newAdmin.role } });

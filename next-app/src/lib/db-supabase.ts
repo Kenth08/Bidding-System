@@ -667,9 +667,7 @@ export const db = {
       const data = params.data || params;
       const payload = {
         id: data.id || uuid(),
-        title: data.project_title ?? data.title ?? "",
-        description: data.technical_specifications ?? data.description ?? "",
-        project_title: data.project_title,
+        project_title: data.project_title ?? data.title ?? "",
         budget: data.budget,
         deadline: data.deadline ?? null,
         public_result_expiry_date: data.public_result_expiry_date ?? null,
@@ -681,7 +679,6 @@ export const db = {
         rejection_reason: data.rejection_reason ?? "",
         revision_notes: data.revision_notes ?? "",
         review_remarks: data.review_remarks ?? null,
-        created_by: data.created_by_id ?? data.created_by ?? null,
         reviewed_by_id: data.reviewed_by_id ?? null,
         reviewed_at: data.reviewed_at ?? null,
         created_by_id: data.created_by_id ?? null,
@@ -804,6 +801,56 @@ export const db = {
       for (const row of rows) {
         const { error } = await supabaseServer.from(SUPPLIER_BUSINESS_TYPES_TABLE).delete().eq("supplier_id", row.supplier_id).eq("business_type_id", row.business_type_id);
         if (error) throw error;
+      }
+      return { count: rows.length };
+    },
+  },
+
+  projectBusinessType: {
+    findMany: async (params: any = {}) => {
+      const { data, error } = await supabaseServer.from("project_business_types").select("*");
+      if (error) throw error;
+      const rows = (data || []).filter((row: any) => matchesWhere(row, params.where));
+      const sorted = sortRows(rows, params.orderBy);
+      const limited = applyTake(sorted, params);
+
+      if (!params.include?.business_type) return limited;
+
+      const selected = params.include.business_type.select;
+      return Promise.all(limited.map(async (row: any) => {
+        const businessType = row.business_type_id ? await fetchBusinessTypeById(row.business_type_id) : null;
+        return {
+          ...row,
+          business_type: businessType && selected ? pick(businessType, selected) : businessType,
+        };
+      }));
+    },
+
+    createMany: async (params: any = {}) => {
+      const data = params.data || [];
+      let count = 0;
+      for (const item of data) {
+        const { error } = await supabaseServer.from("project_business_types").insert({
+          project_id: item.project_id,
+          business_type_id: item.business_type_id,
+          created_at: new Date().toISOString(),
+        });
+        if (error) {
+          if (!params.skipDuplicates) throw error;
+          continue;
+        }
+        count += 1;
+      }
+      return { count };
+    },
+
+    deleteMany: async (params: any = {}) => {
+      const { data, error } = await supabaseServer.from("project_business_types").select("*");
+      if (error) throw error;
+      const rows = (data || []).filter((row: any) => matchesWhere(row, params.where));
+      for (const row of rows) {
+        const { error: delError } = await supabaseServer.from("project_business_types").delete().eq("project_id", row.project_id).eq("business_type_id", row.business_type_id);
+        if (delError) throw delError;
       }
       return { count: rows.length };
     },

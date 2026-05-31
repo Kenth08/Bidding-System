@@ -210,7 +210,7 @@ CHAPTER 2
 METHODOLOGY
 
 The project adopts a Hybrid Project Management Methodology that combines the structured approach of Waterfall and the flexibility of Agile to effectively support the requirements of a capstone project as illustrated in Figure 1. The Waterfall approach is applied during the initial stages, particularly in planning, requirements definition, and documentation, ensuring that all outputs such as proposals and system designs are clearly defined and validated before development begins. Meanwhile, Agile practices are utilized during the implementation and testing phases, allowing iterative development, continuous testing, and incremental improvement of system features such as real-time monitoring, alert mechanisms, and report generation. This integration enables a balance between structure and adaptability, making it suitable for systems with both well-defined requirements and evolving components, such as AI functionalities and user interface enhancements.
-The project begins with the Planning phase, where the proponents defined the project scope, objectives, timeline, and required resources based on the approved concept paper. During this phase, they also established the overall direction of the system and ensured its feasibility within the given timeframe. In the Analysis phase, the proponents gathered and finalized system requirements by reviewing existing fire safety processes, identifying user needs, and determining both functional and non-functional requirements necessary for the system.
+The project begins with the Planning phase, where the proponents defined the project scope, objectives, timeline, and required resources based on the approved concept paper. During this phase, they also established the overall direction of the system and ensured its feasibility within the given timeframe. In the Analysis phase, the proponents gathered and finalized system requirements by reviewing existing procurement and bidding processes, identifying user needs, and determining both functional and non-functional requirements necessary for the system.
 In the Design phase, the proponents translated these requirements into a structured system architecture, including the design of the database, user interface, and overall system flow, supported by diagrams and prototypes to visualize how the system will operate. During the Implementation phase, the proponents developed the system using an iterative approach, where coding, integration of IoT components, and testing were performed incrementally. This allowed them to refine features such as real-time monitoring, alert mechanisms, and automated reporting based on testing results.
 Finally, in the Maintenance phase, the proponents conducted system evaluation, identified issues, and applied necessary improvements to enhance system performance and usability. Although limited within the project duration, this phase ensured that the system remains stable, reliable, and ready for future enhancements.
 
@@ -282,8 +282,8 @@ The following are the system’s non functional requirements:
 
 
 Use Case Diagram 
-The primary users as shown in Figure 6, identified in the system are the System Administrator and Security Personnel. The System Administrator is responsible for managing and maintaining the system, including configuring sensors, managing user accounts, and updating system settings. These interactions ensure that the system operates according to the defined parameters and remains aligned with user requirements. The administrator provides configuration and control data to the system, which is then processed and stored for system operation.
-On the other hand, the Security Personnel interacts with the system by monitoring real-time sensor data and receiving fire alerts. The system processes incoming environmental data and generates alerts when fire-related conditions are detected. These alerts are then transmitted to the security personnel, enabling immediate response and action.
+The primary users as shown in Figure 6, identified in the system are the System Administrator, the School Head (Procuring Entity), and the Supplier. The System Administrator is responsible for managing and maintaining the system, including verifying supplier documents, managing user accounts, and monitoring audit logs. These interactions ensure that the system operates according to the defined parameters and remains aligned with user requirements. The administrator provides verification status, user management controls, and system configurations to the system, which is then processed and stored for system operation.
+On the other hand, the School Head interacts with the system by creating procurement requests, publishing projects, evaluating bids, and awarding projects to winning suppliers. The Supplier interacts by registering, completing their profile, uploading legal and financial documents, viewing published projects, and submitting bids. The system processes bids, runs verification checks on supplier eligibility, anchors transaction hashes to the blockchain ledger, and notifies participants of updates, enabling transparency and accountability throughout the bidding process.
 
 	
 Figure 6. Use Case Diagram of the system.
@@ -296,7 +296,35 @@ The diagram also shows key data flows such as project data, bid submissions, eva
 Overall, the Context Flow Diagram demonstrates how data is collected, processed, and transformed into meaningful outputs that support decision-making in procurement activities. It highlights the role of blockchain technology in enhancing transparency, accountability, and security within the system.
 
 
-  
+```mermaid
+graph TD
+    System("0.0 | ProcureChain System")
+    Admin[System Administrator]
+    SchoolHead[School Head]
+    Supplier[Supplier]
+    Viewer[Public Viewer]
+
+    Supplier -->|Registration Details & Documents| System
+    Supplier -->|Bid Proposals| System
+    System -->|Verification Status & Feedback| Supplier
+    System -->|Bidding Opportunities & Notifications| Supplier
+
+    SchoolHead -->|Procurement Requests| System
+    SchoolHead -->|Project Specifications| System
+    SchoolHead -->|Bid Evaluations & Award Decisions| System
+    System -->|Procurement Status Updates| SchoolHead
+    System -->|Received Bids| SchoolHead
+    System -->|Bidding Results| SchoolHead
+
+    Admin -->|Admin Credentials| System
+    Admin -->|Verification & Review Decisions| System
+    System -->|Verification Requests| Admin
+    System -->|System Logs & Alerts| Admin
+
+    Viewer -->|Verification Requests| System
+    System -->|Public Bidding Results| Viewer
+    System -->|Verification Authenticity Certificate| Viewer
+```
 Figure 7. Context flow diagram of the system.
 
 
@@ -315,13 +343,84 @@ Overall, the Data Flow Diagram presents a clear view of how the system processes
 
 
 
-/
+```mermaid
+graph TD
+    %% Entities (Rectangles)
+    Admin[System Administrator]
+    SchoolHead[School Head]
+    Supplier[Supplier]
+    Viewer[Public Viewer]
 
+    %% Processes (Rounded Rectangles)
+    P1("1.0 | User Registration & Verification")
+    P2("2.0 | Project Management")
+    P3("3.0 | Bid Submission")
+    P4("4.0 | Bid Evaluation & Awarding")
+    P5("5.0 | Blockchain Anchoring & Verification")
 
-   
+    %% Data Stores (Flat Rectangles - Gane & Sarson Style)
+    D1["D1 | Users Database"]
+    D2["D2 | Projects & Procurements Database"]
+    D3["D3 | Bids Database"]
+    D4["D4 | Blockchain Records"]
 
+    %% Process 1.0 Flows
+    Supplier -->|Registration Details & Documents| P1
+    P1 -->|Verification Requests| Admin
+    Admin -->|Verification & Review Decisions| P1
+    P1 -->|User Account Details| D1
+    D1 -->|Supplier Profile Status| P1
+    P1 -->|Verification Status & Feedback| Supplier
 
+    %% Process 2.0 Flows
+    Admin -->|Verification & Review Decisions| P2
+    P2 -->|Procurement Review Requests| Admin
+    SchoolHead -->|Procurement Requests & Project Specs| P2
+    P2 -->|Project & Request Details| D2
+    D2 -->|Bidding Opportunities| P2
+    P2 -->|Bidding Opportunities & Notifications| Supplier
+    P2 -->|Procurement Status Updates| SchoolHead
+
+    %% Process 3.0 Flows
+    Supplier -->|Bid Proposals| P3
+    D1 -->|Supplier Profile Status| P3
+    P3 -->|Bid Details| D3
+    P3 -->|Bid Submission Logs| D1
+
+    %% Process 4.0 Flows
+    SchoolHead -->|Bid Evaluations & Award Decisions| P4
+    D2 -->|Project Details| P4
+    D3 -->|Received Bids| P4
+    P4 -->|Award Outcomes| D3
+    P4 -->|Project Award Status| D2
+    P4 -->|Received Bids & Results| SchoolHead
+    P4 -->|Bidding Results| Supplier
+
+    %% Process 5.0 Flows
+    Viewer -->|Verification Requests| P5
+    D3 -->|Award Outcomes| P5
+    P5 -->|Record Hash & Winners| D4
+    D4 -->|Blockchain Hashes| P5
+    P5 -->|Public Bidding Results| Viewer
+    P5 -->|Verification Authenticity Certificate| Viewer
+```
  Figure 8. Data flow diagram of the system.
+
+### Data Flow Diagram Syntax and Semantic Rules
+To ensure the correctness and logical consistency of the system's Data Flow Diagrams (Context Flow Diagram and Level 0 DFD), the system design and evaluation adhere to the following formal syntax and semantic rules:
+
+#### 1. Syntax Rules (Connections and Components)
+- **External Entities (Rule 9):** Data flows cannot directly connect one external entity to another. All communication between entities must pass through a system process.
+- **Data Stores (Rule 10):** Data flows cannot directly connect an external entity to a data store, or a data store to another data store. Data must be read from or written to a data store by a process.
+- **Process I/O (Rule 2):** Every process must have at least one input data flow and at least one output data flow. A process cannot be a "black hole" (inputs only) or a "miracle" (outputs only).
+- **Flow Direction:** Data flows are unidirectional and represent the movement of data in one direction.
+
+#### 2. Semantic and Consistency Rules (Balancing)
+- **Viewpoint Consistency (Rule 5):** There must be a consistent viewpoint for the entire set of DFDs.
+- **Decomposition (Rule 6):** Every parent process in a higher-level DFD must be fully and completely described by its child processes in lower-level DFDs.
+- **Balancing/Equivalence (Rule 7):** Every data flow, data store, and external entity on a higher-level DFD must be preserved on the lower-level DFD that decomposes it. For example, if a data flow `bid submissions` connects `Supplier` to the system in the Context Diagram, the same flow must connect `Supplier` to the corresponding process (e.g., Process 2.0 Bid Submission) in the Level 0 DFD.
+- **Data Store Access (Rule 8):** Data cannot move directly from one data store to another; a process must read the data, perform a transformation, and write it to the target store.
+
 SYSTEM DESIGN
 Entity Relationship Diagram
 The Entity Relationship Diagram (ERD) presents the logical structure of the database for the Blockchain-Based Procurement Bidding System. It illustrates the entities involved in the system, their attributes, and the relationships between them. The ERD ensures proper organization of data, supports efficient data management, and maintains data integrity throughout the procurement process.
@@ -674,12 +773,12 @@ To ensure system security, several mechanisms are implemented. These include use
 
 
 SYSTEM TESTING AND IMPLEMENTATION
-	The system testing and implementation phase ensures that the AI-Assisted Smart Campus Fire Detection and Monitoring System operates correctly and meets all functional requirements. Testing validates the integration of IoT sensors, data transmission, processing, alert generation, and reporting modules.
-Performance evaluation is conducted using metrics such as accuracy, precision, recall, and response time to ensure reliable fire detection. Test cases simulate both normal and abnormal environmental conditions, including threshold breaches and fire scenarios, to verify system responsiveness.
-A summary of test results is presented in tabular form to evaluate system performance across key components such as data collection, processing, alert generation, and reporting. This ensures that all modules function as expected.
+	The system testing and implementation phase ensures that the Blockchain-Based Transparent Procurement Bidding System operates correctly and meets all functional requirements. Testing validates the user registration, document upload and validation, bid submission, bid evaluation, supplier ranking, blockchain anchoring, and report generation modules.
+Performance evaluation is conducted using metrics such as page load times, database query execution, transaction processing speed, and API response times to ensure reliable system operation. Test cases simulate user actions, registration with various document uploads (including expired or invalid files), bid submission under valid and invalid conditions (blocking unverified suppliers), winner selection, and blockchain hash verification to confirm tamper detection.
+A summary of test results is presented in tabular form to evaluate system performance across key components such as authentication, document verification, bid management, evaluation, blockchain recording, and reporting. This ensures that all modules function as expected.
 A System Test Plan is prepared to define objectives, scope, test environment, test cases, and acceptance criteria, ensuring structured and systematic validation.
-After testing, system deployment is performed by installing IoT sensors, configuring network infrastructure, deploying the web application, and integrating all system components. Final validation is conducted in the actual environment, followed by user training for administrators and security personnel.
-Continuous monitoring is implemented to evaluate system performance and identify areas for improvement, ensuring long-term reliability and effectiveness in campus fire safety management.
+After testing, system deployment is performed by setting up the database on Supabase PostgreSQL, configuring environment variables, deploying the Next.js application, and integrating the blockchain hash verification functionality. Final validation is conducted in the staging environment, followed by user training for administrators, school heads, and suppliers.
+Continuous monitoring is implemented to evaluate system performance, identify areas for improvement, and monitor blockchain recording success rates, ensuring long-term reliability and effectiveness in e-procurement management.
 
 
 

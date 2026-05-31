@@ -101,7 +101,7 @@ export default function AdminProjects() {
     if (!publishTarget) return;
     setIsConfirmLoading(true);
     try { await projectsAPI.publish(publishTarget.id); setToast({ message: "Project published!", type: "success" }); fetchData(); }
-    catch { setToast({ message: "Failed to publish", type: "error" }); }
+    catch (err: any) { setToast({ message: err?.response?.data?.error || "Failed to publish", type: "error" }); }
     finally {
       setIsConfirmLoading(false);
       // notify other windows/tabs in this browser immediately

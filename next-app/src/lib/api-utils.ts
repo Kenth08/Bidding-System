@@ -6,7 +6,7 @@ import type { UserRole } from "@/types";
 export async function getAuthUser(request: Request) {
   const payload = await getUserFromRequest(request);
   if (!payload?.sub) return null;
-  const user = await db.user.findUnique({ id: payload.sub });
+  const user = await db.user.findUnique({ where: { id: payload.sub } });
   const tokenSessionVersion = typeof (payload as any).session_version === "number"
     ? (payload as any).session_version
     : null;

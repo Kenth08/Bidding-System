@@ -17,6 +17,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return json({ error: "Only draft projects can be published." }, 400);
   }
 
+  // Block publishing if the project deadline has already passed (use end-of-day)
+  const deadlineDate = project.deadline ? new Date(project.deadline) : null;
+  if (deadlineDate) deadlineDate.setHours(23, 59, 59, 999);
+  if (deadlineDate && deadlineDate.getTime() < Date.now()) {
+    await logAudit("PUBLISH_BLOCKED_EXPIRED", user!.id, `Publishing was blocked because the project deadline already passed. Project: "${project.title}", Deadline: ${new Date(project.deadline).toISOString()}, Previous Status: ${project.status}`, "project", id);
+    await createBidLog({ projectId: id, userId: user!.id, role: "admin", action: "PUBLISH_BLOCKED_EXPIRED", description: `Publishing was blocked because the project deadline already passed.` });
+    return json({ error: "Cannot publish. The project deadline has already passed." }, 400);
+  }
+
   // If this project was created from a procurement request, ensure the
   // procurement was approved by the Head before allowing publish.
   if (project.procurement_request_id) {

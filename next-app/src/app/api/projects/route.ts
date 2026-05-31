@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       const projectBTNames = (project.project_business_types || [])
         .map((pbt: any) => pbt.business_type?.name)
         .filter(Boolean);
-      return canSupplierAccessProject(supplierBTNames, projectBTNames, project.open_to_all ?? true);
+      return canSupplierAccessProject(supplierBTNames, projectBTNames, project.open_to_all ?? true, project.procurement_type);
     });
 
     return json(visibleProjects);

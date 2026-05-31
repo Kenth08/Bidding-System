@@ -31,7 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
     // Get audit timeline from bid activity logs
     let timeline: { action: string; description: string; created_at: string }[] = [];
     try {
-      const logs = await db.query("bid_activity_logs", {
+      const logs = await db.bidActivityLog.findMany({
         where: { project_id: projectId },
         orderBy: { created_at: "asc" },
       });

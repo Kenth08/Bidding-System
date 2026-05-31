@@ -155,8 +155,11 @@ export default function AdminProcurement() {
                       {r.status === 'Pending Review' && (
                         <button type="button" disabled className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">Waiting for Head Approval</button>
                       )}
-                      {r.status === 'Approved' && !publishedProcurementIds.has(r.id) && (
+                      {r.status === 'Approved' && !publishedProcurementIds.has(r.id) && !(r.deadline && new Date(r.deadline) < new Date()) && (
                         <button type="button" onClick={goToProjects} className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700">Go to Publish Project</button>
+                      )}
+                      {r.status === 'Approved' && !publishedProcurementIds.has(r.id) && r.deadline && new Date(r.deadline) < new Date() && (
+                        <span className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700">Expired</span>
                       )}
                       {r.status === 'Approved' && publishedProcurementIds.has(r.id) && (
                         <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">Published</span>

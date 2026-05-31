@@ -16,6 +16,7 @@ interface SupplierProfileModalProps {
     business_type?: string;
     representative_name?: string;
     tin?: string;
+    supplier_business_types?: any[];
   } | null;
 }
 
@@ -34,6 +35,7 @@ export default function SupplierProfileModal({ isOpen, onClose, currentUser }: S
 
   const [availableBusinessTypes, setAvailableBusinessTypes] = useState<{ id: string; name: string }[]>([]);
   const [selectedBusinessTypeIds, setSelectedBusinessTypeIds] = useState<string[]>([]);
+  const [businessTypeNames, setBusinessTypeNames] = useState<string[]>([]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -54,9 +56,16 @@ export default function SupplierProfileModal({ isOpen, onClose, currentUser }: S
         const res = await fetch("/api/public/business-types");
         const list = res.ok ? await res.json() : [];
         setAvailableBusinessTypes(list || []);
-        if (currentUser.business_type) {
+
+        // Get supplier's actual business types from the supplier data
+        const sbt = (currentUser as any).supplier_business_types || [];
+        if (sbt.length) {
+          setSelectedBusinessTypeIds(sbt.map((s: any) => s.business_type_id || s.business_type?.id).filter(Boolean));
+          setBusinessTypeNames(sbt.map((s: any) => s.business_type?.name).filter(Boolean));
+        } else if (currentUser.business_type) {
           const match = (list || []).find((b: any) => b.name?.toLowerCase() === String(currentUser.business_type).toLowerCase());
           if (match) setSelectedBusinessTypeIds([match.id]);
+          setBusinessTypeNames([currentUser.business_type]);
         }
       } catch (e) {
         // ignore
@@ -151,7 +160,11 @@ export default function SupplierProfileModal({ isOpen, onClose, currentUser }: S
                   <Building2 className="h-4 w-4 text-slate-400" />
                   Business Type
                 </div>
-                <p className="break-words text-sm font-semibold text-slate-900">{formData.businessType}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {businessTypeNames.length > 0 ? businessTypeNames.map((name) => (
+                    <span key={name} className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{name}</span>
+                  )) : <span className="text-sm text-slate-500">No business type selected</span>}
+                </div>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">

@@ -39,7 +39,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const updated = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true } } } });
   try {
-    publishEvent("bid_updated", { id: updated.id, project_id: updated.project_id, supplier_id: updated.supplier_id, status: updated.status, technical_compliance: Boolean(updated.technical_compliance) });
+    publishEvent("bid_updated", { id: updated!.id, project_id: updated!.project_id, supplier_id: updated!.supplier_id, status: updated!.status, technical_compliance: Boolean(updated!.technical_compliance) });
   } catch (e) {
     // non-fatal
   }

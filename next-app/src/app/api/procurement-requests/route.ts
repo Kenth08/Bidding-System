@@ -28,24 +28,29 @@ export async function POST(request: Request) {
   const { user, error } = await requireRole(request, "admin");
   if (error) return error;
 
-  const body = await request.json();
-  const procurement = await db.procurement.create({
-    data: {
-      id: uuid(),
-      project_title: body.project_title,
-      budget: body.budget,
-      deadline: body.deadline ? new Date(body.deadline) : new Date(Date.now() + 14 * 86400000),
-      public_result_expiry_date: body.public_result_expiry_date ? new Date(body.public_result_expiry_date) : null,
-      procurement_type: body.procurement_type || "Services",
-      technical_specifications: body.technical_specifications || "",
-      procurement_schedule: body.procurement_schedule || "",
-      delivery_period: body.delivery_period || "",
-      status: "Draft",
-      created_by_id: user!.id,
-    },
-  });
+  try {
+    const body = await request.json();
+    const procurement = await db.procurement.create({
+      data: {
+        id: uuid(),
+        project_title: body.project_title,
+        budget: body.budget,
+        deadline: body.deadline ? new Date(body.deadline) : new Date(Date.now() + 14 * 86400000),
+        public_result_expiry_date: body.public_result_expiry_date ? new Date(body.public_result_expiry_date) : null,
+        procurement_type: body.procurement_type || "Services",
+        technical_specifications: body.technical_specifications || "",
+        procurement_schedule: body.procurement_schedule || "",
+        delivery_period: body.delivery_period || "",
+        status: "Draft",
+        created_by_id: user!.id,
+      },
+    });
 
-  await logAudit("CREATE", user!.id, `Created procurement request ${procurement.project_title}`, "procurement", procurement.id);
+    await logAudit("CREATE", user!.id, `Created procurement request ${procurement.project_title}`, "procurement", procurement.id);
 
-  return json(procurement, 201);
+    return json(procurement, 201);
+  } catch (err: any) {
+    console.error("[create procurement request error]", err);
+    return json({ error: "Failed to create procurement request. Please check required fields." }, 500);
+  }
 }

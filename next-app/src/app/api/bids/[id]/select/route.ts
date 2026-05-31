@@ -34,13 +34,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return json({ error: "Winner selection is only allowed after bidding is closed." }, 400);
   }
 
-  const existingWinner = await db.bid.findFirst({ where: { project_id: bid.project_id, status: "won", NOT: { id } } });
+  const existingWinner = await db.bid.findFirst({ where: { project_id: bid.project_id, status: "won", id: { not: id } } });
   if (existingWinner) {
     return json({ error: "Bidding is already completed for this project. A winner has already been selected." }, 400);
   }
 
   // Mark all other bids as lost
-  await db.bid.updateMany({ where: { project_id: bid.project_id, NOT: { id } }, data: { status: "lost" } });
+  await db.bid.updateMany({ where: { project_id: bid.project_id, id: { not: id } }, data: { status: "lost" } });
 
   // Mark this bid as won
   await db.bid.update({ where: { id }, data: { status: "won" } });
@@ -88,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   await notifyUser(bid.supplier_id, "bid_won", "Congratulations! Your Bid Won", `Your bid of ₱${Number(bid.bid_amount).toLocaleString()} was selected as the winner for ${bid.project.title}.`, "/supplier/bids", id);
 
   // Notify losers
-  const losingBids = await db.bid.findMany({ where: { project_id: bid.project_id, NOT: { id } }, include: { supplier: true } });
+  const losingBids = await db.bid.findMany({ where: { project_id: bid.project_id, id: { not: id } }, include: { supplier: true } });
   for (const lb of losingBids) {
     await notifyUser(lb.supplier_id, "bid_lost", "Bid Result", `Your bid for ${bid.project.title} was not selected. Thank you for participating.`, "/supplier/bids", lb.id);
   }

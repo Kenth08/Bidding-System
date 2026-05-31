@@ -84,15 +84,13 @@ export default function AdminSuppliers() {
 
   async function handleApproveDocument(documentId: string) {
     if (!viewing) return;
-    setDetailBusy(true);
     try {
       await suppliersAPI.reviewDocument(viewing.id, documentId, "approve");
-      setToast({ message: "Document approved.", type: "success" });
-      await loadDocumentWorkflow(viewing.id);
+      // Background refresh to sync server state (non-blocking)
+      loadDocumentWorkflow(viewing.id);
     } catch {
       setToast({ message: "Failed to approve document.", type: "error" });
-    } finally {
-      setDetailBusy(false);
+      throw new Error("approve failed");
     }
   }
 

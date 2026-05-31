@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, FileText, Flag, Gavel, Send, Trophy, UserCheck, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, FileText, Flag, Gavel, Send, Trophy, UserCheck, X } from "lucide-react";
 import Modal from "@/components/shared/Modal";
 
 interface LogEntry {
@@ -27,6 +27,7 @@ function formatDate(iso: string) {
 function getIcon(action: string) {
   if (action.includes("CREATED") || action.includes("DRAFT")) return <FileText className="h-4 w-4 text-slate-500" />;
   if (action.includes("APPROVAL") || action.includes("APPROVED")) return <UserCheck className="h-4 w-4 text-blue-500" />;
+  if (action.includes("BLOCKED") || action.includes("EXPIRED")) return <AlertTriangle className="h-4 w-4 text-red-500" />;
   if (action.includes("PUBLISH")) return <Send className="h-4 w-4 text-emerald-500" />;
   if (action.includes("SUBMIT") || action.includes("BID_")) return <Gavel className="h-4 w-4 text-indigo-500" />;
   if (action.includes("REVIEW") || action.includes("EVALUAT")) return <Clock className="h-4 w-4 text-amber-500" />;

@@ -37,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const supplierBTNames = supplierBTs.map((s: any) => s.business_type?.name).filter(Boolean);
     const projectBTNames = (project.project_business_types || []).map((pbt: any) => pbt.business_type?.name).filter(Boolean);
 
-    if (!canSupplierAccessProject(supplierBTNames, projectBTNames, project.open_to_all ?? true)) {
+    if (!canSupplierAccessProject(supplierBTNames, projectBTNames, project.open_to_all ?? true, project.procurement_type)) {
       return json({ error: "You are not eligible to view this project based on your registered business type." }, 403);
     }
   }

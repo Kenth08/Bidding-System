@@ -116,8 +116,15 @@ function RegisterPageContent() {
     (async () => {
       try {
         const res = await fetch("/api/public/business-types");
-        if (res.ok) { const json = await res.json(); setAvailableBusinessTypes(json?.length ? json : FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n }))); }
-        else setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n })));
+        const json = res.ok ? await res.json() : [];
+        const apiItems: { id: string; name: string }[] = Array.isArray(json) ? json : [];
+        // Build map from API for IDs, but always show all BUSINESS_TYPES
+        const apiMap = new Map(apiItems.map((b: any) => [b.name.toLowerCase(), b]));
+        const merged = FALLBACK_BUSINESS_TYPES.map((name) => {
+          const match = apiMap.get(name.toLowerCase());
+          return match ? { id: match.id, name: match.name } : { id: name, name };
+        });
+        setAvailableBusinessTypes(merged);
       } catch { setAvailableBusinessTypes(FALLBACK_BUSINESS_TYPES.map((n) => ({ id: n, name: n }))); }
     })();
     const next = searchParams.get("next");
