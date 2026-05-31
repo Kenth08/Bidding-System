@@ -1,32 +1,20 @@
 "use client";
-import { useState, useEffect } from "react";
 import { FolderOpen, FileText, Trophy } from "lucide-react";
-import { projectsAPI, bidsAPI } from "@/services/api";
+import { useProjects, useBids } from "@/hooks/useQueryHooks";
 import StatCard from "@/components/shared/StatCard";
-import { Project } from "@/types/project";
-import { Bid } from "@/types/bid";
 
 export default function SupplierDashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [bids, setBids] = useState<Bid[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: projectsData, isLoading: projectsLoading } = useProjects({ status: "active" });
+  const { data: bidsData, isLoading: bidsLoading } = useBids();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [pRes, bRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll()]);
-        setProjects(pRes.data);
-        setBids(bRes.data);
-      } catch { /* ignore */ }
-      setLoading(false);
-    }
-    load();
-  }, []);
+  const loading = projectsLoading || bidsLoading;
+  const projects = projectsData?.results || [];
+  const bids = bidsData?.results || [];
 
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-32 rounded-2xl bg-slate-100" /><div className="h-32 rounded-2xl bg-slate-100" /></div>;
 
-  const won = bids.filter((b) => b.status === "won").length;
-  const lost = bids.filter((b) => b.status === "lost").length;
+  const won = bids.filter((b: any) => b.status === "won").length;
+  const lost = bids.filter((b: any) => b.status === "lost").length;
 
   return (
     <div className="space-y-6">

@@ -1,8 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, ArrowRight, FileText, FolderOpen, Trophy } from "lucide-react";
-import { dashboardAPI, projectsAPI } from "@/services/api";
+import { useDashboardStats, useExpiringDocs, useProjects } from "@/hooks/useQueryHooks";
 import StatCard from "@/components/shared/StatCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 
@@ -10,19 +10,13 @@ function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style:
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<any>(null);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expiringDocs, setExpiringDocs] = useState<any[]>([]);
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: expiringDocs, isLoading: docsLoading } = useExpiringDocs();
+  const { data: projectsData, isLoading: projectsLoading } = useProjects();
+  const projects = projectsData?.results || [];
   const [projectFilter, setProjectFilter] = useState("All");
 
-  useEffect(() => {
-    Promise.all([
-      dashboardAPI.getStats().then((r) => setStats(r.data)).catch(() => setStats(null)),
-      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setProjects([])),
-      dashboardAPI.getExpiringDocs().then((r) => setExpiringDocs(r.data?.items || [])).catch(() => setExpiringDocs([])),
-    ]).finally(() => setLoading(false));
-  }, []);
+  const loading = statsLoading || docsLoading || projectsLoading;
 
   if (loading) return <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">{Array(4).fill(0).map((_, i) => <div key={i} className="h-32 bg-slate-200 rounded-2xl animate-pulse" />)}</div>;
 
@@ -85,9 +79,9 @@ export default function AdminDashboard() {
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Expiring Documents (30 days)</h3>
-          {expiringDocs.length === 0 ? <p className="text-xs text-slate-400">No documents expiring within 30 days</p> : (
+          {expiringDocs?.length === 0 ? <p className="text-xs text-slate-400">No documents expiring within 30 days</p> : (
             <ul className="space-y-2">
-              {expiringDocs.slice(0, 6).map((d: any) => (
+              {expiringDocs?.slice(0, 6).map((d: any) => (
                 <li key={`${d.user_id}-${d.document}`} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-slate-800">{d.name}</p>

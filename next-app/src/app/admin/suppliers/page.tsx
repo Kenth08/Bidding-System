@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { suppliersAPI } from "@/services/api";
+import { useSuppliers, useUpdateSupplierStatus } from "@/hooks/useQueryHooks";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
 import SupplierVerificationChecklist from "@/components/admin/SupplierVerificationChecklist";
@@ -13,8 +14,10 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 const TABS = ["All", "pending", "approved", "rejected"];
 
 export default function AdminSuppliers() {
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: suppliersData, isLoading: loading, refetch } = useSuppliers();
+  const updateStatusMutation = useUpdateSupplierStatus();
+  const suppliers: any[] = suppliersData?.data || [];
+
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<any>(null);
@@ -24,9 +27,6 @@ export default function AdminSuppliers() {
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approved" | "rejected" | "verify" | "reject_verification" } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-
-  const fetchData = () => { setLoading(true); suppliersAPI.getAll().then((r) => { setSuppliers(Array.isArray(r.data.data) ? r.data.data : []); setLoading(false); }).catch(() => setLoading(false)); };
-  useEffect(() => { fetchData(); }, []);
 
   const filtered = useMemo(() => suppliers.filter((s) => {
     const statusMatch = filter === "All" || s.status === filter;
@@ -40,15 +40,13 @@ export default function AdminSuppliers() {
     setIsConfirmLoading(true);
     try {
       if (confirmAction.action === "verify" || confirmAction.action === "reject_verification") {
-        // For qualification actions, we need to update verification_status (kept as internal field)
-        await suppliersAPI.updateStatus(confirmAction.id, confirmAction.action === "verify" ? "verified" : "verification_rejected");
+        await updateStatusMutation.mutateAsync({ id: confirmAction.id, status: confirmAction.action === "verify" ? "verified" : "verification_rejected" });
         setToast({ message: `Qualification ${confirmAction.action === "verify" ? "completed" : "rejected"}`, type: "success" });
       } else {
-        // For regular status updates
-        await suppliersAPI.updateStatus(confirmAction.id, confirmAction.action);
+        await updateStatusMutation.mutateAsync({ id: confirmAction.id, status: confirmAction.action });
         setToast({ message: `Supplier ${confirmAction.action}`, type: "success" });
       }
-      fetchData();
+      refetch();
       if (viewing && confirmAction.id === viewing.id) {
         setViewing(null);
         setDocumentWorkflow(null);
@@ -129,7 +127,7 @@ export default function AdminSuppliers() {
       await suppliersAPI.approveAllUnlock(viewing.id);
       setToast({ message: "All required documents approved and supplier unlocked.", type: "success" });
       await loadDocumentWorkflow(viewing.id);
-      fetchData();
+      refetch();
     } catch {
       setToast({ message: "Failed to unlock supplier.", type: "error" });
     } finally {

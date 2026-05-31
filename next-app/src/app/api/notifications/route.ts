@@ -5,10 +5,22 @@ export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
-  const notifications = await db.notification.findMany({
-    where: { recipient_id: user!.id },
-    orderBy: { created_at: "desc" },
-  });
+  const url = new URL(request.url);
+  const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("page_size")) || 20));
+  const skip = (page - 1) * pageSize;
 
-  return json(notifications);
+  const where = { recipient_id: user!.id };
+
+  const [notifications, total] = await Promise.all([
+    db.notification.findMany({
+      where,
+      orderBy: { created_at: "desc" },
+      skip,
+      take: pageSize,
+    }),
+    db.notification.count({ where }),
+  ]);
+
+  return json({ results: notifications, total, page, page_size: pageSize });
 }

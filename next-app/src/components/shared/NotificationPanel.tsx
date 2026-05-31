@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { AlertCircle, Award, Bell, Briefcase, CheckCircle, FileText, FolderOpen, Handshake, LucideIcon, RotateCcw, Shield, Users, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { notificationsAPI } from "@/services/api";
+import { useUnreadCount, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/hooks/useQueryHooks";
 
 const ICON_MAP: Record<string, { icon: LucideIcon; bg: string; color: string }> = {
   new_supplier: { icon: Users, bg: "bg-amber-50", color: "text-amber-500" },
@@ -48,38 +50,31 @@ interface NotificationItem {
 
 export default function NotificationPanel({ onNavigate }: { onNavigate?: (link: string, item: unknown) => void }) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useOutsideClick(panelRef, () => setOpen(false));
 
-  useEffect(() => {
-    fetchUnreadCount();
-    const i = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(i);
-  }, []);
+  const { data: unreadCount = 0 } = useUnreadCount();
 
-  useEffect(() => {
-    if (open) fetchNotifications();
-  }, [open]);
+  const { data: notifData, isLoading: loading } = useQuery({
+    queryKey: ["notifications", "panel"],
+    queryFn: async () => {
+      const r = await notificationsAPI.getAll();
+      return (r.data.results || r.data || []) as NotificationItem[];
+    },
+    enabled: open,
+  });
+  const notifications = notifData || [];
 
-  async function fetchUnreadCount() {
-    try { const r = await notificationsAPI.getUnreadCount(); setUnreadCount(Number(r.data.count || 0)); } catch { /* silent */ }
-  }
-
-  async function fetchNotifications() {
-    setLoading(true);
-    try { const r = await notificationsAPI.getAll(); setNotifications(r.data.results || r.data || []); } catch { setNotifications([]); } finally { setLoading(false); }
-  }
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
 
   async function handleMarkAllRead() {
-    try { await notificationsAPI.markAllRead(); setNotifications((p) => p.map((i) => ({ ...i, is_read: true }))); setUnreadCount(0); } catch { /* silent */ }
+    try { await markAllRead.mutateAsync(); } catch { /* silent */ }
   }
 
-  async function handleMarkRead(id: string, wasUnread = true) {
-    try { await notificationsAPI.markOneRead(id); setNotifications((p) => p.map((i) => (i.id === id ? { ...i, is_read: true } : i))); if (wasUnread) setUnreadCount((p) => Math.max(0, p - 1)); } catch { /* silent */ }
+  async function handleMarkRead(id: string) {
+    try { await markRead.mutateAsync(id); } catch { /* silent */ }
   }
 
   function resolveNavigationTarget(item: NotificationItem) {
@@ -95,7 +90,7 @@ export default function NotificationPanel({ onNavigate }: { onNavigate?: (link: 
   }
 
   async function handleNotificationClick(item: NotificationItem) {
-    await handleMarkRead(item.id, !item.is_read);
+    if (!item.is_read) await handleMarkRead(item.id);
     const target = resolveNavigationTarget(item);
     setOpen(false);
     onNavigate?.(target.link, { ...item, projectId: target.projectId });

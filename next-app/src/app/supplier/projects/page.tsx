@@ -2,7 +2,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, DollarSign, FileCheck2, RefreshCw, ShieldCheck, Signature, TriangleAlert, Upload, X } from "lucide-react";
-import { projectsAPI, bidsAPI } from "@/services/api";
+import { bidsAPI } from "@/services/api";
+import { useProjects, useBids, useCurrentUser } from "@/hooks/useQueryHooks";
+import { useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/shared/Modal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import Toast from "@/components/shared/Toast";
@@ -106,11 +108,15 @@ export default function SupplierProjects() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedProjectId = searchParams.get("project");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [bids, setBids] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
-  const [userBusinessType, setUserBusinessType] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: projectsData, isLoading: projectsLoading, isError: fetchError, refetch: refetchProjects } = useProjects({ status: "active" });
+  const { data: bidsData, isLoading: bidsLoading } = useBids();
+  const { data: currentUser } = useCurrentUser();
+
+  const projects = projectsData?.results || [];
+  const bids = bidsData?.results || [];
+  const loading = projectsLoading || bidsLoading;
+  const userBusinessType = currentUser?.business_type || null;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
@@ -174,26 +180,6 @@ export default function SupplierProjects() {
   function updateDocument(setter: (state: BidDocumentState) => void, file: File | null, required: boolean) {
     const error = validateBidFile(file, required);
     setter({ file, error, success: Boolean(file && !error) });
-  }
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    setLoading(true);
-    setFetchError(false);
-    try {
-      const [projectsRes, bidsRes, meRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll(), (await import("@/services/api")).authAPI.me()]);
-      setProjects(projectsRes.data);
-      setBids(bidsRes.data);
-      const user = meRes.data;
-      setUserBusinessType(user?.business_type || null);
-    } catch {
-      setFetchError(true);
-    } finally {
-      setLoading(false);
-    }
   }
 
   useEffect(() => {
@@ -310,7 +296,8 @@ export default function SupplierProjects() {
       payload.append("supplier_declaration", String(supplierDeclaration));
       await bidsAPI.create(payload);
       setToast({ message: "Your bid has been submitted successfully.", type: "success" });
-      setBids((prev) => [...prev, { project: selected, project_id: selected.id }]);
+      queryClient.invalidateQueries({ queryKey: ["bids"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       resetBidForm();
     } catch (err: any) {
       const msg = err?.response?.data?.error || "Failed to submit bid";
@@ -333,7 +320,7 @@ export default function SupplierProjects() {
   if (fetchError) return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <p className="mb-2 text-base font-semibold text-slate-700">Unable to load projects. Please try again.</p>
-      <button onClick={loadData} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">
+      <button onClick={() => refetchProjects()} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">
         <RefreshCw className="h-4 w-4" /> Retry
       </button>
     </div>

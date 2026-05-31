@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { projectsAPI } from "@/services/api";
+import { useProjects, useCreateProject, useUpdateProject, usePublishProject, useArchiveProject, useDeleteProject } from "@/hooks/useQueryHooks";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
 import SearchBar from "@/components/shared/SearchBar";
@@ -23,12 +23,10 @@ function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style:
 
 export default function AdminProjects() {
   const router = useRouter();
-  const [projects, setProjects] = useState<any[]>([]);
   const [procurementTypes, setProcurementTypes] = useState<string[]>(FALLBACK_PROCUREMENT_TYPES);
   const [businessTypes, setBusinessTypes] = useState<{ id: string; name: string }[]>([]);
   const [selectedBTIds, setSelectedBTIds] = useState<string[]>([]);
   const [openToAll, setOpenToAll] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -41,9 +39,17 @@ export default function AdminProjects() {
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const fetchData = () => { setLoading(true); projectsAPI.getAll().then((r) => { setProjects(Array.isArray(r.data) ? r.data : r.data.results || []); setLoading(false); }).catch(() => setLoading(false)); };
+  const { data: projectsData, isLoading: loading } = useProjects(filter === "All" ? undefined : { status: filter });
+  const projects = projectsData?.results || [];
+
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const publishProject = usePublishProject();
+  const archiveProject = useArchiveProject();
+  const deleteProject = useDeleteProject();
+
+  // Fetch business types on mount
   useEffect(() => {
-    fetchData();
     fetch('/api/public/business-types')
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
@@ -55,7 +61,7 @@ export default function AdminProjects() {
       .catch(() => setProcurementTypes(FALLBACK_PROCUREMENT_TYPES));
   }, []);
 
-  const filtered = useMemo(() => projects.filter((p) => {
+  const filtered = useMemo(() => projects.filter((p: any) => {
     const statusMatch = filter === "All" || p.status === filter;
     const q = search.toLowerCase();
     return statusMatch && (!q || (p.title || "").toLowerCase().includes(q));
@@ -89,10 +95,10 @@ export default function AdminProjects() {
     setIsSaving(true);
     try {
       const payload: any = { title: form.title.trim(), budget: form.budget, deadline: form.deadline, procurement_type: form.procurement_type, technical_specifications: form.technical_specifications, delivery_period: Number(form.delivery_period) || 0, procurement_schedule: form.procurement_schedule || null, public_result_expiry_date: form.public_result_expiry_date || null, open_to_all: openToAll, business_type_ids: openToAll ? [] : selectedBTIds };
-      if (editing) await projectsAPI.update(editing.id, payload);
-      else await projectsAPI.create(payload);
+      if (editing) await updateProject.mutateAsync({ id: editing.id, data: payload });
+      else await createProject.mutateAsync(payload);
       setToast({ message: editing ? "Project updated" : "Project created", type: "success" });
-      setShowModal(false); setSelectedBTIds([]); setOpenToAll(true); fetchData();
+      setShowModal(false); setSelectedBTIds([]); setOpenToAll(true);
     } catch { setToast({ message: "Failed to save", type: "error" }); }
     finally { setIsSaving(false); }
   }
@@ -100,30 +106,19 @@ export default function AdminProjects() {
   async function handlePublish() {
     if (!publishTarget) return;
     setIsConfirmLoading(true);
-    try { await projectsAPI.publish(publishTarget.id); setToast({ message: "Project published!", type: "success" }); fetchData(); }
+    try { await publishProject.mutateAsync(publishTarget.id); setToast({ message: "Project published!", type: "success" }); }
     catch (err: any) { setToast({ message: err?.response?.data?.error || "Failed to publish", type: "error" }); }
     finally {
       setIsConfirmLoading(false);
-      // notify other windows/tabs in this browser immediately
       try { window.dispatchEvent(new CustomEvent("project:published", { detail: { id: publishTarget?.id } })); } catch (e) {}
       setPublishTarget(null);
     }
   }
 
-  // Dispatch a window event so other open admin views update immediately
-  useEffect(() => {
-    const handler = (e: any) => {
-      // refresh list when a publish happens elsewhere
-      fetchData();
-    };
-    window.addEventListener("project:published", handler);
-    return () => window.removeEventListener("project:published", handler);
-  }, []);
-
   async function handleDelete() {
     if (!deleteTarget) return;
     setIsConfirmLoading(true);
-    try { await projectsAPI.delete(deleteTarget.id); setToast({ message: "Project deleted", type: "success" }); fetchData(); }
+    try { await deleteProject.mutateAsync(deleteTarget.id); setToast({ message: "Project deleted", type: "success" }); }
     catch { setToast({ message: "Failed to delete", type: "error" }); }
     finally { setIsConfirmLoading(false); setDeleteTarget(null); }
   }
@@ -131,7 +126,7 @@ export default function AdminProjects() {
   async function handleArchive() {
     if (!archiveTarget) return;
     setIsConfirmLoading(true);
-    try { await projectsAPI.archive(archiveTarget.id, "Archived by admin"); setToast({ message: "Project archived", type: "success" }); fetchData(); }
+    try { await archiveProject.mutateAsync({ id: archiveTarget.id, reason: "Archived by admin" }); setToast({ message: "Project archived", type: "success" }); }
     catch { setToast({ message: "Failed to archive", type: "error" }); }
     finally { setIsConfirmLoading(false); setArchiveTarget(null); }
   }
@@ -163,7 +158,7 @@ export default function AdminProjects() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-50">
-              {filtered.map((p) => (
+              {filtered.map((p: any) => (
                 <tr key={p.id} className="hover:bg-slate-50/50">
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">{p.title}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(p.budget)}</td>

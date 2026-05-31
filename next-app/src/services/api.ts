@@ -54,7 +54,7 @@ export const authAPI = {
 };
 
 export const projectsAPI = {
-  getAll: (statusFilter?: string) => api.get("/projects", { params: statusFilter && statusFilter !== "All" ? { status: statusFilter } : {} }),
+  getAll: (statusFilter?: string, params?: Record<string, unknown>) => api.get("/projects", { params: { ...(statusFilter && statusFilter !== "All" ? { status: statusFilter } : {}), ...params } }),
   getApprovedRecords: () => api.get("/projects/approved-records"),
   getOne: (id: string) => api.get(`/projects/${id}`),
   create: (data: object) => api.post("/projects", data),

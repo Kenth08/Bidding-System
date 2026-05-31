@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { bidsAPI } from "@/services/api";
+import { useBids } from "@/hooks/useQueryHooks";
 import StatusBadge from "@/components/shared/StatusBadge";
 import EmptyState from "@/components/shared/EmptyState";
 import Toast from "@/components/shared/Toast";
@@ -19,8 +19,6 @@ function getBidDocuments(bid: Bid) {
 }
 
 export default function SupplierBids() {
-  const [bids, setBids] = useState<Bid[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [logProjectId, setLogProjectId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
@@ -45,61 +43,18 @@ export default function SupplierBids() {
     return remarks;
   };
 
+  const { data: bidsData, isLoading: loading, refetch } = useBids();
+  const bids = (bidsData?.results || []) as Bid[];
+
+  // subscribe to SSE updates; refetch when a bid for this supplier is updated
   useEffect(() => {
-    bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {}).finally(() => setLoading(false));
-
-    // subscribe to SSE updates; refresh when a bid for this supplier is created
-    let userId: string | null = null;
-    import("@/services/api").then(({ authAPI }) => {
-      authAPI.me().then((res) => { userId = res.data?.id; }).catch(() => {});
-    });
-    if (typeof window !== "undefined") {
-      const es = new EventSource("/api/updates/stream");
-      const handleEvent = (e: any) => {
-        try {
-          const payload = JSON.parse(e.data);
-          if (!userId) {
-            bidsAPI.getAll().then((r) => setBids(r.data)).catch(() => {});
-            return;
-          }
-
-          if (String(payload.supplier_id) === String(userId)) {
-            // capture previous state to compare changes for toast messages
-            const prevBid = bids.find((b) => b.id === payload.id);
-
-            bidsAPI.getAll().then((r) => {
-              setBids(r.data);
-              const updated = (r.data || []).find((x: any) => x.id === payload.id);
-              if (selectedBid) {
-                const sel = (r.data || []).find((x: any) => x.id === selectedBid.id);
-                if (sel) setSelectedBid(sel as any);
-              }
-
-              try {
-                if (prevBid && updated) {
-                  // became qualified
-                  if (!prevBid.technical_compliance && updated.technical_compliance) {
-                    setToast({ message: `Your bid for ${getProjectTitle(updated.project)} is now Qualified.`, type: "success" });
-                  }
-                  // result released
-                  if (prevBid.status !== updated.status) {
-                    if (updated.status === "won") setToast({ message: `Congratulations — your bid for ${getProjectTitle(updated.project)} was selected!`, type: "success" });
-                    else if (updated.status === "lost") setToast({ message: `Result released — your bid for ${getProjectTitle(updated.project)} was not selected.`, type: "warning" });
-                  }
-                }
-              } catch (e) {
-                /* ignore toast errors */
-              }
-            }).catch(() => {});
-          }
-        } catch (err) {}
-      };
-
-      es.addEventListener("bid_created", handleEvent);
-      es.addEventListener("bid_updated", handleEvent);
-      return () => es.close();
-    }
-  }, []);
+    if (typeof window === "undefined") return;
+    const es = new EventSource("/api/updates/stream");
+    const handleEvent = () => { refetch(); };
+    es.addEventListener("bid_created", handleEvent);
+    es.addEventListener("bid_updated", handleEvent);
+    return () => es.close();
+  }, [refetch]);
 
   // render toast
   useEffect(() => {

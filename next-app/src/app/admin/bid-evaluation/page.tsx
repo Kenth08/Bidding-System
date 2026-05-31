@@ -3,6 +3,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ClipboardList, FolderOpen, FileText, ShieldCheck, Signature, Trophy, XCircle } from "lucide-react";
 import { bidsAPI, projectsAPI } from "@/services/api";
+import { useProjects, useBids } from "@/hooks/useQueryHooks";
 import EmptyState from "@/components/shared/EmptyState";
 import BiddingLifecycleProgress from "@/components/shared/BiddingLifecycleProgress";
 import BidActivityLogModal from "@/components/shared/BidActivityLogModal";
@@ -91,9 +92,6 @@ function DetailBadge({ label, value }: { label: string; value: string }) {
 
 function AdminBidEvaluationContent() {
   const searchParams = useSearchParams();
-  const [projects, setProjects] = useState<any[]>([]);
-  const [bids, setBids] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<string | null>(searchParams.get("project"));
   const [expandedBidId, setExpandedBidId] = useState<string | null>(null);
   const [evalForm, setEvalForm] = useState({ technical_compliance: false, evaluation_remarks: "" });
@@ -108,55 +106,22 @@ function AdminBidEvaluationContent() {
   const [closeBiddingConfirm, setCloseBiddingConfirm] = useState(false);
   const [isClosingBidding, setIsClosingBidding] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setProjects([])),
-      bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setBids([])),
-    ]).finally(() => setLoading(false));
+  const { data: projectsData, isLoading: projectsLoading } = useProjects({ page_size: 100 });
+  const { data: bidsData, isLoading: bidsLoading, refetch: refreshBids } = useBids({ page_size: 100 });
+  const projects = projectsData?.results || [];
+  const bids = bidsData?.results || [];
+  const loading = projectsLoading || bidsLoading;
 
-    // poll bids periodically so admin sees updated bid counts when suppliers submit
-    const bidPoll = setInterval(() => {
-      bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
-    }, 10000);
-
-    return () => clearInterval(bidPoll);
-  }, []);
-
-  // Subscribe to server-sent events for live updates and window events for same-tab updates
+  // Subscribe to SSE for live updates — just refetch via React Query
   useEffect(() => {
     if (typeof window === "undefined") return;
     const es = new EventSource("/api/updates/stream");
-
-    const onBidCreated = (e: any) => {
-      try {
-        const payload = JSON.parse(e.data);
-        bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
-        projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
-      } catch (err) {}
-    };
-
-    const onProjectPublished = (e: any) => {
-      try {
-        const payload = JSON.parse(e.data);
-        projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
-      } catch (err) {}
-    };
-
-    es.addEventListener("bid_created", onBidCreated);
-    es.addEventListener("project_published", onProjectPublished);
-
-    const onWindowPublished = () => {
-      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
-    };
-    window.addEventListener("project:published", onWindowPublished);
-
-    return () => {
-      es.removeEventListener("bid_created", onBidCreated);
-      es.removeEventListener("project_published", onProjectPublished);
-      es.close();
-      window.removeEventListener("project:published", onWindowPublished);
-    };
-  }, []);
+    const onUpdate = () => { refreshBids(); };
+    es.addEventListener("bid_created", onUpdate);
+    es.addEventListener("bid_updated", onUpdate);
+    es.addEventListener("project_published", onUpdate);
+    return () => es.close();
+  }, [refreshBids]);
 
   // Show all published projects (active/closed/awarded) even if there are 0 bids.
   const projectsList = useMemo(() => {
@@ -224,11 +189,9 @@ function AdminBidEvaluationContent() {
   async function handleSelectWinner() {
     if (!winnerConfirm) return;
     setIsConfirmLoading(true);
-    try { await bidsAPI.selectWinner(winnerConfirm.id); setToast({ message: "Winner selected!", type: "success" }); setWinnerConfirm(null); refreshBids(); projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {}); } catch (e: any) { setToast({ message: e?.response?.data?.error || "Failed", type: "error" }); setWinnerConfirm(null); }
+    try { await bidsAPI.selectWinner(winnerConfirm.id); setToast({ message: "Winner selected!", type: "success" }); setWinnerConfirm(null); refreshBids(); } catch (e: any) { setToast({ message: e?.response?.data?.error || "Failed", type: "error" }); setWinnerConfirm(null); }
     finally { setIsConfirmLoading(false); }
   }
-
-  function refreshBids() { bidsAPI.getAll().then((r) => setBids(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => setBids([])); }
 
   async function handleCloseBidding() {
     if (!selectedProject) return;
@@ -236,7 +199,6 @@ function AdminBidEvaluationContent() {
     try {
       await projectsAPI.closeBidding(selectedProject);
       setToast({ message: "Bidding has been closed. You can now select a winner.", type: "success" });
-      projectsAPI.getAll().then((r) => setProjects(Array.isArray(r.data) ? r.data : r.data.results || [])).catch(() => {});
       refreshBids();
     } catch (e: any) {
       setToast({ message: e?.response?.data?.error || "Failed to close bidding", type: "error" });

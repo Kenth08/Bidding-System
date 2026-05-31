@@ -51,16 +51,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const currentUser = user ? { fullName: user.full_name, email: user.email } : null;
 
-  // auto-clear notifications when navigating to a matching admin page
+  // auto-clear notifications matching current page (debounced, runs once per navigation)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    (async () => {
+    const timer = setTimeout(async () => {
       try {
         const res = await notificationsAPI.getAll();
         const items = res.data.results || res.data || [];
-        const currUrl = new URL(window.location.href);
-        const currPath = currUrl.pathname;
-        const currProject = currUrl.searchParams.get("project");
+        const currPath = window.location.pathname;
+        const currProject = new URLSearchParams(window.location.search).get("project");
         const toMark: string[] = [];
         for (const it of items) {
           if (it.is_read) continue;
@@ -78,10 +77,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           }
         }
         if (toMark.length) await Promise.all(toMark.map((id) => notificationsAPI.markOneRead(id).catch(() => {})));
-      } catch (e) {
-        // ignore
-      }
-    })();
+      } catch { /* silent */ }
+    }, 1000); // 1s debounce to avoid firing on rapid navigations
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   return (

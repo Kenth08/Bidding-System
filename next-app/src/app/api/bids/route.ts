@@ -39,28 +39,42 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const projectId = url.searchParams.get("project");
+  const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("page_size")) || 20));
+  const skip = (page - 1) * pageSize;
 
   if (user!.role === "admin") {
     const where: Record<string, unknown> = {};
     if (projectId) where.project_id = projectId;
-    const bids = await db.bid.findMany({
-      where,
-      include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true, verification_status: true } } },
-      orderBy: [{ bid_amount: "asc" }, { submitted_at: "asc" }],
-    });
-    return json(bids);
+    const [bids, total] = await Promise.all([
+      db.bid.findMany({
+        where,
+        include: { project: true, supplier: { select: { id: true, full_name: true, email: true, company_name: true, verification_status: true } } },
+        orderBy: [{ bid_amount: "asc" }, { submitted_at: "asc" }],
+        skip,
+        take: pageSize,
+      }),
+      db.bid.count({ where }),
+    ]);
+    return json({ results: bids, total, page, page_size: pageSize });
   }
 
   if (user!.role === "supplier") {
-    const bids = await db.bid.findMany({
-      where: { supplier_id: user!.id },
-      include: { project: true },
-      orderBy: { submitted_at: "desc" },
-    });
-    return json(bids);
+    const where = { supplier_id: user!.id };
+    const [bids, total] = await Promise.all([
+      db.bid.findMany({
+        where,
+        include: { project: true },
+        orderBy: { submitted_at: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.bid.count({ where }),
+    ]);
+    return json({ results: bids, total, page, page_size: pageSize });
   }
 
-  return json([]);
+  return json({ results: [], total: 0, page, page_size: pageSize });
 }
 
 export async function POST(request: Request) {
