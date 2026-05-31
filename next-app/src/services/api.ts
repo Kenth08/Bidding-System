@@ -126,8 +126,8 @@ export const awardsAPI = {
 export const procurementAPI = {
   getAll: () => api.get("/procurement-requests"),
   getOne: (id: string) => api.get(`/procurement-requests/${id}`),
-  create: (data: object) => api.post("/procurement-requests", data),
-  update: (id: string, data: object) => api.patch(`/procurement-requests/${id}`, data),
+  create: (data: FormData | object) => api.post("/procurement-requests", data),
+  update: (id: string, data: FormData | object) => api.patch(`/procurement-requests/${id}`, data),
   delete: (id: string) => api.delete(`/procurement-requests/${id}`),
   review: (id: string, action: string, remarks = "") => api.patch(`/procurement-requests/${id}/review`, { action, remarks }),
 };

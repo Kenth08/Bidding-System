@@ -51,6 +51,32 @@ export default function ProjectDetailsModal({ project, supplierBid, isOpen, onCl
           </Section>
         )}
 
+        {/* Project Photos */}
+        {project.procurement_request?.photo_urls && project.procurement_request.photo_urls.length > 0 && (
+          <Section title="Project Photos">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {project.procurement_request.photo_urls.map((url: string, index: number) => (
+                <a 
+                  key={index} 
+                  href={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="group block border border-slate-200 rounded-lg overflow-hidden transition hover:ring-2 hover:ring-emerald-400"
+                >
+                  <img 
+                    src={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                    alt={`Photo ${index + 1}`} 
+                    className="h-20 w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                </a>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {/* Procurement Request info */}
         {project.procurement_request && (
           <Section title="Procurement Information">

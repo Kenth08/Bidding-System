@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   // Supabase storage path — generate signed URL
   try {
-    const bucket = process.env.SUPABASE_BUCKET_NAME || "supplier-documents";
+    const bucket = request.nextUrl.searchParams.get("bucket") || process.env.SUPABASE_BUCKET_NAME || "supplier-documents";
     const { data, error } = await supabaseServer.storage.from(bucket).createSignedUrl(file, 60);
     if (error || !data?.signedUrl) {
       return NextResponse.json({ error: "Unable to generate signed url" }, { status: 500 });

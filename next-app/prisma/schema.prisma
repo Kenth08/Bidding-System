@@ -137,6 +137,7 @@ model Procurement {
   created_by_id             String?   @db.Uuid
   created_at                DateTime  @default(now())
   updated_at                DateTime  @updatedAt
+  photo_urls                String[]  @default([])
   created_by                User?     @relation("CreatedProcurements", fields: [created_by_id], references: [id])
   reviewed_by               User?     @relation("ReviewedProcurements", fields: [reviewed_by_id], references: [id])
   project                   Project?

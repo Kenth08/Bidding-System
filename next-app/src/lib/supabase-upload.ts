@@ -1,6 +1,8 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import path from "path";
 import { v4 as uuid } from "uuid";
+import { writeFile, mkdir } from "fs/promises";
+
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -83,3 +85,58 @@ export async function uploadSupplierDocumentToSupabase(params: {
     signedUrl: signedData?.signedUrl || null,
   };
 }
+
+export async function uploadProcurementPhoto(params: {
+  projectId: string;
+  file: File;
+}) {
+  const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+  
+  // Validate file
+  const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+  
+  if (!params.file || params.file.size <= 0) {
+    throw new Error("Please choose a valid file.");
+  }
+  if (params.file.size > maxSizeBytes) {
+    throw new Error("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
+  }
+  if (!allowedMimeTypes.has(params.file.type)) {
+    throw new Error("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
+  }
+
+  // Create safe filename
+  const cleanFilename = params.file.name
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_.-]/g, "");
+  const uuidPrefix = uuid();
+  const safeFilename = `${uuidPrefix}-${cleanFilename}`;
+  
+  if (isLocalMode) {
+    const folder = `procurement-photos/${params.projectId}`;
+    const dir = path.join(process.cwd(), "public", "uploads", folder);
+    await mkdir(dir, { recursive: true });
+    const buffer = Buffer.from(await params.file.arrayBuffer());
+    await writeFile(path.join(dir, safeFilename), buffer);
+    return `/uploads/${folder}/${safeFilename}`;
+  } else {
+    await ensureDocumentsBucket();
+    const filePath = `procurement-photos/${params.projectId}/${safeFilename}`;
+    const buffer = Buffer.from(await params.file.arrayBuffer());
+    
+    const { error: uploadError } = await supabaseServer.storage
+      .from(DOCUMENTS_BUCKET)
+      .upload(filePath, buffer, {
+        contentType: params.file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`Failed to upload photo: ${uploadError.message}`);
+    }
+
+    return filePath;
+  }
+}
+

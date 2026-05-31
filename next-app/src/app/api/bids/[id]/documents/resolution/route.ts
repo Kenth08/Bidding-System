@@ -9,6 +9,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const bid = await db.bid.findFirst({ where: { id, status: "won" }, include: { project: true, supplier: true } });
   if (!bid) return json({ error: "Bid not found or not selected" }, 404);
 
+  const record = await db.blockchainRecord.findFirst({ where: { bid_id: id } });
+  const txHash = record ? record.hash : null;
+
   const savings = Math.max(Number(bid.project.budget || 0) - Number(bid.bid_amount), 0);
   return json({
     document_type: "Resolution to Award",
@@ -24,5 +27,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     resolution_date: bid.updated_at.toISOString().split("T")[0],
     delivery_period: bid.project.delivery_period,
     savings,
+    blockchain_tx_hash: txHash,
   });
 }

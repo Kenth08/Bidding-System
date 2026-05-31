@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { ArrowLeft, Award, CheckCircle, Clock, Loader2, Shield, XCircle } from "lucide-react";
+import { ArrowLeft, Award, CheckCircle, Clock, Loader2, Shield, XCircle, ExternalLink } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 function formatPeso(value: unknown) { return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Number(value || 0)); }
@@ -96,7 +96,21 @@ export default function ResultDetailPage() {
         {data.verificationHash && (
           <div className="mb-8 rounded-xl border border-slate-100 bg-white p-5">
             <div className="flex items-center gap-2 mb-2"><CheckCircle className="h-4 w-4 text-emerald-500" /><h3 className="text-sm font-semibold text-slate-800">Verification Record</h3></div>
-            <p className="font-mono text-xs text-slate-600 break-all bg-slate-50 rounded-lg p-3 border border-slate-100">{data.verificationHash}</p>
+            <div className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 rounded-lg p-3">
+              <span className="font-mono text-xs text-slate-600 break-all select-all pr-2">
+                {data.verificationHash}
+              </span>
+              <a
+                href={`https://sepolia.basescan.org/tx/${data.verificationHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 active:bg-slate-100"
+                title="View on Basescan"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                <span>View on Basescan</span>
+              </a>
+            </div>
           </div>
         )}
 

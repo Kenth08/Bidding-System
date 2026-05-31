@@ -30,5 +30,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const bid = await db.bid.findFirst({ where: { id, status: "won" }, include: { project: true, supplier: true } });
   if (!bid) return json({ error: "Bid not found or not selected" }, 404);
 
-  return json(buildPayload(bid, "Notice of Award"));
+  const record = await db.blockchainRecord.findFirst({ where: { bid_id: id } });
+  const txHash = record ? record.hash : null;
+
+  return json({
+    ...buildPayload(bid, "Notice of Award"),
+    blockchain_tx_hash: txHash,
+  });
 }

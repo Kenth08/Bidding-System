@@ -38,6 +38,64 @@ export default function AdminProcurement() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [detailsRequest, setDetailsRequest] = useState<any>(null);
   const [publishedProcurementIds, setPublishedProcurementIds] = useState<Set<string>>(new Set());
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
+  const [validationError, setValidationError] = useState("");
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValidationError("");
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+    const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+    const totalCount = photos.length + existingPhotos.length + files.length;
+    
+    if (totalCount > 5) {
+      setValidationError("You can only upload up to 5 photos.");
+      return;
+    }
+    
+    const validFiles: File[] = [];
+    const newPreviews: string[] = [];
+    
+    for (const file of files) {
+      if (!allowedMimeTypes.includes(file.type)) {
+        setValidationError("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
+        return;
+      }
+      if (file.size > maxSizeBytes) {
+        setValidationError("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
+        return;
+      }
+      validFiles.push(file);
+      newPreviews.push(URL.createObjectURL(file));
+    }
+    
+    setPhotos((prev) => [...prev, ...validFiles]);
+    setPhotoPreviews((prev) => [...prev, ...newPreviews]);
+  };
+
+  const removePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviews[index]);
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingPhoto = (index: number) => {
+    setExistingPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    if (!showModal) {
+      photoPreviews.forEach((url) => URL.revokeObjectURL(url));
+      setPhotos([]);
+      setPhotoPreviews([]);
+      setExistingPhotos([]);
+      setValidationError("");
+    }
+  }, [showModal]);
+
 
   const fetchRequests = () => {
     setLoading(true);
@@ -68,11 +126,23 @@ export default function AdminProcurement() {
       .catch(() => setProcurementTypes(FALLBACK_PROCUREMENT_TYPES));
   }, []);
 
-  const openCreate = () => { setEditingRequest(null); setForm(EMPTY_FORM); setShowModal(true); };
+  const openCreate = () => { 
+    setEditingRequest(null); 
+    setForm(EMPTY_FORM); 
+    setPhotos([]);
+    setPhotoPreviews([]);
+    setExistingPhotos([]);
+    setValidationError("");
+    setShowModal(true); 
+  };
   const openEdit = (r: any) => {
     const procurementType = procurementTypes.includes(r.procurement_type) ? r.procurement_type : procurementTypes[0] || '';
     setEditingRequest(r);
     setForm({ projectTitle: r.project_title || '', budget: String(r.budget || ''), deadline: String(r.deadline || '').slice(0, 10), publicResultExpiryDate: String(r.public_result_expiry_date || '').slice(0, 10), procurementType, technicalSpecifications: r.technical_specifications || '', procurementSchedule: String(r.procurement_schedule || '').slice(0, 10), deliveryPeriod: String(r.delivery_period || '').slice(0, 10) });
+    setExistingPhotos(r.photo_urls || []);
+    setPhotos([]);
+    setPhotoPreviews([]);
+    setValidationError("");
     setShowModal(true);
   };
 
@@ -84,13 +154,37 @@ export default function AdminProcurement() {
     }
     setIsSaving(true);
     try {
-      const payload = { project_title: form.projectTitle.trim(), budget: form.budget, deadline: form.deadline || null, public_result_expiry_date: form.publicResultExpiryDate || null, procurement_type: form.procurementType, technical_specifications: form.technicalSpecifications.trim(), procurement_schedule: form.procurementSchedule, delivery_period: form.deliveryPeriod };
-      if (editingRequest) await procurementAPI.update(editingRequest.id, payload);
-      else await procurementAPI.create(payload);
+      const formData = new FormData();
+      formData.append("title", form.projectTitle.trim());
+      formData.append("approvedBudget", form.budget);
+      formData.append("biddingClosesOn", form.deadline || "");
+      formData.append("publicResultVisibleUntil", form.publicResultExpiryDate || "");
+      formData.append("procurementType", form.procurementType);
+      formData.append("technicalSpecifications", form.technicalSpecifications.trim());
+      formData.append("procurementSchedule", form.procurementSchedule || "");
+      formData.append("expectedDeliveryDate", form.deliveryPeriod || "");
+
+      existingPhotos.forEach((url) => {
+        formData.append("existing_photos", url);
+      });
+      photos.forEach((photo) => {
+        formData.append("photos", photo);
+      });
+
+      if (editingRequest) {
+        await procurementAPI.update(editingRequest.id, formData);
+      } else {
+        await procurementAPI.create(formData);
+      }
       setToast({ message: editingRequest ? 'Request updated' : 'Draft saved', type: 'success' });
-      setShowModal(false); fetchRequests();
-    } catch { setToast({ message: 'Failed to save', type: 'error' }); }
-    finally { setIsSaving(false); }
+      setShowModal(false); 
+      fetchRequests();
+    } catch (err: any) { 
+      const errMsg = err?.response?.data?.error || 'Failed to save';
+      setToast({ message: errMsg, type: 'error' }); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const submitForReview = async (request: any) => {
@@ -222,6 +316,92 @@ export default function AdminProcurement() {
               <p className="mt-1 text-xs text-slate-400">The expected date for delivery of goods or services</p>
             </label>
           </div>
+
+          <div className="space-y-2">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Project Photos (Optional)</span>
+            <p className="text-xs text-slate-400">Upload photos related to this procurement request. You can upload multiple images (max 5 photos, up to 5MB each, JPG/PNG/WEBP).</p>
+            
+            <input 
+              type="file" 
+              multiple 
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" 
+              onChange={handleFileChange} 
+              className="hidden" 
+              id="procurement-photos-upload"
+              disabled={photos.length + existingPhotos.length >= 5}
+            />
+            
+            <label 
+              htmlFor="procurement-photos-upload" 
+              className={`flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 cursor-pointer hover:bg-slate-50 transition-colors ${photos.length + existingPhotos.length >= 5 ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <svg className="mx-auto h-8 w-8 text-slate-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs font-medium text-slate-600">Select Files</span>
+            </label>
+
+            {validationError && (
+              <p className="text-xs font-medium text-red-500 mt-1">{validationError}</p>
+            )}
+
+            {/* Existing photos preview */}
+            {existingPhotos.length > 0 && (
+              <div className="space-y-1.5 mt-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Existing Photos</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {existingPhotos.map((url, index) => (
+                    <div key={`existing-${index}`} className="relative border border-slate-100 rounded-xl overflow-hidden bg-slate-50 p-1 group">
+                      <img 
+                        src={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                        alt="Existing Preview" 
+                        className="h-20 w-full object-cover rounded-lg"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => removeExistingPhoto(index)} 
+                        className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow transition-colors"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New photos preview */}
+            {photoPreviews.length > 0 && (
+              <div className="space-y-1.5 mt-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">New Selected Photos</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {photoPreviews.map((url, index) => (
+                    <div key={`new-${index}`} className="relative border border-slate-100 rounded-xl overflow-hidden bg-slate-50 p-1 group">
+                      <img 
+                        src={url} 
+                        alt="New Preview" 
+                        className="h-20 w-full object-cover rounded-lg"
+                      />
+                      <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 text-white text-[9px] px-1 rounded truncate text-center font-normal">
+                        {photos[index]?.name}
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => removePhoto(index)} 
+                        className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow transition-colors"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
             <LoadingButton type="submit" isLoading={isSaving} loadingText="Saving..." className="flex-1 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600">
@@ -268,6 +448,31 @@ export default function AdminProcurement() {
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Technical Specifications</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{detailsRequest.technical_specifications}</p>
+              </div>
+            )}
+            {detailsRequest.photo_urls && detailsRequest.photo_urls.length > 0 && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Project Photos</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {detailsRequest.photo_urls.map((url: string, index: number) => (
+                    <a 
+                      key={index} 
+                      href={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="group block border border-slate-200 rounded-lg overflow-hidden transition hover:ring-2 hover:ring-emerald-400"
+                    >
+                      <img 
+                        src={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                        alt={`Photo ${index + 1}`} 
+                        className="h-20 w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
             {detailsRequest.remarks && (

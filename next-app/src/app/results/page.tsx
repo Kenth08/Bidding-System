@@ -160,7 +160,17 @@ export default function PublicResultsPage() {
                         <tr key={r.project_id} className="transition-colors hover:bg-slate-50/50">
                           <td className="px-5 py-4">
                             <p className="text-sm font-medium text-slate-800">{r.project_title}</p>
-                            {r.verificationHash && <p className="mt-0.5 text-[10px] font-mono text-slate-400 truncate max-w-[180px]" title={r.verificationHash}>🔗 {r.verificationHash.slice(0, 16)}…</p>}
+                            {r.verificationHash && (
+                              <a
+                                href={`https://sepolia.basescan.org/tx/${r.verificationHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-mono text-emerald-600 hover:text-emerald-700 hover:underline"
+                                title="View on Basescan"
+                              >
+                                🔗 {r.verificationHash.slice(0, 16)}…
+                              </a>
+                            )}
                           </td>
                           <td className="px-5 py-4 text-sm text-slate-600">{r.procurement_type || "—"}</td>
                           <td className="px-5 py-4 text-sm text-slate-600">{formatPeso(r.budget)}</td>

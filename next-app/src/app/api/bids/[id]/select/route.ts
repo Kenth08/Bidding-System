@@ -4,7 +4,8 @@ import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifySuppliers, notifyUser } from "@/lib/actions";
 import { createBidLog } from "@/lib/bid-log";
 import { publishEvent } from "@/lib/sse";
-import hashlib from "crypto";
+import { ethers } from "ethers";
+import { getProcureChainContract } from "@/lib/blockchain";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireRole(request, "admin");
@@ -48,30 +49,125 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Update project to awarded
   await db.project.update({ where: { id: bid.project_id }, data: { status: "awarded", awarded_at: new Date() } });
 
-  // Optional blockchain write: disabled by default until blockchain flow is finalized.
-  if (process.env.ENABLE_BLOCKCHAIN === "true") {
-    const existingRecord = await db.blockchainRecord.findFirst({ where: { project_id: bid.project_id } });
-    if (!existingRecord) {
-      const raw = `${bid.project_id}${bid.supplier_id}${bid.bid_amount}${Date.now()}`;
-      const hashValue = "0x" + hashlib.createHash("sha256").update(raw).digest("hex");
-      const projectRef = `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`;
+  // Real blockchain write: anchor the winning bid parameters and document hashes (NOA, NTP, Resolution) on-chain
+  const projectRef = `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`;
+  try {
+    const contract = getProcureChainContract();
 
+    // Query updated bid to get the exact updated_at timestamp used for document generation
+    const updatedBid = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: true } });
+    if (!updatedBid) throw new Error("Updated bid not found");
+
+    const amountStr = updatedBid.bid_amount.toString();
+    const amountBigInt = ethers.parseUnits(amountStr, 18);
+
+    const savings = Math.max(Number(updatedBid.project.budget || 0) - Number(updatedBid.bid_amount), 0);
+    const dateStr = updatedBid.updated_at.toISOString().split("T")[0];
+    const companyName = updatedBid.company_name || updatedBid.supplier.company_name;
+
+    const noaPayload = {
+      document_type: "Notice of Award",
+      reference: `NOA-${updatedBid.project.id.slice(0, 8).toUpperCase()}`,
+      project_title: updatedBid.project.title,
+      procurement_type: updatedBid.project.procurement_type,
+      supplier_name: updatedBid.supplier.full_name,
+      company_name: companyName,
+      bid_amount: Number(updatedBid.bid_amount),
+      budget: Number(updatedBid.project.budget || 0),
+      award_date: dateStr,
+      proceed_date: dateStr,
+      resolution_date: dateStr,
+      delivery_period: updatedBid.project.delivery_period,
+      savings,
+    };
+
+    const ntpPayload = {
+      document_type: "Notice to Proceed",
+      reference: `NTP-${updatedBid.project.id.slice(0, 8).toUpperCase()}`,
+      project_title: updatedBid.project.title,
+      procurement_type: updatedBid.project.procurement_type,
+      supplier_name: updatedBid.supplier.full_name,
+      company_name: companyName,
+      bid_amount: Number(updatedBid.bid_amount),
+      budget: Number(updatedBid.project.budget || 0),
+      award_date: dateStr,
+      proceed_date: dateStr,
+      resolution_date: dateStr,
+      delivery_period: updatedBid.project.delivery_period,
+      savings,
+    };
+
+    const resolutionPayload = {
+      document_type: "Resolution to Award",
+      reference: `RES-${updatedBid.project.id.slice(0, 8).toUpperCase()}`,
+      project_title: updatedBid.project.title,
+      procurement_type: updatedBid.project.procurement_type,
+      supplier_name: updatedBid.supplier.full_name,
+      company_name: companyName,
+      bid_amount: Number(updatedBid.bid_amount),
+      budget: Number(updatedBid.project.budget || 0),
+      award_date: dateStr,
+      proceed_date: dateStr,
+      resolution_date: dateStr,
+      delivery_period: updatedBid.project.delivery_period,
+      savings,
+    };
+
+    const noaHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(noaPayload)));
+    const ntpHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(ntpPayload)));
+    const resolutionHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(resolutionPayload)));
+
+    const tx = await contract.recordAward(
+      updatedBid.project_id,
+      id,
+      updatedBid.supplier_id,
+      amountBigInt,
+      projectRef,
+      noaHash,
+      ntpHash,
+      resolutionHash
+    );
+
+    const receipt = await tx.wait();
+    if (!receipt || receipt.status === 0) {
+      throw new Error("Transaction reverted on-chain");
+    }
+
+    const txHash = tx.hash;
+
+    // Create or update blockchain record in local database
+    const existingRecord = await db.blockchainRecord.findFirst({ where: { project_id: updatedBid.project_id } });
+    if (!existingRecord) {
       await db.blockchainRecord.create({
-        data: { id: uuid(), project_id: bid.project_id, bid_id: id, winner_id: bid.supplier_id, bid_amount: bid.bid_amount, hash: hashValue, project_ref_id: projectRef },
+        data: {
+          id: uuid(),
+          project_id: updatedBid.project_id,
+          bid_id: id,
+          winner_id: updatedBid.supplier_id,
+          bid_amount: updatedBid.bid_amount,
+          hash: txHash,
+          project_ref_id: projectRef,
+        },
       });
-      await db.bid.update({ where: { id }, data: { recorded: true } });
     } else {
       await db.blockchainRecord.update({
         where: { id: existingRecord.id },
         data: {
           bid_id: id,
-          winner_id: bid.supplier_id,
-          bid_amount: bid.bid_amount,
-          project_ref_id: existingRecord.project_ref_id || `PRJ-${bid.project_id.slice(0, 6).toUpperCase()}`,
+          winner_id: updatedBid.supplier_id,
+          bid_amount: updatedBid.bid_amount,
+          hash: txHash,
+          project_ref_id: projectRef,
         },
       });
-      await db.bid.update({ where: { id }, data: { recorded: true } });
     }
+
+    await db.bid.update({ where: { id }, data: { recorded: true } });
+    await logAudit("RECORD_BLOCKCHAIN", user!.id, `Recorded blockchain entry for ${updatedBid.project.title}`, "blockchain", txHash);
+
+  } catch (err: any) {
+    console.error("Failed to automatically record award on blockchain:", err);
+    return json({ error: `Failed to record award on blockchain: ${err.message || err}` }, 500);
   }
 
   // Recalculate ranks

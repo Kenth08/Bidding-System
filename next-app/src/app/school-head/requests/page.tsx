@@ -129,6 +129,31 @@ export default function SchoolHeadRequests() {
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selected.technical_specifications}</p>
             </div>
           )}
+          {selected?.photo_urls && selected.photo_urls.length > 0 && (
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Project Photos</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {selected.photo_urls.map((url: string, index: number) => (
+                  <a 
+                    key={index} 
+                    href={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="group block border border-slate-200 rounded-lg overflow-hidden transition hover:ring-2 hover:ring-emerald-400"
+                  >
+                    <img 
+                      src={`/api/files/preview?file=${encodeURIComponent(url)}&bucket=documents`} 
+                      alt={`Photo ${index + 1}`} 
+                      className="h-20 w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">Remarks</label>
             <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="Add remarks (required for reject/revision)..." />
