@@ -6,13 +6,17 @@ export async function GET(request: Request) {
     const { error } = await requireRole(request, "admin");
     if (error) return error;
 
-    const [users, bids] = await Promise.all([
+    const [allUsers, bids] = await Promise.all([
       db.user.findMany({
         where: { role: "supplier" },
         orderBy: { created_at: "desc" },
+        include: { supplier_business_types: { include: { business_type: true } } },
       }),
       db.bid.findMany({ select: { supplier_id: true, status: true } }),
     ]);
+
+    // Exclude suppliers who haven't completed registration
+    const users = allUsers.filter((u: any) => u.status !== "draft" && u.status !== "incomplete");
 
     const bidRows = Object.values(
       bids.reduce((acc: Record<string, { supplier_id: string; bid_count: number; win_count: number }>, bid: any) => {
@@ -41,34 +45,7 @@ export async function GET(request: Request) {
       if (existing) {
         existing.bid_count = bidRow.bid_count ?? existing.bid_count;
         existing.wins = bidRow.win_count ?? existing.wins;
-        continue;
       }
-
-      const supplierFromBid = await db.user.findUnique({ where: { id: bidRow.supplier_id } });
-      if (supplierFromBid) {
-        const { password_hash, ...safeUser } = supplierFromBid as any;
-        supplierById.set(supplierFromBid.id, {
-          ...safeUser,
-          role: safeUser.role || "supplier",
-          status: safeUser.status || "pending",
-          bid_count: bidRow.bid_count ?? 0,
-          wins: bidRow.win_count ?? 0,
-        });
-        continue;
-      }
-
-      supplierById.set(bidRow.supplier_id, {
-        id: bidRow.supplier_id,
-        full_name: "Unknown Supplier",
-        email: "",
-        role: "supplier",
-        status: "pending",
-        company_name: "",
-        business_type: "",
-        created_at: null,
-        bid_count: bidRow.bid_count ?? 0,
-        wins: bidRow.win_count ?? 0,
-      });
     }
 
     const safe = Array.from(supplierById.values()).sort((left, right) => {

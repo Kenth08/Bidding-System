@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Clock3, FileText, Flag, Lock, Upload, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
+import ViewFileButton from "@/components/shared/ViewFileButton";
 
 export type SupplierDocumentState = "missing" | "uploaded" | "flagged" | "revised" | "approved";
 
@@ -47,10 +48,10 @@ function Dot({ tone }: { tone: SupplierActivityLogItem["tone"] }) {
 
 function formatStatus(document: SupplierReviewDocument) {
   if (document.state === "approved") return "Approved";
-  if (document.state === "flagged") return "Flagged";
-  if (document.state === "revised") return "Revised - re-review";
-  if (document.state === "uploaded") return "Uploaded";
-  return document.required ? "Not uploaded - Required" : "Not uploaded";
+  if (document.state === "flagged") return "Need Revision";
+  if (document.state === "revised") return "Re-uploaded - Pending Review";
+  if (document.state === "uploaded") return "Pending Review";
+  return document.required ? "Not Uploaded - Required" : "Not Uploaded";
 }
 
 function statusPillClass(state: SupplierDocumentState) {
@@ -81,7 +82,7 @@ function getOverallStatus(documents: SupplierReviewDocument[]) {
   const allRequiredUploaded = required.every((doc) => doc.uploaded);
 
   if (allRequiredApproved) return { label: "Approved", className: "bg-emerald-100 text-emerald-700" };
-  if (hasFlagged) return { label: "Documents Flagged", className: "bg-red-100 text-red-700" };
+  if (hasFlagged) return { label: "Needs Revision", className: "bg-red-100 text-red-700" };
   if (!missingRequired && allRequiredUploaded) return { label: "Pending", className: "bg-blue-100 text-blue-700" };
   return { label: "Incomplete", className: "bg-amber-100 text-amber-700" };
 }
@@ -98,47 +99,67 @@ export default function SupplierVerificationChecklist({
   isBusy = false,
 }: SupplierVerificationChecklistProps) {
   const [flagDrafts, setFlagDrafts] = useState<Record<string, string>>({});
+  const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+  const [optimisticApproved, setOptimisticApproved] = useState<Set<string>>(new Set());
+
+  // Merge optimistic approvals into documents for display
+  const effectiveDocuments = useMemo(() => documents.map((doc) =>
+    optimisticApproved.has(doc.id) ? { ...doc, state: "approved" as SupplierDocumentState } : doc
+  ), [documents, optimisticApproved]);
+
+  async function handleApproveOptimistic(documentId: string) {
+    setApprovingIds((prev) => new Set(prev).add(documentId));
+    setOptimisticApproved((prev) => new Set(prev).add(documentId));
+    try {
+      await Promise.resolve(onApproveDocument(documentId));
+    } catch {
+      // Revert optimistic update on failure
+      setOptimisticApproved((prev) => { const next = new Set(prev); next.delete(documentId); return next; });
+    } finally {
+      setApprovingIds((prev) => { const next = new Set(prev); next.delete(documentId); return next; });
+    }
+  }
 
   const stats = useMemo(() => {
-    const total = documents.length;
-    const uploaded = documents.filter((doc) => doc.uploaded).length;
-    const approved = documents.filter((doc) => doc.state === "approved").length;
-    const flagged = documents.filter((doc) => doc.state === "flagged").length;
+    const total = effectiveDocuments.length;
+    const uploaded = effectiveDocuments.filter((doc) => doc.uploaded).length;
+    const approved = effectiveDocuments.filter((doc) => doc.state === "approved").length;
+    const flagged = effectiveDocuments.filter((doc) => doc.state === "flagged").length;
 
     const now = Date.now();
     const soonLimit = now + 30 * 24 * 60 * 60 * 1000;
-    const expiringSoon = documents.filter((doc) => {
+    const expiringSoon = effectiveDocuments.filter((doc) => {
       if (!doc.expiryDate) return false;
       const expiresAt = new Date(doc.expiryDate).getTime();
       return expiresAt >= now && expiresAt <= soonLimit;
     }).length;
 
     return { total, uploaded, approved, flagged, expiringSoon };
-  }, [documents]);
+  }, [effectiveDocuments]);
 
   const flaggedDocuments = useMemo(
-    () => documents.filter((doc) => doc.state === "flagged"),
-    [documents]
+    () => effectiveDocuments.filter((doc) => doc.state === "flagged"),
+    [effectiveDocuments]
   );
   const flaggedRequiredDocuments = useMemo(
-    () => documents.filter((doc) => doc.required && doc.state === "flagged"),
-    [documents]
+    () => effectiveDocuments.filter((doc) => doc.required && doc.state === "flagged"),
+    [effectiveDocuments]
   );
 
   const canNotifySupplier = flaggedRequiredDocuments.length > 0 && !notifSent;
   const canApproveAllUnlock = useMemo(() => {
-    const required = documents.filter((doc) => doc.required);
+    const required = effectiveDocuments.filter((doc) => doc.required);
     return required.length > 0 && required.every((doc) => doc.state === "approved");
-  }, [documents]);
+  }, [effectiveDocuments]);
 
-  const overall = getOverallStatus(documents);
+  const overall = getOverallStatus(effectiveDocuments);
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatCard label="Uploaded" value={`${stats.uploaded}/${stats.total}`} tone="slate" />
         <StatCard label="Expiring Soon" value={String(stats.expiringSoon)} tone="amber" />
-        <StatCard label="Flagged" value={String(stats.flagged)} tone="red" />
+        <StatCard label="Need Revision" value={String(stats.flagged)} tone="red" />
         <StatCard label="Approved" value={String(stats.approved)} tone="green" />
       </div>
 
@@ -163,10 +184,11 @@ export default function SupplierVerificationChecklist({
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <div className="divide-y divide-slate-200">
-          {documents.map((document) => {
+          {effectiveDocuments.map((document) => {
             const canApprove = document.uploaded && document.state !== "approved";
-            const canFlag = document.uploaded && document.state !== "approved";
+            const canFlag = document.state !== "approved";
             const draftReason = flagDrafts[document.id] ?? document.reason ?? "";
+            const isApproving = approvingIds.has(document.id);
 
             return (
               <div key={document.id} className="px-4 py-3">
@@ -184,16 +206,14 @@ export default function SupplierVerificationChecklist({
                         {formatStatus(document)}
                       </span>
                       {isRenderableFileUrl(document.file) ? (
-                        <a href={document.file} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-600 hover:underline">
-                          View file
-                        </a>
+                        <ViewFileButton file={document.file} label="View file" />
                       ) : (
                         <span className="text-xs text-slate-400">No file preview available</span>
                       )}
                     </div>
                     {document.state === "flagged" && document.reason ? (
                       <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                        <span className="font-semibold">Flag reason:</span> {document.reason}
+                        <span className="font-semibold">Revision reason:</span> {document.reason}
                       </div>
                     ) : null}
                   </div>
@@ -201,23 +221,30 @@ export default function SupplierVerificationChecklist({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      disabled={!canApprove || isBusy}
-                      onClick={() => onApproveDocument(document.id)}
+                      disabled={!canApprove || isApproving}
+                      onClick={() => handleApproveOptimistic(document.id)}
                       className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Approve
+                      {isApproving ? (
+                        <span className="inline-flex items-center gap-1"><svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Approving</span>
+                      ) : "Approve"}
                     </button>
                     <button
                       type="button"
-                      disabled={!canFlag || isBusy}
-                      onClick={() => {
+                      disabled={!canFlag || isBusy || !draftReason.trim()}
+                      onClick={async () => {
                         const reason = draftReason.trim();
                         if (!reason) return;
-                        onFlagDocument(document.id, reason);
+                        try {
+                          await Promise.resolve(onFlagDocument(document.id, reason));
+                          setFlagDrafts((prev) => ({ ...prev, [document.id]: "" }));
+                        } catch {
+                          // Keep the draft reason so user can retry.
+                        }
                       }}
                       className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Flag
+                      {document.state === "missing" ? "Request Revision" : "Need Revision"}
                     </button>
                   </div>
                 </div>
@@ -227,7 +254,7 @@ export default function SupplierVerificationChecklist({
                     <input
                       value={draftReason}
                       onChange={(event) => setFlagDrafts((prev) => ({ ...prev, [document.id]: event.target.value }))}
-                      placeholder="Enter a reason before flagging"
+                      placeholder={document.state === "missing" ? "Enter a reason for revision" : "Enter a reason before marking for revision"}
                       className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300"
                     />
                   </div>

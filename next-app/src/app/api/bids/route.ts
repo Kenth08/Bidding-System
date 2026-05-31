@@ -2,6 +2,8 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/lib/db";
 import { requireAuth, json } from "@/lib/api-utils";
 import { logAudit, notifyAdmins } from "@/lib/actions";
+import { createBidLog } from "@/lib/bid-log";
+import { canSupplierAccessProject } from "@/lib/project-access";
 import { publishEvent } from "@/lib/sse";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
@@ -68,18 +70,21 @@ export async function POST(request: Request) {
   // Fetch latest status from DB to ensure "No logout required" rule
   const user = await db.user.findUnique({
     where: { id: authUser!.id },
-    select: { id: true, role: true, verification_status: true, company_name: true, full_name: true }
+    select: { id: true, role: true, status: true, verification_status: true, company_name: true, full_name: true }
   });
 
   if (!user || user.role !== "supplier") {
     return json({ error: "Only suppliers can submit bids." }, 403);
   }
 
-  // Business Logic: Block bids if not fully verified
-  if (user.verification_status !== "verified") {
-    return json({ 
-      error: "Account Restricted. You cannot submit bids until your verification status is 'verified'.",
-      status: user.verification_status 
+  // Business Logic: Block bids if not approved or verified
+  // Require supplier to be fully verified and not account-locked
+  const { getSupplierWorkflow } = await import("@/lib/supplier-workflow-db");
+  const workflow = await getSupplierWorkflow(user.id);
+  if (user.verification_status !== "verified" || workflow.account_locked || ["revision_required", "waiting_admin_approval", "waiting_admin_review"].includes(user.status || "")) {
+    return json({
+      error: "You must complete supplier verification before participating in bidding.",
+      status: user.verification_status,
     }, 403);
   }
 
@@ -140,7 +145,20 @@ export async function POST(request: Request) {
     return json({ error: `Bidding is closed. The deadline was ${project.deadline}.` }, 403);
   }
   if (project.status !== "active") {
-    return json({ project: "Bidding is closed for this project." }, 403);
+    return json({ error: "Submission is closed for this project." }, 403);
+  }
+
+  // Business type eligibility check
+  if (!project.open_to_all) {
+    const [supplierBTs, projectBTs] = await Promise.all([
+      db.supplierBusinessType.findMany({ where: { supplier_id: user!.id }, include: { business_type: true } }),
+      db.projectBusinessType.findMany({ where: { project_id: projectId }, include: { business_type: true } }),
+    ]);
+    const supplierBTNames = supplierBTs.map((s: any) => s.business_type?.name).filter(Boolean);
+    const projectBTNames = projectBTs.map((p: any) => p.business_type?.name).filter(Boolean);
+    if (!canSupplierAccessProject(supplierBTNames, projectBTNames, false, project.procurement_type)) {
+      return json({ error: "You are not eligible to submit a bid for this project." }, 403);
+    }
   }
 
   if (!Number.isFinite(bidAmount) || bidAmount <= 0) return json({ bid_amount: "Enter a valid bid amount." }, 400);
@@ -190,6 +208,8 @@ export async function POST(request: Request) {
 
   await logAudit("SUBMIT_BID", user!.id, `Submitted bid for ${project.title}`, "bid", project.id);
   await notifyAdmins("new_bid", "New Bid Submitted", `${user!.company_name || user!.full_name} submitted an offered price of ₱${bidAmount.toLocaleString()} on ${project.title}.`, `/admin/bid-evaluation?project=${project.id}`, bid.id);
+
+  await createBidLog({ projectId, bidId: bid.id, supplierId: user!.id, userId: user!.id, role: "supplier", action: "BID_SUBMITTED", description: `${user!.company_name || user!.full_name} submitted a bid of ₱${bidAmount.toLocaleString()}` });
 
   // publish SSE for real-time clients
   try {

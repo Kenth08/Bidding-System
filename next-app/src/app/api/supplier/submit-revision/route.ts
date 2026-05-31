@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 import { requireRole, json } from "@/lib/api-utils";
 import { getSupplierWorkflow, updateSupplierWorkflow, addSupplierWorkflowActivity } from "@/lib/supplier-workflow-db";
-import { SUPPLIER_DOCUMENT_DEFINITIONS } from "@/lib/supplier-documents";
 import { sendReuploadConfirmationEmail } from "@/lib/email";
+import { notifyAdmins } from "@/lib/actions";
 
 export async function POST(request: Request) {
   const { user, error } = await requireRole(request, "supplier");
@@ -10,42 +10,28 @@ export async function POST(request: Request) {
 
   const supplierId = user!.id;
   const workflow = await getSupplierWorkflow(supplierId);
-  const requiredDocIds = new Set(
-    SUPPLIER_DOCUMENT_DEFINITIONS.filter((d) => d.required).map((d) => d.id)
-  );
+  const remainingFlagged = Object.keys(workflow.flagged_reasons || {});
 
-  const flaggedRequiredDocIds = Object.keys(workflow.flagged_reasons || {}).filter((id) => requiredDocIds.has(id));
-  if (flaggedRequiredDocIds.length > 0) {
+  // Block if there are still unreuploaded flagged documents
+  if (remainingFlagged.length > 0) {
     return json({
-      error: "Please re-upload all flagged required documents before submitting.",
-      pending: flaggedRequiredDocIds,
+      error: "Please re-upload all flagged documents before submitting.",
+      pending: remainingFlagged,
     }, 400);
   }
 
   const supplier = await db.user.findUnique({ where: { id: supplierId } });
   const nextSessionVersion = ((supplier?.session_version as number) || 0) + 1;
 
-  try {
-    await db.user.update({
-      where: { id: supplierId },
-      data: {
-        status: "waiting_admin_review",
-        session_version: nextSessionVersion,
-      },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/session_version/i.test(message) || !/does not exist|undefined/.test(message)) {
-      throw error;
-    }
-
-    await db.user.update({
-      where: { id: supplierId },
-      data: {
-        status: "waiting_admin_review",
-      },
-    });
-  }
+  // Transition to waiting_admin_review and bump session to force logout
+  await db.user.update({
+    where: { id: supplierId },
+    data: {
+      verification_status: "waiting_admin_review",
+      status: "waiting_admin_review",
+      session_version: nextSessionVersion,
+    },
+  });
 
   await updateSupplierWorkflow(supplierId, {
     accountLocked: true,
@@ -60,6 +46,14 @@ export async function POST(request: Request) {
     message: "Supplier submitted corrected documents for admin review.",
     tone: "blue",
   }).catch(() => {});
+
+  await notifyAdmins(
+    "supplier_revision_submitted",
+    "Supplier Submitted Corrected Documents",
+    `${supplier?.full_name || "A supplier"} has submitted corrected verification documents for review.`,
+    "/admin/suppliers",
+    supplierId
+  ).catch(() => {});
 
   try {
     await sendReuploadConfirmationEmail({

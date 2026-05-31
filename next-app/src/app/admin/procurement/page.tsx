@@ -36,10 +36,25 @@ export default function AdminProcurement() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [detailsRequest, setDetailsRequest] = useState<any>(null);
+  const [publishedProcurementIds, setPublishedProcurementIds] = useState<Set<string>>(new Set());
 
   const fetchRequests = () => {
     setLoading(true);
-    procurementAPI.getAll().then((res) => { setRequests(Array.isArray(res.data) ? res.data : res.data.results || []); setLoading(false); }).catch(() => setLoading(false));
+    Promise.all([
+      procurementAPI.getAll(),
+      fetch('/api/projects').then((r) => r.ok ? r.json() : []),
+    ]).then(([res, projects]) => {
+      setRequests(Array.isArray(res.data) ? res.data : res.data.results || []);
+      const projectList = Array.isArray(projects) ? projects : projects.results || [];
+      const published = new Set<string>(
+        projectList
+          .filter((p: any) => ['active', 'awarded'].includes(p.status) && p.procurement_request_id)
+          .map((p: any) => p.procurement_request_id)
+      );
+      setPublishedProcurementIds(published);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   };
 
   useEffect(() => { 
@@ -130,17 +145,24 @@ export default function AdminProcurement() {
                   <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
+                      <button onClick={() => setDetailsRequest(r)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50">View Details</button>
                       {['Draft', 'Revision Required'].includes(r.status) && (
                         <button onClick={() => openEdit(r)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50">Edit</button>
                       )}
                       {['Draft', 'Revision Required'].includes(r.status) && (
-                        <button onClick={() => submitForReview(r)} disabled={isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">Ready for Head Approval</button>
+                        <button onClick={() => submitForReview(r)} disabled={isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">Send for Approval</button>
                       )}
                       {r.status === 'Pending Review' && (
                         <button type="button" disabled className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">Waiting for Head Approval</button>
                       )}
-                      {r.status === 'Approved' && (
+                      {r.status === 'Approved' && !publishedProcurementIds.has(r.id) && !(r.deadline && new Date(r.deadline) < new Date()) && (
                         <button type="button" onClick={goToProjects} className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700">Go to Publish Project</button>
+                      )}
+                      {r.status === 'Approved' && !publishedProcurementIds.has(r.id) && r.deadline && new Date(r.deadline) < new Date() && (
+                        <span className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700">Expired</span>
+                      )}
+                      {r.status === 'Approved' && publishedProcurementIds.has(r.id) && (
+                        <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">Published</span>
                       )}
                     </div>
                   </td>
@@ -207,6 +229,61 @@ export default function AdminProcurement() {
             </LoadingButton>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={Boolean(detailsRequest)} onClose={() => setDetailsRequest(null)} title="Procurement Request Details" size="lg">
+        {detailsRequest && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-800">{detailsRequest.project_title}</h3>
+              <StatusBadge status={detailsRequest.status} />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Budget</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{'\u20B1'}{Number(detailsRequest.budget).toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Procurement Type</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{detailsRequest.procurement_type || '\u2014'}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Bidding Deadline</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{detailsRequest.deadline ? new Date(detailsRequest.deadline).toLocaleDateString() : '\u2014'}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Public Result Expiry</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{detailsRequest.public_result_expiry_date ? new Date(detailsRequest.public_result_expiry_date).toLocaleDateString() : '\u2014'}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Procurement Schedule</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{detailsRequest.procurement_schedule ? new Date(detailsRequest.procurement_schedule).toLocaleDateString() : '\u2014'}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Expected Delivery</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{detailsRequest.delivery_period ? new Date(detailsRequest.delivery_period).toLocaleDateString() : '\u2014'}</p>
+              </div>
+            </div>
+            {detailsRequest.technical_specifications && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Technical Specifications</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{detailsRequest.technical_specifications}</p>
+              </div>
+            )}
+            {detailsRequest.remarks && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Reviewer Remarks</p>
+                <p className="mt-2 text-sm text-amber-800">{detailsRequest.remarks}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 text-xs text-slate-400">
+              <div>Created by: <span className="font-medium text-slate-600">{detailsRequest.created_by?.full_name || '\u2014'}</span></div>
+              <div>Reviewed by: <span className="font-medium text-slate-600">{detailsRequest.reviewed_by?.full_name || '\u2014'}</span></div>
+              <div>Created: <span className="font-medium text-slate-600">{detailsRequest.created_at ? new Date(detailsRequest.created_at).toLocaleString() : '\u2014'}</span></div>
+              <div>Updated: <span className="font-medium text-slate-600">{detailsRequest.updated_at ? new Date(detailsRequest.updated_at).toLocaleString() : '\u2014'}</span></div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {toast && <Toast isVisible={true} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

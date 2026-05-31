@@ -1,12 +1,16 @@
-import { db as supabaseDb } from "./db-supabase";
-import { dbDirect } from "./db-direct";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
-const isLocalMode = process.env.LOCAL_MODE === "true" || process.env.NEXT_PUBLIC_LOCAL_MODE === "true";
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-export const db: any = isLocalMode
-	? dbDirect
-	: {
-			...supabaseDb,
-			businessType: (supabaseDb as any).businessType ?? (dbDirect as any).businessType,
-			supplierBusinessType: (supabaseDb as any).supplierBusinessType ?? (dbDirect as any).supplierBusinessType,
-		};
+function createClient() {
+  const url = process.env.DATABASE_URL || "";
+  const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 20 });
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({ adapter } as any);
+}
+
+export const db = globalForPrisma.prisma ?? createClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;

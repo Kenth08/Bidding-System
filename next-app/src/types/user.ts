@@ -7,6 +7,8 @@ export interface User {
   email: string;
   role: UserRole;
   status: UserStatus;
+  verification_status?: string;
+  verification_notes?: string;
   company_name: string;
   company_address: string;
   representative_name?: string | null;

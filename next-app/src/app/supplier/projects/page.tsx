@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Calendar, DollarSign, FileCheck2, ShieldCheck, Signature, TriangleAlert, Upload, X } from "lucide-react";
+import { Calendar, DollarSign, FileCheck2, RefreshCw, ShieldCheck, Signature, TriangleAlert, Upload, X } from "lucide-react";
 import { projectsAPI, bidsAPI } from "@/services/api";
 import Modal from "@/components/shared/Modal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -9,7 +9,10 @@ import Toast from "@/components/shared/Toast";
 import SignaturePad from "@/components/shared/SignaturePad";
 import EmptyState from "@/components/shared/EmptyState";
 import LoadingButton from "@/components/ui/LoadingButton";
+import SearchBar from "@/components/shared/SearchBar";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
+import ProjectCard, { getDeadlineStatus } from "@/components/supplier/ProjectCard";
+import ProjectDetailsModal from "@/components/supplier/ProjectDetailsModal";
 import { Project } from "@/types/project";
 
 type BidDocumentState = {
@@ -106,7 +109,12 @@ export default function SupplierProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [bids, setBids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [userBusinessType, setUserBusinessType] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [detailsProject, setDetailsProject] = useState<Project | null>(null);
   const [selected, setSelected] = useState<Project | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [additionalRemarks, setAdditionalRemarks] = useState("");
@@ -169,22 +177,24 @@ export default function SupplierProjects() {
   }
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [projectsRes, bidsRes, meRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll(), /* get current user */ (await import("@/services/api")).authAPI.me()]);
-        setProjects(projectsRes.data);
-        setBids(bidsRes.data);
-        const user = meRes.data;
-        setUserBusinessType(user?.business_type || null);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
+    loadData();
   }, []);
+
+  async function loadData() {
+    setLoading(true);
+    setFetchError(false);
+    try {
+      const [projectsRes, bidsRes, meRes] = await Promise.all([projectsAPI.getAll("active"), bidsAPI.getAll(), (await import("@/services/api")).authAPI.me()]);
+      setProjects(projectsRes.data);
+      setBids(bidsRes.data);
+      const user = meRes.data;
+      setUserBusinessType(user?.business_type || null);
+    } catch {
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!selectedProjectId || !projects.length) return;
@@ -195,9 +205,40 @@ export default function SupplierProjects() {
   const submittedProjectIds = new Set(
     bids.map((bid) => {
       if (typeof bid.project === "string") return bid.project;
-      return bid.project?.id || "";
+      return bid.project?.id || bid.project_id || "";
     }).filter(Boolean)
   );
+
+  const bidByProject = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const bid of bids) {
+      const pid = typeof bid.project === "string" ? bid.project : bid.project?.id || bid.project_id || "";
+      if (pid) map.set(pid, bid);
+    }
+    return map;
+  }, [bids]);
+
+  const filteredProjects = useMemo(() => {
+    let list = [...projects];
+
+    // Search
+    const q = search.toLowerCase();
+    if (q) list = list.filter((p) => p.title.toLowerCase().includes(q) || (p.procurement_type || "").toLowerCase().includes(q) || (p.requirements || "").toLowerCase().includes(q));
+
+    // Status filter
+    if (statusFilter === "open") list = list.filter((p) => getDeadlineStatus(p.deadline) === "open" && !submittedProjectIds.has(p.id));
+    else if (statusFilter === "closing_soon") list = list.filter((p) => getDeadlineStatus(p.deadline) === "closing_soon");
+    else if (statusFilter === "submitted") list = list.filter((p) => submittedProjectIds.has(p.id));
+    else if (statusFilter === "closed") list = list.filter((p) => getDeadlineStatus(p.deadline) === "closed");
+
+    // Sort
+    if (sortBy === "newest") list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    else if (sortBy === "deadline") list.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+    else if (sortBy === "budget_high") list.sort((a, b) => Number(b.budget) - Number(a.budget));
+    else if (sortBy === "budget_low") list.sort((a, b) => Number(a.budget) - Number(b.budget));
+
+    return list;
+  }, [projects, search, statusFilter, sortBy, submittedProjectIds]);
 
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -271,55 +312,100 @@ export default function SupplierProjects() {
       setToast({ message: "Your bid has been submitted successfully.", type: "success" });
       setBids((prev) => [...prev, { project: selected, project_id: selected.id }]);
       resetBidForm();
-    } catch { setToast({ message: "Failed to submit bid", type: "error" }); }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to submit bid";
+      setToast({ message: msg, type: "error" });
+    }
     finally { setIsConfirmLoading(false); setConfirmSubmit(false); }
   }
 
-  if (loading) return <div className="animate-pulse space-y-4"><div className="h-24 rounded-2xl bg-slate-100" /><div className="h-24 rounded-2xl bg-slate-100" /></div>;
+  if (loading) return (
+    <div className="space-y-4 animate-pulse">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="rounded-2xl border border-slate-100 bg-white p-5">
+          <div className="flex justify-between"><div className="h-5 w-48 rounded bg-slate-200" /><div className="h-8 w-24 rounded bg-slate-200" /></div>
+          <div className="mt-4 grid grid-cols-4 gap-4">{[1, 2, 3, 4].map((j) => <div key={j} className="h-4 rounded bg-slate-100" />)}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  if (fetchError) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <p className="mb-2 text-base font-semibold text-slate-700">Unable to load projects. Please try again.</p>
+      <button onClick={loadData} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">
+        <RefreshCw className="h-4 w-4" /> Retry
+      </button>
+    </div>
+  );
+
   if (!projects.length) {
-    if (userBusinessType) {
-      return (
-        <EmptyState
-          title="No matching projects"
-          subtitle="No procurement opportunities match your selected business categories. Update your profile to see more projects."
-          actionLabel="Update profile"
-          onAction={() => router.push("/supplier/profile")}
-        />
-      );
-    }
-    return <EmptyState title="No active projects" subtitle="Check back later for new procurement opportunities." />;
+    return <EmptyState title="No matching procurement opportunities" subtitle="There are currently no available bidding projects that match your registered business type." actionLabel="Update profile" onAction={() => router.push("/supplier/profile")} />;
   }
+
+  const FILTERS = [
+    { value: "all", label: "All Projects" },
+    { value: "open", label: "Open" },
+    { value: "closing_soon", label: "Closing Soon" },
+    { value: "submitted", label: "Bid Submitted" },
+    { value: "closed", label: "Closed" },
+  ];
 
   const submitButtonLabel = canSubmitBid ? "Submit Bid" : "Complete Required Fields";
 
   return (
-    <div className="space-y-4">
-      {projects.map((p) => (
-        <div key={p.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">{p.title}</h3>
-              <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" />₱{Number(p.budget).toLocaleString()}</span>
-                <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{new Date(p.deadline).toLocaleDateString()}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                if (submittedProjectIds.has(p.id)) return;
-                setSelected(p);
-                router.replace(`/supplier/projects?project=${p.id}`);
-              }}
-              disabled={submittedProjectIds.has(p.id)}
-              aria-disabled={submittedProjectIds.has(p.id)}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${submittedProjectIds.has(p.id) ? "bg-slate-100 text-slate-400" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
-            >
-              {submittedProjectIds.has(p.id) ? "Bid Submitted" : "Submit Bid"}
-            </button>
-          </div>
-          {submittedProjectIds.has(p.id) ? <p className="mt-3 text-xs font-medium text-emerald-600">You already submitted a bid for this project.</p> : null}
+    <div className="space-y-5">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">Available Projects</h1>
+        <p className="mt-1 text-sm text-slate-500">Browse procurement opportunities and submit your bids.</p>
+      </div>
+
+      {/* Search + Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SearchBar value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search projects..." className="sm:max-w-xs" />
+        <div className="flex items-center gap-2">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-emerald-300">
+            <option value="newest">Newest first</option>
+            <option value="deadline">Deadline nearest</option>
+            <option value="budget_high">Budget highest</option>
+            <option value="budget_low">Budget lowest</option>
+          </select>
         </div>
-      ))}
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex flex-wrap gap-1">
+        {FILTERS.map((f) => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${statusFilter === f.value ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{f.label}</button>
+        ))}
+      </div>
+
+      {/* Project cards */}
+      {filteredProjects.length === 0 ? (
+        <EmptyState title="No projects match your filters" subtitle="Try adjusting your search or filter criteria." />
+      ) : (
+        <div className="space-y-4">
+          {filteredProjects.map((p) => (
+            <ProjectCard
+              key={p.id}
+              project={p}
+              supplierBid={bidByProject.get(p.id) || ((p as any).bids?.length > 0 ? (p as any).bids[0] : null)}
+              onSubmitBid={() => { setSelected(p); router.replace(`/supplier/projects?project=${p.id}`); }}
+              onViewDetails={() => setDetailsProject(p)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      <ProjectDetailsModal
+        project={detailsProject}
+        supplierBid={detailsProject ? (bidByProject.get(detailsProject.id) || ((detailsProject as any).bids?.length > 0 ? (detailsProject as any).bids[0] : null)) : null}
+        isOpen={Boolean(detailsProject)}
+        onClose={() => setDetailsProject(null)}
+        onSubmitBid={detailsProject ? () => { setSelected(detailsProject); router.replace(`/supplier/projects?project=${detailsProject.id}`); } : undefined}
+      />
 
       <Modal isOpen={!!selected} onClose={resetBidForm} title="Submit Bid" subtitle={selected?.title} size="xl">
         <form onSubmit={handleFormSubmit} className="space-y-4">

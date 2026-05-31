@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expiringDocs, setExpiringDocs] = useState<any[]>([]);
+  const [projectFilter, setProjectFilter] = useState("All");
 
   useEffect(() => {
     Promise.all([
@@ -38,16 +39,30 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Recent Projects</h3><p className="text-xs text-slate-400 mt-0.5">Last 5 projects</p></div>
-          <table className="w-full">
-            <thead><tr className="bg-slate-50/50 border-b border-slate-100"><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Project</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th><th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th></tr></thead>
-            <tbody className="divide-y divide-slate-50">
-              {projects.slice(0, 5).map((p) => (
-                <tr key={p.id} className="odd:bg-slate-50/40 transition-colors hover:bg-emerald-50/40"><td className="px-6 py-3 text-sm text-slate-700">{p.title}</td><td className="px-6 py-3 text-sm text-slate-600">{formatPeso(p.budget)}</td><td className="px-6 py-3 text-sm text-slate-600">{p.deadline ? new Date(p.deadline).toLocaleDateString() : "\u2014"}</td><td className="px-6 py-3"><StatusBadge status={p.status} /></td></tr>
-              ))}
-              {projects.length === 0 && <tr><td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-400">No projects yet</td></tr>}
-            </tbody>
-          </table>
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800">Recent Projects</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Last 10 projects by status</p>
+          </div>
+          <div className="px-6 py-3 border-b border-slate-100 flex gap-1 flex-wrap">
+            {["All", "Draft", "Active", "Closed", "Awarded"].map((tab) => (
+              <button key={tab} onClick={() => setProjectFilter(tab)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${projectFilter === tab ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{tab}</button>
+            ))}
+          </div>
+          <div className="px-6 py-4 space-y-3 max-h-[400px] overflow-y-auto">
+            {(() => {
+              const filtered = projectFilter === "All" ? projects.slice(0, 10) : projects.filter((p) => p.status === projectFilter.toLowerCase()).slice(0, 10);
+              if (!filtered.length) return <p className="text-sm text-slate-400 py-4 text-center">No {projectFilter.toLowerCase()} projects found.</p>;
+              return filtered.map((p) => (
+                <button key={p.id} onClick={() => router.push(`/admin/projects`)} className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-white">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{p.title}</p>
+                    <p className="mt-1 text-xs text-slate-500 truncate">{formatPeso(p.budget)} · {p.deadline ? new Date(p.deadline).toLocaleDateString() : "No deadline"}</p>
+                  </div>
+                  <StatusBadge status={p.status} className="shrink-0" />
+                </button>
+              ));
+            })()}
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5">

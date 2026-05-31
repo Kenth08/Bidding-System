@@ -2,14 +2,14 @@
 import { useEffect, ReactNode } from "react";
 import { X } from "lucide-react";
 
-const SIZE_CLASS: Record<string, string> = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg", xl: "max-w-3xl" };
+const SIZE_CLASS: Record<string, string> = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg", xl: "max-w-3xl", "xlwide": "max-w-6xl" };
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
   subtitle?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "xlwide";
   children: ReactNode;
 }
 
@@ -27,7 +27,7 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, size
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-2 backdrop-blur-sm sm:p-4">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <div className={`relative mx-auto my-2 flex w-full flex-col ${SIZE_CLASS[size] || SIZE_CLASS.lg} overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl sm:my-4`}>
-        <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
+        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5 bg-white">
           <div>
             {title ? <h3 className="text-base font-semibold text-slate-900">{title}</h3> : null}
             {subtitle ? <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p> : null}
@@ -36,7 +36,10 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, size
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="max-h-[75vh] overflow-y-auto px-6 py-5">{children}</div>
+        <div className="sticky bottom-0 z-10 flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 bg-white px-6 py-3">
+          {/* footer placeholder for actions if needed */}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,13 @@
 export type ProjectStatus = "draft" | "active" | "closed" | "awarded";
 export type ProcurementType = "Goods" | "Infrastructure" | "Consulting" | "Services";
 
+export interface ProjectBusinessType {
+  business_type: {
+    id: string;
+    name: string;
+  };
+}
+
 export interface Project {
   id: string;
   procurement_request: string | null;
@@ -19,7 +26,9 @@ export interface Project {
   archived_reason: string | null;
   published_at: string | null;
   awarded_at: string | null;
-  created_by: string | null;
+  open_to_all?: boolean;
+  project_business_types?: ProjectBusinessType[];
+  created_by?: { id: string; full_name: string; email: string } | null;
   created_at: string;
   updated_at: string;
 }

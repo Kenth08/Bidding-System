@@ -10,6 +10,15 @@ const protectedPaths: Record<string, string[]> = {
   "/school-head": ["school_head"],
 };
 
+const ALLOWED_WHEN_REVISION_REQUIRED = [
+  "/supplier/revision-required",
+  "/supplier/verification-status",
+  "/supplier/profile",
+  "/supplier/notifications",
+  "/supplier/documents/reupload",
+  "/supplier/documents",
+];
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -28,57 +37,41 @@ export async function proxy(request: NextRequest) {
   try {
     const { payload } = await jwtVerify(token, secret);
     const role = payload.role as string;
+    const status = (payload.status as string) || "";
     const allowedRoles = protectedPaths[matchedPrefix];
 
     if (!allowedRoles.includes(role)) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
+    // Supplier access control based on verification_status in JWT
     if (role === "supplier" && pathname.startsWith("/supplier")) {
-      try {
-        const workflowResponse = await fetch(new URL("/api/auth/supplier-documents", request.url), {
-          headers: {
-            cookie: request.headers.get("cookie") || "",
-          },
-        });
-
-        if (workflowResponse.ok) {
-          const workflow = await workflowResponse.json();
-          const accessState = String(workflow?.accessState || "restricted");
-          const accountStatus = String(workflow?.accountStatus || "");
-          const allowedRevisionPaths = [
-            "/supplier/revision-required",
-            "/supplier/verification",
-            "/supplier/verification-status",
-            "/supplier/profile",
-            "/supplier/notifications",
-            "/supplier/documents",
-          ];
-
-          if (accountStatus === "waiting_admin_approval" || accountStatus === "waiting_admin_review") {
-            return NextResponse.redirect(new URL("/login?error=under_review", request.url));
-          }
-
-          if (accessState === "revision_required") {
-            const isAllowedPath = allowedRevisionPaths.some((path) => pathname.startsWith(path));
-            if (!isAllowedPath) {
-              return NextResponse.redirect(new URL("/supplier/revision-required", request.url));
-            }
-          } else if (accessState !== "verified") {
-            return NextResponse.redirect(new URL("/supplier/verification-status", request.url));
-          }
-        }
-      } catch {
-        // If the workflow check fails, fall through and let the app handle it.
+      if (status === "waiting_admin_approval" || status === "waiting_admin_review") {
+        const res = NextResponse.redirect(new URL("/login?error=under_review", request.url));
+        res.cookies.delete("access_token");
+        res.cookies.delete("refresh_token");
+        return res;
       }
+
+      if (status === "revision_required") {
+        const isAllowed = ALLOWED_WHEN_REVISION_REQUIRED.some((p) => pathname.startsWith(p));
+        if (!isAllowed) {
+          return NextResponse.redirect(new URL("/supplier/revision-required", request.url));
+        }
+      }
+      // verified: allow all supplier routes
     }
 
     return NextResponse.next();
   } catch (err: any) {
     if (err?.code === "ERR_JWT_EXPIRED") {
+      // Let the page load; client-side will handle refresh
       return NextResponse.next();
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    const res = NextResponse.redirect(new URL("/login", request.url));
+    res.cookies.delete("access_token");
+    res.cookies.delete("refresh_token");
+    return res;
   }
 }
 

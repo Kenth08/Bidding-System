@@ -53,7 +53,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const docs = SUPPLIER_DOCUMENT_DEFINITIONS.map((definition) => {
     const upload = latestByType.get(definition.id);
-    const uploaded = isDocumentUploaded(supplier as unknown as Record<string, unknown>, definition);
+    const hasUpload = Boolean(upload?.file);
+    const uploaded = isDocumentUploaded(supplier as unknown as Record<string, unknown>, definition) || hasUpload;
     const state = mapVerificationStatusToState(upload?.verification_status, uploaded);
     const userFile = normalizeDocumentFile((supplier as any)[definition.userField]);
     const uploadFile = normalizeDocumentFile(upload?.file);
@@ -73,6 +74,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       reviewedAt: upload?.verified_at || null,
       reason: state === "flagged" ? upload?.verification_notes || null : null,
       verification_status: upload?.verification_status || null,
+      expiryDate: definition.expiryField ? (supplier as any)[definition.expiryField] || null : null,
     };
   });
 
@@ -175,7 +177,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
 
     // mark supplier account as requiring revision
-    await db.user.update({ where: { id }, data: { status: "revision_required" } });
+    await db.user.update({ where: { id }, data: { status: "revision_required", verification_status: "revision_required" } });
 
     // send a document-level rejection email
     try {

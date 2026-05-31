@@ -31,11 +31,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   restoreSession: async () => {
+    const state = useAuthStore.getState();
+    if (state.user) { set({ isLoading: false }); return; }
     try {
       const res = await authAPI.me();
       if (res.data) {
-        const user = res.data;
-        set({ user, isLoading: false });
+        set({ user: res.data, isLoading: false });
       } else {
         sessionStorage.removeItem("access_token");
         sessionStorage.removeItem("refresh_token");

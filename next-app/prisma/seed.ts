@@ -58,18 +58,7 @@ const SEED_USERS = [
 async function main() {
   console.log("🌱 Seeding accounts...\n");
 
-  const DEFAULT_BUSINESS_TYPES = [
-    "IT Equipment",
-    "Office Supplies",
-    "Construction Materials",
-    "Medical Supplies",
-    "ICT Services",
-    "Electrical Supplies",
-    "Agricultural Supplies",
-    "Printing Services",
-    "Transportation",
-    "Consultancy",
-  ];
+  const { BUSINESS_TYPES: DEFAULT_BUSINESS_TYPES } = await import("../src/lib/business-types");
 
   console.log("🌱 Seeding business types (idempotent)...\n");
   for (const name of DEFAULT_BUSINESS_TYPES) {

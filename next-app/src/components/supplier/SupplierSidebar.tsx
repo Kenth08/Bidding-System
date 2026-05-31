@@ -14,6 +14,7 @@ interface SupplierSidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   currentUser?: { fullName?: string; email?: string; company_name?: string } | null;
+  restrictedAccess?: boolean;
 }
 
 export default function SupplierSidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, currentUser }: SupplierSidebarProps) {

@@ -6,7 +6,9 @@ import EmptyState from "@/components/shared/EmptyState";
 import Toast from "@/components/shared/Toast";
 import { Bid } from "@/types/bid";
 import SupplierBidProgress from "@/components/shared/SupplierBidProgress";
+import BidActivityLogModal from "@/components/shared/BidActivityLogModal";
 import Modal from "@/components/shared/Modal";
+import { ClipboardList } from "lucide-react";
 
 function getBidDocuments(bid: Bid) {
   return [
@@ -20,6 +22,7 @@ export default function SupplierBids() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
+  const [logProjectId, setLogProjectId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
 
   const getProjectTitle = (project: Bid["project"]) => {
@@ -194,6 +197,8 @@ export default function SupplierBids() {
 
             <SupplierBidProgress status={selectedBid.status} technical_compliance={selectedBid.technical_compliance} />
 
+            <button onClick={() => { setLogProjectId(typeof selectedBid.project === "string" ? selectedBid.project : selectedBid.project?.id || selectedBid.project_id || null); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList className="h-4 w-4" />My Bid Logs</button>
+
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evaluation Remarks</p>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{getEvaluationRemarks(selectedBid)}</p>
@@ -202,6 +207,7 @@ export default function SupplierBids() {
         ) : null}
       </Modal>
       {toast ? <Toast message={toast.message} type={toast.type} isVisible={Boolean(toast)} onClose={() => setToast(null)} /> : null}
+      <BidActivityLogModal isOpen={Boolean(logProjectId)} onClose={() => setLogProjectId(null)} projectId={logProjectId} apiBase="supplier" />
     </div>
   );
 }

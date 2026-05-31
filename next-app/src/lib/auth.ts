@@ -3,8 +3,9 @@ import { User } from "@/types";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret-change-me");
 
-export async function signAccessToken(user: { id: string; email: string; role: string; session_version?: number }) {
+export async function signAccessToken(user: { id: string; email: string; role: string; status?: string; session_version?: number }) {
   const payload: any = { sub: user.id, email: user.email, role: user.role };
+  if (user.status) payload.status = user.status;
   if (typeof user.session_version === "number") payload.session_version = user.session_version;
 
   return new SignJWT(payload)

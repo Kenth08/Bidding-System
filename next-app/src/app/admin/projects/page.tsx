@@ -12,19 +12,10 @@ import LoadingButton from "@/components/ui/LoadingButton";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import StrictNumberInput from "@/components/shared/StrictNumberInput";
 
+import { BUSINESS_TYPES } from "@/lib/business-types";
+
 const TABS = ["All", "draft", "active", "closed", "awarded"];
-const FALLBACK_PROCUREMENT_TYPES = [
-  "IT Equipment",
-  "Office Supplies",
-  "Construction Materials",
-  "Medical Supplies",
-  "ICT Services",
-  "Electrical Supplies",
-  "Agricultural Supplies",
-  "Printing Services",
-  "Transportation",
-  "Consultancy",
-];
+const FALLBACK_PROCUREMENT_TYPES = BUSINESS_TYPES as unknown as string[];
 const EMPTY_FORM = { title: "", budget: "", deadline: "", procurement_type: "", technical_specifications: "", delivery_period: "", procurement_schedule: "", public_result_expiry_date: "" };
 const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-400/20";
 
@@ -34,6 +25,9 @@ export default function AdminProjects() {
   const router = useRouter();
   const [projects, setProjects] = useState<any[]>([]);
   const [procurementTypes, setProcurementTypes] = useState<string[]>(FALLBACK_PROCUREMENT_TYPES);
+  const [businessTypes, setBusinessTypes] = useState<{ id: string; name: string }[]>([]);
+  const [selectedBTIds, setSelectedBTIds] = useState<string[]>([]);
+  const [openToAll, setOpenToAll] = useState(true);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -53,8 +47,10 @@ export default function AdminProjects() {
     fetch('/api/public/business-types')
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        const names = Array.isArray(data) ? data.map((item: any) => item.name).filter(Boolean) : [];
+        const items = Array.isArray(data) ? data : [];
+        const names = items.map((item: any) => item.name).filter(Boolean);
         if (names.length) setProcurementTypes(names);
+        if (items.length) setBusinessTypes(items.map((item: any) => ({ id: item.id, name: item.name })));
       })
       .catch(() => setProcurementTypes(FALLBACK_PROCUREMENT_TYPES));
   }, []);
@@ -78,6 +74,9 @@ export default function AdminProjects() {
       procurement_schedule: String(p.procurement_schedule || "").slice(0, 10),
       public_result_expiry_date: String(p.public_result_expiry_date || "").slice(0, 10),
     });
+    const pbtIds = (p.project_business_types || []).map((pbt: any) => pbt.business_type_id);
+    setSelectedBTIds(pbtIds);
+    setOpenToAll(p.open_to_all ?? pbtIds.length === 0);
     setShowModal(true);
   }
 
@@ -89,11 +88,11 @@ export default function AdminProjects() {
     }
     setIsSaving(true);
     try {
-      const payload = { title: form.title.trim(), budget: form.budget, deadline: form.deadline, procurement_type: form.procurement_type, technical_specifications: form.technical_specifications, delivery_period: Number(form.delivery_period) || 0, procurement_schedule: form.procurement_schedule || null, public_result_expiry_date: form.public_result_expiry_date || null };
+      const payload: any = { title: form.title.trim(), budget: form.budget, deadline: form.deadline, procurement_type: form.procurement_type, technical_specifications: form.technical_specifications, delivery_period: Number(form.delivery_period) || 0, procurement_schedule: form.procurement_schedule || null, public_result_expiry_date: form.public_result_expiry_date || null, open_to_all: openToAll, business_type_ids: openToAll ? [] : selectedBTIds };
       if (editing) await projectsAPI.update(editing.id, payload);
       else await projectsAPI.create(payload);
       setToast({ message: editing ? "Project updated" : "Project created", type: "success" });
-      setShowModal(false); fetchData();
+      setShowModal(false); setSelectedBTIds([]); setOpenToAll(true); fetchData();
     } catch { setToast({ message: "Failed to save", type: "error" }); }
     finally { setIsSaving(false); }
   }
@@ -102,7 +101,7 @@ export default function AdminProjects() {
     if (!publishTarget) return;
     setIsConfirmLoading(true);
     try { await projectsAPI.publish(publishTarget.id); setToast({ message: "Project published!", type: "success" }); fetchData(); }
-    catch { setToast({ message: "Failed to publish", type: "error" }); }
+    catch (err: any) { setToast({ message: err?.response?.data?.error || "Failed to publish", type: "error" }); }
     finally {
       setIsConfirmLoading(false);
       // notify other windows/tabs in this browser immediately
@@ -159,6 +158,7 @@ export default function AdminProjects() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Budget</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Deadline</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Eligible Types</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-400">Actions</th>
             </tr></thead>
@@ -169,6 +169,15 @@ export default function AdminProjects() {
                   <td className="px-6 py-4 text-sm text-slate-600">{formatPeso(p.budget)}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{p.deadline ? new Date(p.deadline).toLocaleDateString() : "\u2014"}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{p.procurement_type || "\u2014"}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className="flex flex-wrap gap-2">
+                      {p.open_to_all ? (
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">Open to All</span>
+                      ) : (p.project_business_types?.length ? p.project_business_types.map((pbt: any) => (
+                        <span key={pbt.business_type?.id || pbt.business_type?.name} className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">{pbt.business_type?.name}</span>
+                      )) : <span className="text-[11px] text-slate-500">No eligible types</span>)}
+                    </div>
+                  </td>
                   <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1.5">
@@ -201,6 +210,25 @@ export default function AdminProjects() {
             </select>
             <p className="mt-1 text-xs text-slate-400">Choose the exact category name used in supplier registration.</p>
           </label>
+          {/* Eligible Business Types */}
+          <div className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Eligible Supplier Business Types</span>
+            <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={openToAll} onChange={(e) => { setOpenToAll(e.target.checked); if (e.target.checked) setSelectedBTIds([]); }} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200" />
+              Open to All Business Types
+            </label>
+            {!openToAll && (
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                {businessTypes.map((bt) => (
+                  <label key={bt.id} className="flex items-center gap-2 text-xs text-slate-700">
+                    <input type="checkbox" checked={selectedBTIds.includes(bt.id)} onChange={(e) => setSelectedBTIds(e.target.checked ? [...selectedBTIds, bt.id] : selectedBTIds.filter((id) => id !== bt.id))} className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200" />
+                    {bt.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-slate-400">{openToAll ? "All verified suppliers will see this project." : "Only suppliers with matching business types will see this project."}</p>
+          </div>
           <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Technical Specifications</span><textarea value={form.technical_specifications} onChange={(e) => setForm({ ...form, technical_specifications: e.target.value })} className={inputClass} rows={3} placeholder="Describe requirements" /></label>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Period (days)</span><StrictNumberInput value={form.delivery_period} onChange={(value) => setForm({ ...form, delivery_period: value })} className={inputClass} min="0" required placeholder="Enter number of days" helperText="Numbers only. Use digits for the delivery period." /></label>

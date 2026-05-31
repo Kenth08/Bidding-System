@@ -47,7 +47,8 @@ export async function GET(request: Request) {
 
   const documents = SUPPLIER_DOCUMENT_DEFINITIONS.map((definition) => {
     const upload = latestByType.get(definition.id);
-    const uploaded = isDocumentUploaded(user as unknown as Record<string, unknown>, definition);
+    const hasUpload = Boolean(upload?.file);
+    const uploaded = isDocumentUploaded(user as unknown as Record<string, unknown>, definition) || hasUpload;
     const state = mapVerificationStatusToState(upload?.verification_status, uploaded);
     const userFile = normalizeDocumentFile((user as any)[definition.userField]);
     const uploadFile = normalizeDocumentFile(upload?.file);
@@ -74,20 +75,21 @@ export async function GET(request: Request) {
   const { verificationState: computedState } = buildVerificationState(documents);
   const accountStatus = String(user!.status || user!.verification_status || "");
   const accessState =
-    accountStatus === "verified"
+    accountStatus === "verified" || accountStatus === "approved" || accountStatus === "active"
       ? "verified"
-      : accountStatus === "revision_required"
-        ? "revision_required"
-        : "restricted";
+      : computedState === "verified"
+        ? "verified"
+        : accountStatus === "revision_required"
+          ? "revision_required"
+          : "restricted";
 
-  const flaggedRequired = documents.filter((doc) => doc.required && doc.state === "flagged");
-  const hasRequiredPendingReview = documents.some(
-    (doc) => doc.required && (doc.state === "revised" || doc.state === "uploaded")
-  );
+  const flaggedDocs = documents.filter((doc) => doc.state === "flagged");
+  const flaggedRequired = flaggedDocs.filter((doc) => doc.required);
+  const hasPendingReview = documents.some((doc) => doc.state === "revised" || doc.state === "uploaded");
   const canSubmitRevision =
     accessState === "revision_required" &&
-    flaggedRequired.length === 0 &&
-    hasRequiredPendingReview;
+    flaggedDocs.length === 0 &&
+    hasPendingReview;
 
   return json({
     accountLocked: workflow.account_locked,

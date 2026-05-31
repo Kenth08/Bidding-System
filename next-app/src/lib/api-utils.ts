@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { dbDirect } from "@/lib/db-direct";
+import { db } from "@/lib/db";
 import { getUserFromRequest, extractToken } from "@/lib/auth";
 import type { UserRole } from "@/types";
 
 export async function getAuthUser(request: Request) {
   const payload = await getUserFromRequest(request);
   if (!payload?.sub) return null;
-  const user = await dbDirect.user.findUnique({ id: payload.sub });
+  const user = await db.user.findUnique({ where: { id: payload.sub } });
   const tokenSessionVersion = typeof (payload as any).session_version === "number"
     ? (payload as any).session_version
     : null;
@@ -44,6 +44,15 @@ export async function requireRole(request: Request, ...roles: UserRole[]) {
   const { user, error } = await requireAuth(request);
   if (error) return { user: null, error };
   if (!roles.includes(user!.role as UserRole)) {
+    return { user: null, error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
+  }
+  return { user: user!, error: null };
+}
+
+export async function requireSupplierAuth(request: Request) {
+  const { user, error } = await requireAuth(request);
+  if (error) return { user: null, error };
+  if (user!.role !== "supplier") {
     return { user: null, error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
   }
   return { user: user!, error: null };

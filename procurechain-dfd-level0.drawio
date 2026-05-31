@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Electron" modified="2026-05-31T07:00:00Z" agent="5.0 (Windows NT 10.0; Win64; x64) draw.io/21.2.8" version="21.2.8" type="device">
+  <diagram id="dfd_level0_diagram" name="Level 0 DFD">
+    <mxGraphModel dx="1422" dy="926" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- External Entities (Rectangles - Yellow fill) -->
+        <mxCell id="ent_admin" value="System Administrator" style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="40" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent_school_head" value="School Head&#xa;(Procuring Entity)" style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="780" y="40" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent_supplier" value="Supplier" style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="750" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent_viewer" value="Public Viewer" style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="780" y="750" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Processes (Rounded Rectangles - Blue fill) -->
+        <mxCell id="proc_1" value="1.0&#xa;&#xa;User Registration &amp;&#xa;Verification" style="rounded=1;whiteSpace=wrap;html=1;arcSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="150" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="proc_2" value="2.0&#xa;&#xa;Project Management" style="rounded=1;whiteSpace=wrap;html=1;arcSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="540" y="150" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="proc_3" value="3.0&#xa;&#xa;Bid Submission" style="rounded=1;whiteSpace=wrap;html=1;arcSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="380" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="proc_4" value="4.0&#xa;&#xa;Bid Evaluation &amp;&#xa;Awarding" style="rounded=1;whiteSpace=wrap;html=1;arcSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="540" y="380" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="proc_5" value="5.0&#xa;&#xa;Blockchain Anchoring &amp;&#xa;Verification" style="rounded=1;whiteSpace=wrap;html=1;arcSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="410" y="610" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Data Stores (Gane & Sarson DFD Style: open right - Grey fill) -->
+        <mxCell id="store_d1" value="D1 | Users Database" style="shape=partialRectangle;right=0;left=1;top=1;bottom=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="40" y="270" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store_d2" value="D2 | Projects Database" style="shape=partialRectangle;right=0;left=1;top=1;bottom=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="800" y="270" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store_d3" value="D3 | Bids Database" style="shape=partialRectangle;right=0;left=1;top=1;bottom=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="40" y="510" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store_d4" value="D4 | Blockchain Records" style="shape=partialRectangle;right=0;left=1;top=1;bottom=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;align=center;verticalAlign=middle;fontStyle=1;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="800" y="510" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- DATA FLOWS (EDGES) -->
+
+        <!-- Process 1.0 Flows -->
+        <mxCell id="flow_p1_1" value="Registration Details" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.15;entryY=1;entryDx=0;entryDy=0;" parent="1" source="ent_supplier" target="proc_1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p1_2" value="Verification Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.15;exitY=0;exitDx=0;exitDy=0;entryX=0.85;entryY=1;entryDx=0;entryDy=0;" parent="1" source="proc_1" target="ent_admin" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p1_3" value="Review Decisions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="ent_admin" target="proc_1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p1_4" value="User Account Details" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="proc_1" target="store_d1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p1_5" value="Profile Status" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.85;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="store_d1" target="proc_1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="270" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="flow_p1_6" value="Verification Feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" parent="1" source="proc_1" target="ent_supplier" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Process 2.0 Flows -->
+        <mxCell id="flow_p2_1" value="Review Decisions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" parent="1" source="ent_admin" target="proc_2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_2" value="Review Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.15;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="proc_2" target="ent_admin" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_3" value="Procurement Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" parent="1" source="ent_school_head" target="proc_2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_4" value="Project &amp; Req Details" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="proc_2" target="store_d2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_5" value="Bidding Opportunities" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="proc_2" target="store_d2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_6" value="Bidding Ops &amp; Alerts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" parent="1" source="proc_2" target="ent_supplier" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_7" value="Procurement Updates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="proc_2" target="ent_school_head" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Process 3.0 Flows -->
+        <mxCell id="flow_p3_1" value="Bid Proposals" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" parent="1" source="ent_supplier" target="proc_3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p3_2" value="Supplier Verification" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="store_d1" target="proc_3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p3_3" value="Bid Details" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="proc_3" target="store_d3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p3_4" value="Bid Logs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.15;exitY=0;exitDx=0;exitDy=0;entryX=0.85;entryY=1;entryDx=0;entryDy=0;" parent="1" source="proc_3" target="store_d1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Process 4.0 Flows -->
+        <mxCell id="flow_p4_1" value="Award Decisions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" parent="1" source="ent_school_head" target="proc_4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p4_2" value="Project Details" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" parent="1" source="store_d2" target="proc_4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p4_3" value="Received Bids" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="store_d3" target="proc_4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p4_4" value="Award Outcomes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="proc_4" target="store_d3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p4_5" value="Project Award Status" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" parent="1" source="proc_4" target="store_d2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p4_6" value="Bidding Results &amp; Bids" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="proc_4" target="ent_school_head" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p4_7" value="Bidding Results" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="proc_4" target="ent_supplier" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Process 5.0 Flows -->
+        <mxCell id="flow_p5_1" value="Verification Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" parent="1" source="ent_viewer" target="proc_5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p5_2" value="Award Outcomes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="store_d3" target="proc_5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p5_3" value="Record Hash &amp; Winners" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="proc_5" target="store_d4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p5_4" value="Blockchain Hashes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.65;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="store_d4" target="proc_5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p5_5" value="Public Bidding Results" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="proc_5" target="ent_viewer" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p5_6" value="Verification Certificate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#333333;endArrow=block;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" parent="1" source="proc_5" target="ent_viewer" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

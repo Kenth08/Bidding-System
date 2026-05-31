@@ -72,7 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
 
   // mark supplier account status
-  await db.user.update({ where: { id }, data: { status: "revision_required" } });
+  await db.user.update({ where: { id }, data: { status: "revision_required", verification_status: "revision_required" } });
 
   const loginUrl = `${new URL(request.url).origin}/login`;
   const emailItems = flaggedRequiredRows.map((row: any) => ({

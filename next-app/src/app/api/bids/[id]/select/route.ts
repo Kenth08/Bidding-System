@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { requireRole, json } from "@/lib/api-utils";
 import { logAudit, notifySuppliers, notifyUser } from "@/lib/actions";
+import { createBidLog } from "@/lib/bid-log";
 import { publishEvent } from "@/lib/sse";
 import hashlib from "crypto";
 
@@ -13,25 +14,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const bid = await db.bid.findUnique({ where: { id }, include: { project: true, supplier: true } });
   if (!bid) return json({ error: "Bid not found" }, 404);
 
-  // Allow selecting a winner only when the bid is qualified (technical_compliance)
-  // or when the supplier account is verified. Qualification is the preferred
-  // gate for awarding; supplier verification is an alternate path.
-  if (!(bid.technical_compliance || bid.supplier?.verification_status === "verified")) {
-    return json({ error: "Cannot select winner. The bid must be qualified or the supplier must be verified before selecting a winner." }, 400);
+  // Allow selecting a winner only when the bid is qualified (technical_compliance=true).
+  // Unqualified bids cannot be selected as winner.
+  if (!bid.technical_compliance) {
+    return json({ error: "Cannot select winner. The bid must be qualified (technically compliant) before selecting a winner." }, 400);
   }
 
   // Only allow selecting a winner after bidding has closed.
-  if (bid.project.status !== "closed") {
+  // Auto-close the project if the deadline has passed but status wasn't updated yet.
+  if (bid.project.status === "active") {
+    const deadline = new Date(bid.project.deadline);
+    deadline.setHours(0, 0, 0, 0);
+    if (deadline < new Date()) {
+      await db.project.update({ where: { id: bid.project_id }, data: { status: "closed" } });
+    } else {
+      return json({ error: "Winner selection is only allowed after bidding is closed." }, 400);
+    }
+  } else if (bid.project.status !== "closed") {
     return json({ error: "Winner selection is only allowed after bidding is closed." }, 400);
   }
 
-  const existingWinner = await db.bid.findFirst({ where: { project_id: bid.project_id, status: "won", NOT: { id } } });
+  const existingWinner = await db.bid.findFirst({ where: { project_id: bid.project_id, status: "won", id: { not: id } } });
   if (existingWinner) {
     return json({ error: "Bidding is already completed for this project. A winner has already been selected." }, 400);
   }
 
   // Mark all other bids as lost
-  await db.bid.updateMany({ where: { project_id: bid.project_id, NOT: { id } }, data: { status: "lost" } });
+  await db.bid.updateMany({ where: { project_id: bid.project_id, id: { not: id } }, data: { status: "lost" } });
 
   // Mark this bid as won
   await db.bid.update({ where: { id }, data: { status: "won" } });
@@ -73,12 +82,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   await logAudit("SELECT_WINNER", user!.id, `Selected winner for ${bid.project.title}: ${bid.supplier.full_name}`, "bid", id);
+  await createBidLog({ projectId: bid.project_id, bidId: id, supplierId: bid.supplier_id, userId: user!.id, role: "admin", action: "WINNER_SELECTED", description: `${bid.supplier.full_name} selected as winner with bid of ₱${Number(bid.bid_amount).toLocaleString()}` });
 
   // Notify winner
   await notifyUser(bid.supplier_id, "bid_won", "Congratulations! Your Bid Won", `Your bid of ₱${Number(bid.bid_amount).toLocaleString()} was selected as the winner for ${bid.project.title}.`, "/supplier/bids", id);
 
   // Notify losers
-  const losingBids = await db.bid.findMany({ where: { project_id: bid.project_id, NOT: { id } }, include: { supplier: true } });
+  const losingBids = await db.bid.findMany({ where: { project_id: bid.project_id, id: { not: id } }, include: { supplier: true } });
   for (const lb of losingBids) {
     await notifyUser(lb.supplier_id, "bid_lost", "Bid Result", `Your bid for ${bid.project.title} was not selected. Thank you for participating.`, "/supplier/bids", lb.id);
   }
