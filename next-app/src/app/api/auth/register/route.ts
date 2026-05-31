@@ -80,6 +80,10 @@ export async function POST(request: Request) {
   if (!full_name || !email || !company_name || !representative_name || !tin || !company_profile) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
+  const tinDigits = tin.replace(/[-\s]/g, "");
+  if (!/^\d{9}$/.test(tinDigits) && !/^\d{12}$/.test(tinDigits)) {
+    return NextResponse.json({ error: "TIN must be 9 digits (individual) or 12 digits (corporate)." }, { status: 400 });
+  }
   if (!fromGoogle && (!password || password.length < 6)) {
     return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
   }

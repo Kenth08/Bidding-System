@@ -64,7 +64,7 @@ export default function SupplierResults() {
       fetch("/api/public/results").then((response) => (response.ok ? response.json() : [])),
     ])
       .then(([bidsResponse, publicResults]) => {
-        setBids(bidsResponse.data);
+        setBids(Array.isArray(bidsResponse.data) ? bidsResponse.data : bidsResponse.data?.results || []);
         setWinners(Array.isArray(publicResults) ? publicResults : []);
       })
       .catch(() => {})

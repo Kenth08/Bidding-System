@@ -155,7 +155,10 @@ function RegisterPageContent() {
         else if (form.password !== form.confirmPassword) errs.confirmPassword = "Passwords do not match.";
       }
       if (form.phone && !/^[0-9]+$/.test(String(form.phone).trim())) errs.phone = "Digits only.";
-      if (form.tin && !/^[0-9]+$/.test(String(form.tin).trim())) errs.tin = "Digits only.";
+      if (form.tin) {
+        const tinDigits = String(form.tin).replace(/[-\s]/g, "");
+        if (!/^\d{9}$/.test(tinDigits) && !/^\d{12}$/.test(tinDigits)) errs.tin = "Must be 9 digits (individual) or 12 digits (corporate). e.g. 123-456-789";
+      }
     } else if (s === 1) {
       reqFile("secDtiCertificate", "SEC/DTI Certificate required."); reqFile("mayorsPm", "Mayor's Permit required.");
       reqFile("philgepsRegistration", "PhilGEPS Registration required."); reqFile("validId", "Valid ID required.");
@@ -321,7 +324,8 @@ function RegisterPageContent() {
                         </label>
                         <label data-field="tin" className="block">
                           <span className="mb-1.5 block text-xs font-semibold text-slate-700">TIN <span className="text-red-400">*</span></span>
-                          <StrictNumberInput value={form.tin as string} onChange={(v) => updateForm("tin", v)} className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-2 ${validationErrors.tin ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} helperText="Numbers only." />
+                          <input type="text" value={form.tin as string} onChange={(e) => { const v = e.target.value.replace(/[^0-9-]/g, ""); updateForm("tin", v); }} placeholder="XXX-XXX-XXX" maxLength={14} className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-2 ${validationErrors.tin ? "border-red-300 focus:ring-red-100" : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"} bg-white`} />
+                          <p className="mt-1 text-xs text-slate-400">9 digits (individual) or 12 digits (corporate). e.g. 123-456-789</p>
                           {validationErrors.tin && <p className="mt-1 text-xs text-red-600">{validationErrors.tin}</p>}
                         </label>
                         <div className="md:col-span-2"><TextInput label="Representative Name" value={form.representativeName as string} onChange={(v) => updateForm("representativeName", v)} error={validationErrors.representativeName} fieldKey="representativeName" /></div>

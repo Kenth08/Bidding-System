@@ -32,6 +32,14 @@ export async function PATCH(request: Request) {
     if (body[key] !== undefined) data[key] = String(body[key]);
   }
 
+  // Validate TIN format if provided
+  if (data.tin) {
+    const tinDigits = data.tin.replace(/[-\s]/g, "");
+    if (!/^\d{9}$/.test(tinDigits) && !/^\d{12}$/.test(tinDigits)) {
+      return json({ error: "TIN must be 9 digits (individual) or 12 digits (corporate)." }, 400);
+    }
+  }
+
   // If client provided business_type_ids (array of ids or names), sync junction table
   if (Array.isArray(body.business_type_ids)) {
     const items: string[] = body.business_type_ids.map(String).filter(Boolean);
