@@ -135,11 +135,13 @@ npm run dev                  # http://localhost:3000
 
 ## Demo Accounts
 
-| Username   | Password   | Role     | Notes |
-|------------|------------|----------|-------|
-| `admin`    | `admin123` | Admin    | Django superuser — also access `/admin/` |
-| `head`     | `head123`  | Head     | |
-| `supplier` | `password123` | Supplier | Pre-verified demo account |
+| Username   | Role     | Notes |
+|------------|----------|-------|
+| `admin`    | Admin    | Django superuser — also access `/admin/` |
+| `head`     | Head     | |
+| `supplier` | Supplier | Pre-verified demo account |
+
+Passwords are set when running `python manage.py seed`. Check the seed command output or ask the system administrator for credentials.
 
 > **Note:** Admin and Head accounts log in with a plain username (not an email). To use Two-Factor Authentication, go to the **Security** page (dropdown in the top-right header) and set an MFA email address first.
 
