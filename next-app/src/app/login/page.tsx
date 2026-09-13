@@ -77,7 +77,7 @@ function LoginPageContent() {
         <ArrowLeft className="h-4 w-4" />Back to Home
       </button>
 
-      <div className="relative hidden min-h-screen w-[480px] flex-col overflow-hidden bg-slate-900 px-12 py-10 lg:flex" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "40px 40px" }}>
+      <div className="relative hidden min-h-screen w-120 flex-col overflow-hidden bg-slate-900 px-12 py-10 lg:flex" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "40px 40px" }}>
         <div className="pointer-events-none absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-500 opacity-[0.06] blur-3xl" />
         <div className="relative my-auto rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
           <div className="mb-6 flex items-center gap-3">

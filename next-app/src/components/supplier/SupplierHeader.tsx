@@ -23,7 +23,7 @@ function SupplierProfileDropdown({ user, onLogout, onOpenProfile, onOpenSettings
       </button>
       {isOpen ? (
         <div className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.12)]">
-          <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 to-emerald-50/60 px-4 py-4">
+          <div className="border-b border-slate-100 bg-linear-to-br from-slate-50 to-emerald-50/60 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-white">{avatarInitial}</div>
               <div><p className="text-sm font-semibold text-slate-900">{displayName}</p><p className="text-xs text-slate-400">{user?.email || "supplier@example.com"}</p><p className="text-xs text-slate-500">{user?.company_name || "-"}</p></div>

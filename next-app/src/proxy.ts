@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { createClient as refreshSupabaseSession } from "@/utils/supabase/middleware";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret-change-me");
 
@@ -12,17 +13,20 @@ const protectedPaths: Record<string, string[]> = {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const supabaseResponse = refreshSupabaseSession(request);
 
-  if (pathname.startsWith("/api")) return NextResponse.next();
+  if (pathname.startsWith("/api")) return supabaseResponse;
 
   const matchedPrefix = Object.keys(protectedPaths).find((p) => pathname.startsWith(p));
-  if (!matchedPrefix) return NextResponse.next();
+  if (!matchedPrefix) return supabaseResponse;
 
   const token = request.cookies.get("access_token")?.value
     || request.headers.get("authorization")?.replace("Bearer ", "");
 
   if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   try {
@@ -31,15 +35,19 @@ export async function proxy(request: NextRequest) {
     const allowedRoles = protectedPaths[matchedPrefix];
 
     if (!allowedRoles.includes(role)) {
-      return NextResponse.redirect(new URL("/", request.url));
+      const redirect = NextResponse.redirect(new URL("/", request.url));
+      supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+      return redirect;
     }
 
-    return NextResponse.next();
+    return supabaseResponse;
   } catch (err: any) {
     if (err?.code === "ERR_JWT_EXPIRED") {
-      return NextResponse.next();
+      return supabaseResponse;
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 }
 

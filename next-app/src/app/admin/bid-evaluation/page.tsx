@@ -149,7 +149,7 @@ function AdminBidEvaluationContent() {
         {projectsWithBids.length === 0 ? <EmptyState title="No projects with bids" subtitle="Bids will appear here once suppliers submit them." /> : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {projectsWithBids.map((p) => (
-              <button key={p.id} onClick={() => setSelectedProject(p.id)} className="group flex min-h-[190px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+              <button key={p.id} onClick={() => setSelectedProject(p.id)} className="group flex min-h-47.5 flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 ring-1 ring-emerald-100">

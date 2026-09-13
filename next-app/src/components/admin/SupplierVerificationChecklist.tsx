@@ -326,7 +326,7 @@ function DocumentChecklistRow({
     <div className="px-4 py-3">
       <div className="flex items-start gap-3">
         {/* Status Icon */}
-        <div className="mt-0.5 flex-shrink-0">
+        <div className="mt-0.5 shrink-0">
           {isExpired ? (
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
               <X className="h-4 w-4 text-red-600" />
@@ -369,7 +369,7 @@ function DocumentChecklistRow({
           {hasFile && !doc.fileValue?.includes("DECLARED") && (
             <div className="mt-2 flex items-center gap-1">
               <FileCheck className="h-4 w-4 text-slate-400" />
-              <a href={doc.fileValue} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
+              <a href={doc.fileValue ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
                 View Document
               </a>
             </div>
@@ -378,7 +378,7 @@ function DocumentChecklistRow({
 
         {/* Action Buttons */}
         {isEditing && (
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={onApprove}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-medium transition"
@@ -388,7 +388,7 @@ function DocumentChecklistRow({
               Approve
             </button>
             <button
-              onClick={() => setExpanded(!expanded)}
+              onClick={onExpand}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-medium transition"
               title="Flag this document for revision"
             >

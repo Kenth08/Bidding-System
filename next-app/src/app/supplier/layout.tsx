@@ -61,15 +61,15 @@ export default function SupplierLayout({ children }: { children: ReactNode }) {
     company_address: user.company_address,
     phone: user.phone,
     business_type: user.business_type,
-    representative_name: user.representative_name,
-    tin: user.tin,
+    representative_name: user.representative_name ?? undefined,
+    tin: user.tin ?? undefined,
     status: user.status,
   } : null;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <SupplierSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} />
-      <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-[248px]">
+      <div className="flex min-h-screen flex-col bg-slate-50 lg:pl-62">
         <SupplierHeader title={pageMeta.title} user={currentUser} setSidebarOpen={setSidebarOpen} onLogout={logout} onNotificationNavigate={handleNotificationNavigate} onOpenProfile={() => setShowProfileModal(true)} onOpenSettings={() => setShowSettingsModal(true)} />
         <main className="flex-1 p-6">{children}</main>
       </div>

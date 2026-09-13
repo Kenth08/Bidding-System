@@ -1,10 +1,10 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient({ adapter });
 
 const SEED_USERS = [

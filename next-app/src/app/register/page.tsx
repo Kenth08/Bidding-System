@@ -277,7 +277,7 @@ function RegisterPageContent() {
 
   return (
     <div className="relative min-h-screen bg-slate-50">
-      <div className="fixed left-0 top-0 hidden h-screen w-[480px] overflow-hidden bg-slate-900 lg:flex lg:flex-col px-12 py-10">
+      <div className="fixed left-0 top-0 hidden h-screen w-120 overflow-hidden bg-slate-900 lg:flex lg:flex-col px-12 py-10">
         <div className="absolute -left-20 bottom-10 h-64 w-64 rounded-full bg-emerald-500/10" />
         <div className="absolute -right-16 top-14 h-72 w-72 rounded-full bg-emerald-500/10" />
         <button
@@ -308,7 +308,7 @@ function RegisterPageContent() {
         </div>
       </div>
 
-      <div className="flex min-h-screen flex-1 items-center justify-center bg-white px-4 py-8 lg:ml-[480px] lg:px-12">
+      <div className="flex min-h-screen flex-1 items-center justify-center bg-white px-4 py-8 lg:ml-120 lg:px-12">
         <div className="w-full max-w-3xl rounded-2xl border border-slate-100 bg-white p-8">
           <button
             type="button"
