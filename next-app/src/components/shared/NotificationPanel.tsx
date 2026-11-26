@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Award, Bell, Briefcase, CheckCircle, FileText, FolderOpen, Handshake, LucideIcon, RotateCcw, Shield, Users, X } from "lucide-react";
+import { AlertCircle, Award, Bell, Briefcase, CalendarX, CheckCircle, Clock, FileText, FileWarning, FolderOpen, Handshake, Lock, LucideIcon, RotateCcw, Shield, Users, X } from "lucide-react";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { notificationsAPI } from "@/services/api";
 
@@ -22,6 +22,12 @@ const ICON_MAP: Record<string, { icon: LucideIcon; bg: string; color: string }> 
   supplier_documents_flagged: { icon: AlertCircle, bg: "bg-amber-50", color: "text-amber-600" },
   supplier_document_resubmitted: { icon: RotateCcw, bg: "bg-blue-50", color: "text-blue-600" },
   supplier_documents_approved: { icon: CheckCircle, bg: "bg-emerald-50", color: "text-emerald-600" },
+  // From the scheduled (cron) jobs
+  bidding_closed: { icon: Lock, bg: "bg-slate-100", color: "text-slate-500" },
+  deadline_reminder: { icon: Clock, bg: "bg-amber-50", color: "text-amber-500" },
+  document_expiring: { icon: FileWarning, bg: "bg-amber-50", color: "text-amber-600" },
+  document_expired: { icon: FileWarning, bg: "bg-red-50", color: "text-red-500" },
+  result_expired: { icon: CalendarX, bg: "bg-slate-100", color: "text-slate-500" },
 };
 
 function timeAgo(dateStr: string) {
