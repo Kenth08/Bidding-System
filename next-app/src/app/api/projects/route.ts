@@ -4,6 +4,7 @@ import { requireAuth, requireRole, json } from "@/lib/api-utils";
 import { logAudit } from "@/lib/actions";
 import { createBidLog } from "@/lib/bid-log";
 import { canSupplierAccessProject } from "@/lib/project-access";
+import { closeExpiredProjects } from "@/lib/scheduled-jobs";
 
 export async function GET(request: Request) {
   const { user, error } = await requireAuth(request);
@@ -14,11 +15,13 @@ export async function GET(request: Request) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Auto-close expired active projects
-  await db.project.updateMany({
-    where: { status: "active", deadline: { lt: today }, is_archived: false },
-    data: { status: "closed" },
-  });
+  // Auto-close expired active projects (same job the cron scheduler runs, so
+  // notifications and logs are sent once, whichever runs first).
+  try {
+    await closeExpiredProjects();
+  } catch (e) {
+    console.error("[projects] auto-close failed", e);
+  }
 
   let where: Record<string, unknown> = { is_archived: false };
 

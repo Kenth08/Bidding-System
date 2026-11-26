@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Activity, ArrowRight, FileText, FolderOpen, Trophy } from "lucide-react";
 import { dashboardAPI, projectsAPI } from "@/services/api";
 import StatCard from "@/components/shared/StatCard";
+import ScheduledJobsCard from "@/components/admin/ScheduledJobsCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 
 function formatPeso(v: unknown) { return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Number(v || 0)); }
@@ -99,6 +100,7 @@ export default function AdminDashboard() {
             </ul>
           )}
         </div>
+        <ScheduledJobsCard />
       </div>
     </div>
   );

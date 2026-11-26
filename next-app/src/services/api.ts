@@ -136,6 +136,12 @@ export const auditLogAPI = {
   getAll: () => api.get("/projects/audit-logs"),
 };
 
+export const cronAPI = {
+  // Admin only — scheduler status and the "Run now" button
+  getStatus: () => api.get("/cron/scheduled-jobs"),
+  runNow: () => api.post("/cron/scheduled-jobs"),
+};
+
 export const reportsAPI = {
   getProcurement: () => api.get("/reports/procurement"),
   getSuppliers: () => api.get("/reports/suppliers"),

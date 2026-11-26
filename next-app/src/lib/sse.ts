@@ -1,5 +1,8 @@
-const clients: Map<number, { controller: ReadableStreamDefaultController<Uint8Array> }> = new Map();
-let seq = 1;
+// Kept on globalThis so events published from the cron scheduler (bundled
+// separately from route handlers) reach the same connected clients.
+const g = globalThis as unknown as { __sseClients?: Map<number, { controller: ReadableStreamDefaultController<Uint8Array> }> };
+const clients = (g.__sseClients ??= new Map());
+let seq = Date.now();
 
 function encode(data: string) {
   return new TextEncoder().encode(data);
